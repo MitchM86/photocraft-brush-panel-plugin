@@ -27,11 +27,47 @@ use crate::{Error, Sample, Update, deliver};
 /// `XIAllDevices`: select for every device, slaves included.
 const ALL_DEVICES: u16 = 0;
 
+/// A slave pointer device as `XIQueryDevice` reports it, every valuator kept (for [`Raw`]).
+#[derive(Clone, Debug, PartialEq)]
+pub struct RawDevice {
+    pub id: u16,
+    pub name: String,
+    /// Each valuator's (number, label, min, max).
+    pub valuators: Vec<(u16, String, f64, f64)>,
+}
+
+/// Which raw event a [`Raw::Event`] was.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RawKind {
+    Motion,
+    Press,
+    Release,
+}
+
+/// What the server sent, before any mapping: for diagnosing pen input ([`spawn_traced`]).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Raw {
+    /// The device list, read on start and on every hierarchy or device change.
+    Devices(Vec<RawDevice>),
+    /// A raw event: server time in milliseconds, slave device, button (`detail`, 0 for motion)
+    /// and the valuators it carries (all of them, not only the pen axes).
+    Event { time_ms: u32, device: u16, kind: RawKind, button: u32, valuators: Vec<(u16, f64)> },
+}
+
+/// Diagnostics callback of [`spawn_traced`].
+pub type Trace = Box<dyn Fn(&Raw) + Send + 'static>;
+
 /// Start listening on `display` (`None` = `$DISPLAY`, the display winit uses). The connection
 /// and the XI2 version are checked before this returns; events are then read on a background
 /// thread that calls `callback` with `Some(sample)` for pen events and `None` when another
 /// pointer moves. The thread ends when the X connection closes.
 pub fn spawn(display: Option<&str>, callback: impl Fn(Option<Sample>) + Send + 'static) -> Result<JoinHandle<()>, Error> {
+    spawn_traced(display, callback, None)
+}
+
+/// [`spawn`], also handing every raw event and device list to `trace` (on the reader thread,
+/// before the event is mapped). Without a trace nothing extra is collected.
+pub fn spawn_traced(display: Option<&str>, callback: impl Fn(Option<Sample>) + Send + 'static, trace: Option<Trace>) -> Result<JoinHandle<()>, Error> {
     let (conn, screen) = RustConnection::connect(display).map_err(|e| Error::Unsupported(format!("cannot connect to the X server: {e}")))?;
     let root = conn.setup().roots.get(screen).map(|s| s.root).ok_or_else(|| Error::Platform(format!("X screen {screen} not found")))?;
     // Raw events for everyone (not just the grabbing client) need XI 2.1; ask for 2.2.
@@ -46,36 +82,56 @@ pub fn spawn(display: Option<&str>, callback: impl Fn(Option<Sample>) + Send + '
         .check()
         .map_err(|e| Error::Platform(format!("XISelectEvents: {e}")))?;
     let mut state = State::default();
-    state.set_devices(query_devices(&conn));
+    set_devices(&conn, &mut state, trace.as_ref());
     std::thread::Builder::new()
         .name("photocraft-tablet-x11".into())
-        .spawn(move || run(&conn, &mut state, &callback))
+        .spawn(move || run(&conn, &mut state, &callback, trace.as_ref()))
         .map_err(|e| Error::Platform(format!("cannot start the tablet thread: {e}")))
 }
 
-fn run(conn: &RustConnection, state: &mut State, callback: &dyn Fn(Option<Sample>)) {
+fn run(conn: &RustConnection, state: &mut State, callback: &dyn Fn(Option<Sample>), trace: Option<&Trace>) {
     // A connection error (the display went away) ends the loop; malformed events are skipped by
     // x11rb's parser and by the bounds in `xi`.
     while let Ok(event) = conn.wait_for_event() {
-        let update = match event {
-            Event::XinputRawMotion(e) | Event::XinputRawButtonPress(e) | Event::XinputRawButtonRelease(e) => {
-                let values: Vec<f64> = e.axisvalues.iter().map(|v| fp3232(v.integral, v.frac)).collect();
-                state.handle(e.deviceid, valuators(&e.valuator_mask, &values))
-            }
+        let raw = match event {
+            Event::XinputRawMotion(e) => Some((RawKind::Motion, e)),
+            Event::XinputRawButtonPress(e) => Some((RawKind::Press, e)),
+            Event::XinputRawButtonRelease(e) => Some((RawKind::Release, e)),
             Event::XinputHierarchy(_) | Event::XinputDeviceChanged(_) => {
-                state.set_devices(query_devices(conn));
-                Update::Keep
+                set_devices(conn, state, trace);
+                None
             }
-            _ => Update::Keep,
+            _ => None,
         };
-        if let Update::Set(sample) = update {
+        let Some((kind, e)) = raw else { continue };
+        let values: Vec<f64> = e.axisvalues.iter().map(|v| fp3232(v.integral, v.frac)).collect();
+        if let Some(t) = trace {
+            let valuators = valuators(&e.valuator_mask, &values).collect();
+            let button = if kind == RawKind::Motion { 0 } else { e.detail };
+            send_trace(t, &Raw::Event { time_ms: e.time, device: e.deviceid, kind, button, valuators });
+        }
+        if let Update::Set(sample) = state.handle(e.deviceid, valuators(&e.valuator_mask, &values)) {
             deliver(callback, sample);
         }
     }
 }
 
-/// The slave pointer devices with their pen valuators (empty on any error).
-fn query_devices(conn: &RustConnection) -> Vec<Device> {
+/// Re-read the device list into `state` (and the trace).
+fn set_devices(conn: &RustConnection, state: &mut State, trace: Option<&Trace>) {
+    let devices = query_devices(conn);
+    state.set_devices(devices.iter().map(|d| Device::new(d.id, &d.name, d.valuators.iter().cloned())));
+    if let Some(t) = trace {
+        send_trace(t, &Raw::Devices(devices));
+    }
+}
+
+/// Run the trace callback without letting a panic end the reader thread.
+fn send_trace(trace: &Trace, raw: &Raw) {
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| trace(raw)));
+}
+
+/// The slave pointer devices with all their valuators (empty on any error).
+fn query_devices(conn: &RustConnection) -> Vec<RawDevice> {
     let Ok(reply) = conn.xinput_xi_query_device(ALL_DEVICES).map_err(drop).and_then(|c| c.reply().map_err(drop)) else { return Vec::new() };
     let mut out = Vec::new();
     for info in reply.infos.iter().take(crate::xi::MAX_DEVICES) {
@@ -90,7 +146,7 @@ fn query_devices(conn: &RustConnection) -> Vec<Device> {
             }
             _ => None,
         });
-        out.push(Device::new(info.deviceid, &name, valuators.collect::<Vec<_>>()));
+        out.push(RawDevice { id: info.deviceid, name: name.into_owned(), valuators: valuators.collect() });
     }
     out
 }

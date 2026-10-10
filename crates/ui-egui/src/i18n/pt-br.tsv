@@ -2853,3 +2853,10 @@ fontWeight	Italic	Itálico
 	Previous Document	Documento anterior
 	W x H x Resolution	L x A x Resolução
 	Front Image	Imagem frontal
+	Always use pressure for flow	Sempre usar a pressão para o fluxo
+	Pressure for Flow	Pressão para o fluxo
+	Size Pressure Curve	Curva de pressão: tamanho
+	Opacity Pressure Curve	Curva de pressão: opacidade
+	Flow Pressure Curve	Curva de pressão: fluxo
+	Basic Smoothing (Krita)	Suavização básica (Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	Une as amostras da caneta com curvas em vez de linhas retas, sem atraso

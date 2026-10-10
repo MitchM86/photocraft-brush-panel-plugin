@@ -2404,3 +2404,10 @@ fontWeight	Italic	斜體
 	Previous Document	上一個文件
 	W x H x Resolution	寬 x 高 x 解析度
 	Front Image	前面的影像
+	Always use pressure for flow	一律以壓力控制流量
+	Pressure for Flow	流量的壓力
+	Size Pressure Curve	大小壓力曲線
+	Opacity Pressure Curve	不透明度壓力曲線
+	Flow Pressure Curve	流量壓力曲線
+	Basic Smoothing (Krita)	基本平滑(Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	以曲線而非直線連接筆的取樣點,無延遲

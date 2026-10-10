@@ -3005,3 +3005,10 @@ fontWeight	Italic	기울임
 	Previous Document	이전 문서
 	W x H x Resolution	폭 x 높이 x 해상도
 	Front Image	전면 이미지
+	Always use pressure for flow	흐름에 항상 필압 사용
+	Pressure for Flow	흐름에 필압 사용
+	Size Pressure Curve	크기 필압 곡선
+	Opacity Pressure Curve	불투명도 필압 곡선
+	Flow Pressure Curve	흐름 필압 곡선
+	Basic Smoothing (Krita)	기본 보정(Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	펜 샘플을 직선 대신 곡선으로 연결합니다(지연 없음)

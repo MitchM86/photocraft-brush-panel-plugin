@@ -335,6 +335,7 @@ fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 ui.add_enabled_ui(on, |ui| section_body(ui, &mut b, section, &app.session.tools.presets, app.session.tools.current_preset.as_deref()))
                     .inner
                     .inspect(|name| run_or_status(app, "brush.presets.setCurrent", json!({ "name": name })));
+                crate::brush_sections::response_curves(ui, &mut b, section);
             });
         });
     });

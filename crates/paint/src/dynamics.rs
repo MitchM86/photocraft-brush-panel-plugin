@@ -6,7 +6,8 @@
 
 use photocraft_geom::Point;
 
-use crate::brush::{BrushSettings, Control, Dynamic, Smoothing};
+use crate::brush::{BrushSettings, Control, Dynamic, PressureResponse, Smoothing};
+use crate::curve::ResponseCurve;
 use crate::rng::{rand_signed, rand01, stream};
 use crate::{Dab, StrokePoint};
 
@@ -18,6 +19,9 @@ pub const SMOOTHING_STEP_MS: f64 = 16.0;
 /// With Spacing unchecked, one dab per this many milliseconds of stroke time, so faster strokes
 /// space their dabs further apart (Photoshop: "the speed of the cursor determines the spacing").
 pub const SPEED_SPACING_MS: f64 = 8.0;
+
+/// Dabs narrower than this (pixels) aren't painted (Krita's `checkSizeTooSmall`).
+pub const MIN_DAB_DIAMETER: f32 = 0.01;
 
 /// Densest speed spacing, in pixels between dabs (a slow, long stroke never floods the buffer).
 const MIN_SPEED_STEP: f64 = 0.5;
@@ -139,6 +143,174 @@ impl Smoother {
     }
 }
 
+/// Bézier pieces flatter than this (control-point distance from the chord, in pixels) are drawn
+/// as straight lines.
+const CURVE_FLATNESS: f64 = 0.5;
+/// Subdivision depth limit per segment (at most 2^depth pieces), against hostile input.
+const CURVE_MAX_DEPTH: u32 = 12;
+
+/// Krita's Basic smoothing: input points are joined by cubic Bézier curves instead of straight
+/// lines, with each control point set from the pointer's velocity at both ends of the segment,
+/// so a fast stroke whose samples are far apart stays round instead of polygonal. Pressure, tilt
+/// and the other channels mix along each curve. It doesn't lag behind the pen: the segment
+/// before the newest point is drawn once the point after it is known (its end tangent needs
+/// it), and [`Self::finish`] draws the last one.
+#[derive(Clone, Debug, Default)]
+pub struct CurveSmoother {
+    /// The point before `previous`: where the next segment starts.
+    older: Option<StrokePoint>,
+    previous: Option<StrokePoint>,
+    /// Velocity at `older` (pixels per millisecond, or per point without timestamps).
+    tangent: Option<(f64, f64)>,
+    /// Where the output has got to.
+    drawn: Option<(f64, f64)>,
+}
+
+impl CurveSmoother {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Velocity from `a` to `b` (Krita divides by at least one millisecond).
+    fn velocity(a: &StrokePoint, b: &StrokePoint) -> (f64, f64) {
+        let dt = (b.time - a.time).max(1.0);
+        let dt = if dt.is_finite() { dt } else { 1.0 };
+        ((b.x - a.x) / dt, (b.y - a.y) / dt)
+    }
+
+    /// Feed one input point; appends the points to paint through.
+    pub fn push(&mut self, p: StrokePoint, out: &mut Vec<StrokePoint>) {
+        let Some(prev) = self.previous else {
+            self.previous = Some(p);
+            self.emit(p, out);
+            return;
+        };
+        match (self.tangent, self.older) {
+            (Some(t1), Some(older)) => {
+                let t2 = Self::velocity(&older, &p);
+                self.segment(older, prev, t1, t2, out);
+                self.tangent = Some(t2);
+            }
+            _ => self.tangent = Some(Self::velocity(&prev, &p)),
+        }
+        self.older = Some(prev);
+        self.previous = Some(p);
+    }
+
+    /// End of stroke: the last segment, with the velocity along it as its end tangent.
+    pub fn finish(&mut self, out: &mut Vec<StrokePoint>) {
+        if let (Some(t1), Some(older), Some(prev)) = (self.tangent.take(), self.older, self.previous) {
+            let t2 = Self::velocity(&older, &prev);
+            self.segment(older, prev, t1, t2, out);
+        }
+    }
+
+    /// Is a segment waiting for the next point? While the pen is held still, feeding its point
+    /// again draws it.
+    pub fn pending(&self) -> bool {
+        match (self.previous, self.drawn) {
+            (Some(p), Some(d)) => p.x != d.0 || p.y != d.1,
+            _ => false,
+        }
+    }
+
+    fn emit(&mut self, p: StrokePoint, out: &mut Vec<StrokePoint>) {
+        self.drawn = Some((p.x, p.y));
+        out.push(p);
+    }
+
+    /// Krita's `paintBezierSegment`: control points from the tangents at both ends.
+    fn segment(&mut self, a: StrokePoint, b: StrokePoint, t1: (f64, f64), t2: (f64, f64), out: &mut Vec<StrokePoint>) {
+        let len = |v: (f64, f64)| v.0.hypot(v.1);
+        let (v1, v2) = (len(t1), len(t2));
+        if !(v1 > 0.0 && v2 > 0.0 && v1.is_finite() && v2.is_finite()) {
+            // A still or reversing pointer has no direction to curve along.
+            self.emit(b, out);
+            return;
+        }
+        let (p1, p2) = ((a.x, a.y), (b.x, b.y));
+        let dir1 = (p1.0 + t1.0, p1.1 + t1.1);
+        let dir2 = (p2.0 - t2.0, p2.1 - t2.1);
+        let chord = len((p2.0 - p1.0, p2.1 - p1.1));
+        let (target1, target2) = if segments_cross(dir1, dir2, p1, p2) {
+            // The control directions point to opposite sides of the chord: go half the chord
+            // along each tangent.
+            let h = chord / 2.0;
+            ((p1.0 + t1.0 / v1 * h, p1.1 + t1.1 / v1 * h), (p2.0 - t2.0 / v2 * h, p2.1 - t2.1 / v2 * h))
+        } else {
+            // Both towards where the tangent lines meet (the chord's middle if they don't).
+            let mid = ((p1.0 + p2.0) / 2.0, (p1.1 + p2.1) / 2.0);
+            let x = lines_meet(p1, dir1, p2, dir2).filter(|q| q.0.abs() + q.1.abs() <= 1e6).unwrap_or(mid);
+            (x, x)
+        };
+        // How far towards the targets the controls go: less when both ends move at the same
+        // speed (avoids corner-like curves), the slower end scaled by the speed ratio.
+        let similarity = (v1 / v2).min(v2 / v1).max(0.5);
+        let mut coeff = 0.8 * (1.0 - (similarity - 0.8).max(0.0));
+        let toward = |p: (f64, f64), t: (f64, f64), k: f64| (p.0 * (1.0 - k) + k * t.0, p.1 * (1.0 - k) + k * t.1);
+        let (c1, c2) = if v1 > v2 {
+            let c1 = toward(p1, target1, coeff);
+            coeff *= similarity;
+            (c1, toward(p2, target2, coeff))
+        } else {
+            let c2 = toward(p2, target2, coeff);
+            coeff *= similarity;
+            (toward(p1, target1, coeff), c2)
+        };
+        self.bezier(a, c1, c2, b, 0, out);
+    }
+
+    /// Krita's `paintBezierCurve`: midpoint subdivision until each piece is flat; the channels
+    /// mix halfway at every split.
+    fn bezier(&mut self, a: StrokePoint, c1: (f64, f64), c2: (f64, f64), b: StrokePoint, depth: u32, out: &mut Vec<StrokePoint>) {
+        let (d1, d2) = (line_distance((a.x, a.y), (b.x, b.y), c1), line_distance((a.x, a.y), (b.x, b.y), c2));
+        if depth >= CURVE_MAX_DEPTH || !(d1 >= CURVE_FLATNESS || d2 >= CURVE_FLATNESS) {
+            self.emit(b, out);
+            return;
+        }
+        let half = |p: (f64, f64), q: (f64, f64)| ((p.0 + q.0) / 2.0, (p.1 + q.1) / 2.0);
+        let l2 = half((a.x, a.y), c1);
+        let h = half(c1, c2);
+        let l3 = half(l2, h);
+        let r3 = half(c2, (b.x, b.y));
+        let r2 = half(h, r3);
+        let l4 = half(l3, r2);
+        let mid = StrokePoint { x: l4.0, y: l4.1, ..lerp_pt(&a, &b, 0.5) };
+        self.bezier(a, l2, l3, mid, depth + 1, out);
+        self.bezier(mid, r2, r3, b, depth + 1, out);
+    }
+}
+
+/// Do the segments `a1`–`a2` and `b1`–`b2` intersect (endpoints included)?
+fn segments_cross(a1: (f64, f64), a2: (f64, f64), b1: (f64, f64), b2: (f64, f64)) -> bool {
+    let cross = |o: (f64, f64), p: (f64, f64), q: (f64, f64)| (p.0 - o.0) * (q.1 - o.1) - (p.1 - o.1) * (q.0 - o.0);
+    let (d1, d2) = (cross(b1, b2, a1), cross(b1, b2, a2));
+    let (d3, d4) = (cross(a1, a2, b1), cross(a1, a2, b2));
+    d1 * d2 <= 0.0 && d3 * d4 <= 0.0 && !(d1 == 0.0 && d2 == 0.0)
+}
+
+/// Where the line through `p1` and `q1` meets the line through `p2` and `q2` (`None`: parallel).
+fn lines_meet(p1: (f64, f64), q1: (f64, f64), p2: (f64, f64), q2: (f64, f64)) -> Option<(f64, f64)> {
+    let (r, s) = ((q1.0 - p1.0, q1.1 - p1.1), (q2.0 - p2.0, q2.1 - p2.1));
+    let den = r.0 * s.1 - r.1 * s.0;
+    if den.abs() < 1e-12 || !den.is_finite() {
+        return None;
+    }
+    let t = ((p2.0 - p1.0) * s.1 - (p2.1 - p1.1) * s.0) / den;
+    let x = (p1.0 + r.0 * t, p1.1 + r.1 * t);
+    (x.0.is_finite() && x.1.is_finite()).then_some(x)
+}
+
+/// Distance of `p` from the line through `a` and `b` (from `a` when they coincide).
+fn line_distance(a: (f64, f64), b: (f64, f64), p: (f64, f64)) -> f64 {
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    let l = dx.hypot(dy);
+    if l < 1e-12 {
+        return (p.0 - a.0).hypot(p.1 - a.1);
+    }
+    ((p.0 - a.0) * dy - (p.1 - a.1) * dx).abs() / l
+}
+
 /// Smooth a whole point list with the brush's smoothing settings.
 pub fn smooth_points(cfg: &Smoothing, zoom: f32, pts: &[StrokePoint]) -> Vec<StrokePoint> {
     let mut s = Smoother::new(cfg, zoom);
@@ -147,7 +319,16 @@ pub fn smooth_points(cfg: &Smoothing, zoom: f32, pts: &[StrokePoint]) -> Vec<Str
         s.push(*p, &mut out);
     }
     s.finish(&mut out);
-    out
+    if !cfg.curves {
+        return out;
+    }
+    let mut c = CurveSmoother::new();
+    let mut curved = Vec::with_capacity(out.len() * 2);
+    for p in out {
+        c.push(p, &mut curved);
+    }
+    c.finish(&mut curved);
+    curved
 }
 
 // ---------------------------------------------------------------------------
@@ -329,14 +510,28 @@ pub fn control_angle(c: Control, fade_steps: u32, s: &StepInput) -> f32 {
     }
 }
 
+/// [`control_value`] with Pen Pressure through the setting's response curve
+/// ([`crate::PressureResponse`]); other controls are unchanged.
+pub fn curved_control_value(c: Control, fade_steps: u32, s: &StepInput, curve: Option<(&PressureResponse, &ResponseCurve)>) -> f32 {
+    match (c, curve) {
+        (Control::PenPressure, Some((resp, curve))) => resp.eval(curve, s.point.pressure),
+        _ => control_value(c, fade_steps, s),
+    }
+}
+
 /// A 0..1 multiplier from a dynamic: control lerps from `minimum` to 1, jitter reduces randomly,
 /// never below `minimum`.
 fn scalar(d: &Dynamic, s: &StepInput, r: f32) -> f32 {
+    curved_scalar(d, s, r, None)
+}
+
+/// [`scalar`] with Pen Pressure through `curve` (`None`: linear).
+fn curved_scalar(d: &Dynamic, s: &StepInput, r: f32, curve: Option<(&PressureResponse, &ResponseCurve)>) -> f32 {
     if !d.is_active() {
         return 1.0;
     }
     let min = d.minimum.clamp(0.0, 1.0);
-    let cv = control_value(d.control, d.fade_steps, s);
+    let cv = curved_control_value(d.control, d.fade_steps, s, curve);
     let v = (min + (1.0 - min) * cv) * (1.0 - d.jitter.clamp(0.0, 1.0) * r);
     v.max(min)
 }
@@ -394,11 +589,12 @@ pub fn dynamic_color(b: &BrushSettings, s: &StepInput, seed: u64, index: u64) ->
 pub fn base_diameter(b: &BrushSettings, s: &StepInput) -> f32 {
     let sd = &b.shape_dynamics;
     let mut f = 1.0;
+    let resp = &b.pressure_response;
     if sd.enabled && sd.size.control != Control::Off {
         let min = sd.size.minimum.clamp(0.0, 1.0);
-        f = min + (1.0 - min) * control_value(sd.size.control, sd.size.fade_steps, s);
+        f = min + (1.0 - min) * curved_control_value(sd.size.control, sd.size.fade_steps, s, Some((resp, &resp.size)));
     } else if b.pressure_size {
-        f = s.point.pressure.clamp(0.0, 1.0);
+        f = resp.eval(&resp.size, s.point.pressure);
     }
     b.size * f
 }
@@ -420,6 +616,12 @@ impl DabBuilder {
 
     pub fn step_len(&self, p: &StrokePoint) -> f64 {
         let s = StepInput { point: *p, direction: 0.0, initial_direction: 0.0, step: 0 };
+        if let Some(coeff) = self.brush.auto_spacing.filter(|c| c.is_finite() && *c > 0.0) {
+            // Krita's `calcAutoSpacing`: proportional under a pixel, then with √diameter.
+            let d = base_diameter(&self.brush, &s).max(0.0);
+            let step = coeff.min(10.0) * if d < 1.0 { d } else { d.sqrt() };
+            return f64::from(step).max(0.1);
+        }
         let d = base_diameter(&self.brush, &s).max(1.0);
         f64::from(d * self.brush.spacing.max(0.01)).max(0.5)
     }
@@ -478,6 +680,15 @@ impl DabBuilder {
                     }
                 }
             }
+            // Krita's `checkSizeTooSmall`: a dab narrower than MIN_DAB_DIAMETER isn't painted,
+            // and one under a pixel covers a pixel at most at the coverage of its real width
+            // (Krita renders it sub-pixel): its opacity ceiling, so the many overlapping dabs of a
+            // thin line can't build it up past that. A lift-off tail then fades out instead of
+            // trailing a solid hairline. The Pencil (aliased) stays hard.
+            if diameter.is_nan() || diameter < MIN_DAB_DIAMETER {
+                continue;
+            }
+            let coverage = if b.aliased { 1.0 } else { diameter.min(1.0) };
             let radius = (diameter / 2.0).max(0.5);
             // Scatter.
             let mut c = Point::new(s.point.x, s.point.y);
@@ -497,14 +708,18 @@ impl DabBuilder {
             }
             // Transfer.
             let tr = &b.transfer;
+            let resp = &b.pressure_response;
             let (mut opacity, mut flow) = (1.0, b.flow);
             if tr.enabled {
-                opacity = scalar(&tr.opacity, s, r(stream::OPACITY));
-                flow *= scalar(&tr.flow, s, r(stream::FLOW));
+                opacity = curved_scalar(&tr.opacity, s, r(stream::OPACITY), Some((resp, &resp.opacity)));
+                flow *= curved_scalar(&tr.flow, s, r(stream::FLOW), Some((resp, &resp.flow)));
             }
             let (wet, mix) = if tr.enabled { (scalar(&tr.wetness, s, r(stream::WET)), scalar(&tr.mix, s, r(stream::MIX))) } else { (1.0, 1.0) };
             if b.pressure_opacity && !(tr.enabled && tr.opacity.control != Control::Off) {
-                opacity *= s.point.pressure.clamp(0.0, 1.0);
+                opacity *= resp.eval(&resp.opacity, s.point.pressure);
+            }
+            if b.pressure_flow && !(tr.enabled && tr.flow.control != Control::Off) {
+                flow *= resp.eval(&resp.flow, s.point.pressure);
             }
             // Colour.
             let color = if b.color_dynamics.enabled {
@@ -524,7 +739,7 @@ impl DabBuilder {
                 roundness,
                 flip_x: fx,
                 flip_y: fy,
-                opacity: opacity.clamp(0.0, 1.0),
+                opacity: (opacity * coverage).clamp(0.0, 1.0),
                 color,
                 depth,
                 index: i,
@@ -614,6 +829,8 @@ pub fn apply_pose(b: &BrushSettings, mut p: StrokePoint) -> StrokePoint {
 #[derive(Clone, Debug)]
 pub struct DabGenerator {
     smoother: Smoother,
+    /// Krita's Basic smoothing after the smoother (`Smoothing::curves`).
+    curves: Option<CurveSmoother>,
     walker: PathWalker,
     dual_walker: Option<PathWalker>,
     builder: DabBuilder,
@@ -625,7 +842,7 @@ impl DabGenerator {
     /// Does the stroke change with time while the pointer is held still (airbrush Build-up, or
     /// smoothing still catching up)? The canvas then keeps feeding it the held point.
     pub fn wants_time(&self) -> bool {
-        self.walker.interval.is_some() || self.smoother.lagging()
+        self.walker.interval.is_some() || self.smoother.lagging() || self.curves.as_ref().is_some_and(CurveSmoother::pending)
     }
 
     pub fn new(brush: &BrushSettings, zoom: f32) -> Self {
@@ -634,6 +851,7 @@ impl DabGenerator {
         let dual_on = brush.dual_brush.enabled;
         Self {
             smoother: Smoother::new(&brush.smoothing, zoom),
+            curves: brush.smoothing.curves.then(CurveSmoother::new),
             walker: if brush.spacing_enabled { PathWalker::new(interval) } else { PathWalker::new(interval).speed_spacing(SPEED_SPACING_MS) },
             dual_walker: dual_on.then(|| PathWalker::new(None)),
             builder: DabBuilder::new(&brush),
@@ -670,14 +888,30 @@ impl DabGenerator {
         for p in pts {
             self.smoother.push(*p, &mut sm);
         }
+        let sm = self.curve(sm, false);
         self.walk(&sm, dabs, dual);
         self.scratch = sm;
+    }
+
+    /// The smoother's output through Krita's Basic smoothing when it's on (`end`: the stroke's
+    /// last points).
+    fn curve(&mut self, pts: Vec<StrokePoint>, end: bool) -> Vec<StrokePoint> {
+        let Some(c) = self.curves.as_mut() else { return pts };
+        let mut out = Vec::with_capacity(pts.len() * 2);
+        for p in pts {
+            c.push(p, &mut out);
+        }
+        if end {
+            c.finish(&mut out);
+        }
+        out
     }
 
     /// End of stroke.
     pub fn finish(&mut self, dabs: &mut Vec<Dab>, dual: &mut Vec<Dab>) {
         let mut sm = Vec::new();
         self.smoother.finish(&mut sm);
+        let sm = self.curve(sm, true);
         self.walk(&sm, dabs, dual);
         let mut steps = Vec::new();
         self.walker.finish(&mut |s| steps.push(s));

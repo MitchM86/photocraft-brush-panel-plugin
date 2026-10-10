@@ -2496,3 +2496,10 @@ fontWeight	Italic	Corsivo
 	Previous Document	Documento precedente
 	W x H x Resolution	L x A x Risoluzione
 	Front Image	Immagine in primo piano
+	Always use pressure for flow	Usa sempre pressione per flusso
+	Pressure for Flow	Pressione per flusso
+	Size Pressure Curve	Curva di pressione: dimensione
+	Opacity Pressure Curve	Curva di pressione: opacità
+	Flow Pressure Curve	Curva di pressione: flusso
+	Basic Smoothing (Krita)	Smussatura di base (Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	Unisce i campioni della penna con curve invece che con linee rette, senza ritardo

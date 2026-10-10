@@ -10,6 +10,7 @@
 use photocraft_color::BlendMode;
 use serde::{Deserialize, Serialize};
 
+use crate::curve::ResponseCurve;
 use crate::mixer::MixerSettings;
 use crate::tile::{GrayTile, StoredTile};
 
@@ -422,6 +423,58 @@ impl Default for Pose {
     }
 }
 
+/// Per-setting pressure response curves (Krita's brush option curves): pen pressure (after
+/// Preferences › Tools › Pressure Curve) goes through the setting's own curve before it scales
+/// that setting, so one brush can grow thin-to-thick over the light range a pen really reports
+/// while its flow is already full at a touch.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PressureResponse {
+    pub size: ResponseCurve,
+    pub opacity: ResponseCurve,
+    pub flow: ResponseCurve,
+    /// How the curves pass through their points.
+    pub spline: CurveSpline,
+}
+
+/// The shape of a [`PressureResponse`] curve between its points.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CurveSpline {
+    /// Never dips between points (Preferences › Tools › Pressure Curve's shape).
+    #[default]
+    Monotone,
+    /// Krita's brush curves: the natural cubic spline.
+    Natural,
+}
+
+impl PressureResponse {
+    /// The response of Krita's "Basic-5 Size" preset: size stays thin under light pressure and
+    /// climbs quickly above it; flow is full from the lightest touch and only fades as the pen
+    /// lifts off, so stroke ends taper out instead of trailing a solid hairline.
+    pub fn krita_basic_5() -> Self {
+        Self {
+            size: ResponseCurve::new(&[[0.0, 0.0], [0.35, 0.1], [1.0, 1.0]]),
+            opacity: ResponseCurve::linear(),
+            flow: ResponseCurve::new(&[[0.0, 0.0], [0.036, 0.266], [0.068, 0.995], [1.0, 1.0]]),
+            spline: CurveSpline::Natural,
+        }
+    }
+
+    /// `curve` (one of this response's) at pressure `p`, in this response's spline.
+    pub fn eval(&self, curve: &ResponseCurve, p: f32) -> f32 {
+        match self.spline {
+            CurveSpline::Monotone => curve.eval(p),
+            CurveSpline::Natural => curve.eval_natural(p),
+        }
+    }
+
+    /// Every curve is the identity.
+    pub fn is_linear(&self) -> bool {
+        self.size.is_linear() && self.opacity.is_linear() && self.flow.is_linear()
+    }
+}
+
 /// Stroke smoothing (Photoshop's Smoothing % and its options).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -436,11 +489,14 @@ pub struct Smoothing {
     pub catch_up_on_end: bool,
     /// Divide the string length by the view zoom (the command's `zoom` param).
     pub adjust_for_zoom: bool,
+    /// Krita's Basic smoothing: join the input points with curves instead of straight lines
+    /// (after the smoothing above), without lagging behind the pen.
+    pub curves: bool,
 }
 
 impl Default for Smoothing {
     fn default() -> Self {
-        Self { amount: 0.0, pulled_string: false, catch_up: true, catch_up_on_end: true, adjust_for_zoom: true }
+        Self { amount: 0.0, pulled_string: false, catch_up: true, catch_up_on_end: true, adjust_for_zoom: true, curves: false }
     }
 }
 
@@ -457,6 +513,11 @@ pub struct BrushSettings {
     /// Photoshop's Spacing checkbox. Off: the pointer's speed sets the spacing (one dab every
     /// [`crate::dynamics::SPEED_SPACING_MS`] of stroke time; without timestamps, by distance).
     pub spacing_enabled: bool,
+    /// Krita's Auto spacing: dabs `coefficient × √diameter` pixels apart (`× diameter` under one
+    /// pixel), so thin lines get far fewer dabs than a fixed fraction would give. Replaces
+    /// `spacing` when set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_spacing: Option<f32>,
     /// Maximum coverage for the whole stroke.
     pub opacity: f32,
     /// Per-dab coverage.
@@ -467,6 +528,13 @@ pub struct BrushSettings {
     /// Shortcut for Transfer › Opacity › Pen Pressure.
     #[serde(alias = "pressure_opacity")]
     pub pressure_opacity: bool,
+    /// Shortcut for Transfer › Flow › Pen Pressure (Krita's Flow › Pressure).
+    #[serde(alias = "pressure_flow")]
+    pub pressure_flow: bool,
+    /// How pen pressure maps to size, opacity and flow wherever pressure drives them (the
+    /// shortcuts above, and Shape Dynamics / Transfer controls set to Pen Pressure). Linear by
+    /// default (Photoshop); Krita's presets shape each one.
+    pub pressure_response: PressureResponse,
     /// Straight RGBA colour (display RGB). Commands fill it from the foreground colour.
     pub color: [f32; 4],
     /// Background colour for Color Dynamics' foreground/background jitter.
@@ -519,10 +587,13 @@ impl Default for BrushSettings {
             hardness: 1.0,
             spacing: 0.1,
             spacing_enabled: true,
+            auto_spacing: None,
             opacity: 1.0,
             flow: 1.0,
             pressure_size: true,
             pressure_opacity: false,
+            pressure_flow: false,
+            pressure_response: PressureResponse::default(),
             color: [0.0, 0.0, 0.0, 1.0],
             background: [1.0, 1.0, 1.0, 1.0],
             erase: false,

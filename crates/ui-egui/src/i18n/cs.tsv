@@ -2427,3 +2427,10 @@ fontWeight	Italic	Kurzíva
 	Previous Document	Předchozí dokument
 	W x H x Resolution	Š x V x Rozlišení
 	Front Image	Přední obraz
+	Always use pressure for flow	Vždy použít přítlak pro tok
+	Pressure for Flow	Přítlak pro tok
+	Size Pressure Curve	Křivka přítlaku: velikost
+	Opacity Pressure Curve	Křivka přítlaku: krytí
+	Flow Pressure Curve	Křivka přítlaku: tok
+	Basic Smoothing (Krita)	Základní vyhlazování (Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	Spojí vzorky pera křivkami místo rovných čar, bez zpoždění

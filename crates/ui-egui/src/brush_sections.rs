@@ -348,6 +348,39 @@ fn shape_dynamics(ui: &mut egui::Ui, b: &mut BrushSettings) {
     widgets::checkbox(ui, &mut sd.brush_projection, tl!("Brush Projection")).on_hover_text(tl!("Apply the pen's tilt and rotation to the tip shape"));
 }
 
+/// The pressure response curves shown below section `i` (Shape Dynamics: size; Transfer:
+/// opacity and flow). They are drawn outside the section's greyed-out body: they also shape the
+/// options-bar pressure buttons, which work with the section off.
+pub fn response_curves(ui: &mut egui::Ui, b: &mut BrushSettings, i: usize) {
+    let krita = paint::PressureResponse::krita_basic_5();
+    let r = &mut b.pressure_response;
+    let natural = r.spline == paint::CurveSpline::Natural;
+    match i {
+        1 => response_curve(ui, tl!("Size Pressure Curve"), &mut r.size, &krita.size, natural),
+        6 => {
+            response_curve(ui, tl!("Opacity Pressure Curve"), &mut r.opacity, &krita.opacity, natural);
+            response_curve(ui, tl!("Flow Pressure Curve"), &mut r.flow, &krita.flow, natural);
+        }
+        _ => {}
+    }
+}
+
+/// One of the brush's pen-pressure response curves ([`paint::PressureResponse`], Krita's
+/// per-option curves): how pressure maps to the setting wherever pressure drives it, the
+/// options-bar pressure buttons included. Krita's "Basic-5 Size" curve is among the presets.
+fn response_curve(ui: &mut egui::Ui, label: &str, curve: &mut paint::ResponseCurve, krita: &paint::ResponseCurve, natural: bool) {
+    ui.add_space(8.0);
+    dim(ui, label);
+    ui.add_space(2.0);
+    let krita = krita.points();
+    let mut presets: Vec<(&str, &[[f32; 2]])> = crate::pressure_curve_ui::PRESETS.to_vec();
+    presets.push(("Krita Basic-5", &krita));
+    let mut points = curve.points();
+    if crate::pressure_curve_ui::points_editor(ui, &mut points, &presets, None, natural) {
+        *curve = paint::ResponseCurve::new(&points);
+    }
+}
+
 fn scattering(ui: &mut egui::Ui, b: &mut BrushSettings) {
     let sc = &mut b.scattering;
     pct(ui, tl!("Scatter"), &mut sc.scatter.jitter, 10.0);
@@ -574,6 +607,7 @@ fn smoothing(ui: &mut egui::Ui, b: &mut BrushSettings) {
     widgets::checkbox(ui, &mut s.catch_up, tl!("Stroke Catch-up"));
     widgets::checkbox(ui, &mut s.catch_up_on_end, tl!("Catch-up on Stroke End"));
     widgets::checkbox(ui, &mut s.adjust_for_zoom, tl!("Adjust for Zoom"));
+    widgets::checkbox(ui, &mut s.curves, tl!("Basic Smoothing (Krita)")).on_hover_text(tl!("Join the pen's samples with curves instead of straight lines, without lag"));
 }
 
 /// Controls for section `i` (see [`crate::brush_panel::SECTIONS`]). `presets` feed the tip grids.
@@ -614,6 +648,43 @@ pub fn section_body(ui: &mut egui::Ui, b: &mut BrushSettings, i: usize, presets:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The size curve sits below Shape Dynamics, the opacity and flow curves below Transfer; each
+    /// takes Krita's Basic-5 curve from its presets. `PHOTOCRAFT_UI_SHOT=<dir>` saves what they
+    /// look like.
+    #[test]
+    fn pressure_curves_show_under_their_sections_and_take_kritas_preset() {
+        use egui_kittest::Harness;
+        use egui_kittest::kittest::Queryable;
+        let k = paint::PressureResponse::krita_basic_5();
+        for (section, labels) in [(1, &["Size Pressure Curve"][..]), (6, &["Opacity Pressure Curve", "Flow Pressure Curve"][..])] {
+            let mut h = Harness::builder()
+                .with_size(egui::vec2(340.0, 420.0))
+                .build_ui_state(|ui, b: &mut BrushSettings| response_curves(ui, b, section), BrushSettings::default());
+            h.run_steps(2);
+            for l in labels {
+                let _ = h.get_by_label(l);
+            }
+            // The last curve's preset buttons: size (section 1) or flow (section 6).
+            h.get_all_by_label("Krita Basic-5").last().expect("a Krita preset button").click();
+            h.run_steps(2);
+            let r = &h.state().pressure_response;
+            if section == 1 {
+                assert_eq!(r.size, k.size);
+            } else {
+                assert_eq!(r.flow, k.flow);
+                assert!(r.opacity.is_linear() && r.size.is_linear());
+            }
+            if let Some(dir) = std::env::var_os("PHOTOCRAFT_UI_SHOT")
+                && let Ok(img) = h.render()
+            {
+                let _ = img.save(std::path::Path::new(&dir).join(format!("pressure-curves-{section}.png")));
+            }
+        }
+        // Other sections draw no curves.
+        let h = Harness::builder().build_ui_state(|ui, b: &mut BrushSettings| response_curves(ui, b, 2), BrushSettings::default());
+        assert!(h.query_by_label("Krita Basic-5").is_none());
+    }
 
     #[test]
     fn ellipse_widget_drags_angle_and_roundness() {

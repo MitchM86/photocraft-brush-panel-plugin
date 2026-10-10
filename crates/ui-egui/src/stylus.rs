@@ -184,6 +184,7 @@ impl Stylus {
             self.prev = Some(*last);
         }
         self.frame = self.feed.drain();
+        let drained = self.frame.len();
         self.current = None;
         for e in events {
             if let egui::Event::Touch { phase, force, .. } = e {
@@ -205,6 +206,10 @@ impl Stylus {
             self.frame.retain(|s| s.pressure > 0.0);
         }
         self.peak = self.frame.iter().fold(self.peak, |m, s| m.max(s.pressure));
+        if (drained > 0 || self.touch.is_some()) && crate::pen_trace::enabled() {
+            let touch = self.touch.map(|t| format!("{t:.5}")).unwrap_or_default();
+            crate::pen_trace::row("frame", format_args!("{drained},{},{touch}", self.frame.len()));
+        }
     }
 
     /// The pen's current sample. When the pen touched during this frame but has lifted since
@@ -260,16 +265,16 @@ impl Stylus {
         let lerp = |x: f32, y: f32| x + (y - x) * t;
         // Rotation takes the shorter way round.
         let dr = (b.rotation - a.rotation + 540.0).rem_euclid(360.0) - 180.0;
-        self.current = Some(
-            PenSample {
-                pressure: lerp(a.pressure, b.pressure),
-                tilt_x: lerp(a.tilt_x, b.tilt_x),
-                tilt_y: lerp(a.tilt_y, b.tilt_y),
-                rotation: a.rotation + dr * t,
-                eraser: b.eraser,
-            }
-            .sanitized(),
-        );
+        let s = PenSample {
+            pressure: lerp(a.pressure, b.pressure),
+            tilt_x: lerp(a.tilt_x, b.tilt_x),
+            tilt_y: lerp(a.tilt_y, b.tilt_y),
+            rotation: a.rotation + dr * t,
+            eraser: b.eraser,
+        }
+        .sanitized();
+        crate::pen_trace::row("select", format_args!("{k},{n},{m},{i},{t:.4},{:.5},{:.5},{:.5}", a.pressure, b.pressure, s.pressure));
+        self.current = Some(s);
     }
 
     /// Back to the current sample after a frame's moves.

@@ -3533,3 +3533,10 @@ cameraRaw	Masking	Маскування
 	W x H x Resolution	Ш x В x Роздільна здатність
 	Front Image	Зображення переднього плану
 	PhotoCraft — Screen Color Picker	PhotoCraft — Піпетка кольору екрана
+	Always use pressure for flow	Завжди використовувати натиск для потоку
+	Pressure for Flow	Натиск для потоку
+	Size Pressure Curve	Крива натиску: розмір
+	Opacity Pressure Curve	Крива натиску: непрозорість
+	Flow Pressure Curve	Крива натиску: потік
+	Basic Smoothing (Krita)	Базове згладжування (Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	Зʼєднує відліки пера кривими замість прямих ліній, без затримки

@@ -3605,3 +3605,10 @@ cameraRaw	Whites	Witten
 	W x H x Resolution	B x H x Resolutie
 	Front Image	Voorste afbeelding
 	PhotoCraft — Screen Color Picker	PhotoCraft — Schermkleurkiezer
+	Always use pressure for flow	Altijd druk gebruiken voor doorstroming
+	Pressure for Flow	Druk voor doorstroming
+	Size Pressure Curve	Drukcurve: grootte
+	Opacity Pressure Curve	Drukcurve: dekking
+	Flow Pressure Curve	Drukcurve: doorstroming
+	Basic Smoothing (Krita)	Basisafvlakking (Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	Verbindt de penmonsters met curven in plaats van rechte lijnen, zonder vertraging

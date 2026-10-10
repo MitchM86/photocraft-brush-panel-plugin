@@ -2817,7 +2817,9 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                 // This move's share of the pen samples the frame brought (pressure, tilt, rotation).
                 app.stylus.select(k, n);
                 let d = xf.to_doc(p);
-                tool_event(app, ToolEvent::Move { x: d[0], y: d[1], pressure: app.stylus.pressure() }, mods);
+                let pressure = app.stylus.pressure();
+                crate::pen_trace::row("move", format_args!("{k},{n},{:.2},{:.2},{:.3},{:.3},{pressure:.5}", p.x, p.y, d[0], d[1]));
+                tool_event(app, ToolEvent::Move { x: d[0], y: d[1], pressure }, mods);
             }
             app.stylus.clear_selection();
             app.stylus.clock_ms = now_ms;
@@ -3807,6 +3809,9 @@ fn tool_move(app: &mut PhotocraftApp, x: f64, y: f64, pressure: f32, mods: egui:
         if moved || held {
             d.points.push([x, y, pressure as f64]);
             app.stylus.record_point();
+            if let Some([tx, ty, r]) = app.stylus.stroke.last().filter(|_| crate::pen_trace::enabled()) {
+                crate::pen_trace::row("point", format_args!("{x:.3},{y:.3},{pressure:.5},{tx:.2},{ty:.2},{r:.2}"));
+            }
         }
     }
 }
@@ -4096,6 +4101,11 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
             if from.is_some() {
                 app.stylus.record_point();
             }
+            if crate::pen_trace::enabled() {
+                crate::pen_trace::row("down", format_args!("{x:.3},{y:.3},{pressure:.5},{tool:?}"));
+                let brush = serde_json::to_string(&app.session.tools.brush).unwrap_or_default();
+                crate::pen_trace::row("brush", format_args!("{brush}"));
+            }
             app.live_stroke = if strokes_live(tool) { begin_live_stroke(app) } else { None };
         }
         ToolEvent::Move { x, y, pressure } => {
@@ -4142,6 +4152,7 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
                 d.points.push([x, y, d.points.last().map_or(1.0, |p| p[2])]);
                 app.stylus.record_point();
             }
+            crate::pen_trace::row("up", format_args!("{x:.3},{y:.3},{}", d.points.len()));
             finish_gesture(app, d);
             crate::move_mods::finish(app);
         }

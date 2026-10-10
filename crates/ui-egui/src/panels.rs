@@ -855,6 +855,9 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         // A Pencil-mode Eraser is always full flow, without build-up (Photoshop).
                         ui.add_enabled_ui(!crate::eraser_ui::pencil_mode(app, app.ui.tool), |ui| {
                             percent_field(ui, tl!("Flow"), &mut b.flow, 1.0..=100.0, 62.0);
+                            if icons::button(ui, "circle-dot", 24.0, b.pressure_flow, tl!("Always use pressure for flow")).clicked() {
+                                b.pressure_flow = !b.pressure_flow;
+                            }
                             let airbrush = icons::button(ui, "sparkles", 24.0, b.build_up, tl!("Enable airbrush-style build-up effects"));
                             if crate::brush_picker::named(airbrush, tl!("Enable airbrush-style build-up effects")).clicked() {
                                 b.build_up = !b.build_up;
@@ -910,6 +913,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         widgets::vline(ui, 22.0);
                         widgets::toggle(ui, &mut b.pressure_size, tl!("Pressure for Size"));
                         widgets::toggle(ui, &mut b.pressure_opacity, tl!("Pressure for Opacity"));
+                        widgets::toggle(ui, &mut b.pressure_flow, tl!("Pressure for Flow"));
                     }
                     Tool::MixerBrush => {
                         brush_preset_chip(ui, b, &mut app.ui);
@@ -3152,6 +3156,7 @@ fn smoothing_options(ui: &mut egui::Ui, b: &mut photocraft_engine::BrushSettings
         widgets::checkbox(ui, &mut s.catch_up, tl!("Stroke Catch-up"));
         widgets::checkbox(ui, &mut s.catch_up_on_end, tl!("Catch-up on Stroke End"));
         widgets::checkbox(ui, &mut s.adjust_for_zoom, tl!("Adjust for Zoom"));
+        widgets::checkbox(ui, &mut s.curves, tl!("Basic Smoothing (Krita)")).on_hover_text(tl!("Join the pen's samples with curves instead of straight lines, without lag"));
     });
 }
 

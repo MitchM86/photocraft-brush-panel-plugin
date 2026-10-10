@@ -3535,3 +3535,10 @@ fontWeight	Thin	Πολύ λεπτά
 	Previous Document	Προηγούμενο έγγραφο
 	W x H x Resolution	Π x Υ x Ανάλυση
 	Front Image	Μπροστινή εικόνα
+	Always use pressure for flow	Πάντα χρήση πίεσης για τη ροή
+	Pressure for Flow	Πίεση για ροή
+	Size Pressure Curve	Καμπύλη πίεσης: μέγεθος
+	Opacity Pressure Curve	Καμπύλη πίεσης: αδιαφάνεια
+	Flow Pressure Curve	Καμπύλη πίεσης: ροή
+	Basic Smoothing (Krita)	Βασική εξομάλυνση (Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	Ενώνει τα δείγματα της γραφίδας με καμπύλες αντί για ευθείες, χωρίς καθυστέρηση

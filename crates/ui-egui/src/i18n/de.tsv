@@ -2465,3 +2465,10 @@ fontWeight	Italic	Kursiv
 	Previous Document	Vorheriges Dokument
 	W x H x Resolution	B x H x Auflösung
 	Front Image	Vorderes Bild
+	Always use pressure for flow	Druck immer für Fluss verwenden
+	Pressure for Flow	Druck für Fluss
+	Size Pressure Curve	Druckkurve: Größe
+	Opacity Pressure Curve	Druckkurve: Deckkraft
+	Flow Pressure Curve	Druckkurve: Fluss
+	Basic Smoothing (Krita)	Einfache Glättung (Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	Verbindet die Stiftpunkte mit Kurven statt geraden Linien, ohne Verzögerung

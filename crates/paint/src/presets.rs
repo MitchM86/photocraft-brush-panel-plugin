@@ -64,6 +64,21 @@ fn general(base: &BrushSettings) -> Vec<BrushPreset> {
             },
         ),
         g("Calligraphy Flat", BrushSettings { size: 28.0, hardness: 1.0, roundness: 0.2, angle: 45.0, spacing: 0.05, ..base.clone() }),
+        // Krita's "Basic-5 Size" response: size and flow each through their own pressure curve
+        // (Shape Dynamics and Transfer show and edit them).
+        g(
+            "Krita Basic-5 Size",
+            BrushSettings {
+                size: 40.0,
+                hardness: 1.0,
+                spacing: 0.1,
+                auto_spacing: Some(0.8),
+                pressure_size: true,
+                pressure_flow: true,
+                pressure_response: PressureResponse::krita_basic_5(),
+                ..base.clone()
+            },
+        ),
     ]
 }
 

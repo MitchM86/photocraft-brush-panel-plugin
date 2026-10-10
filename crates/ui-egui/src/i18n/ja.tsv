@@ -3446,3 +3446,10 @@ fontWeight	Italic	斜体
 	Previous Document	前のドキュメント
 	W x H x Resolution	幅 x 高さ x 解像度
 	Front Image	前面の画像
+	Always use pressure for flow	常に筆圧を流量に使う
+	Pressure for Flow	流量に筆圧を使用
+	Size Pressure Curve	筆圧カーブ(サイズ)
+	Opacity Pressure Curve	筆圧カーブ(不透明度)
+	Flow Pressure Curve	筆圧カーブ(流量)
+	Basic Smoothing (Krita)	基本の補正(Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	ペンのサンプルを直線ではなく曲線でつなぎます(遅延なし)

@@ -16,6 +16,7 @@
 #[cfg(any(target_os = "linux", test))]
 use crate::linux_libs::DisplaySession;
 use photocraft_tablet::Sample;
+use photocraft_ui_egui::pen_trace;
 use photocraft_ui_egui::stylus::{PenSample, StylusFeed};
 
 /// A tablet sample as the UI's pen sample.
@@ -25,7 +26,40 @@ pub fn pen_sample(s: Sample) -> PenSample {
 
 /// Writes tablet samples into `feed` (`None` = a mouse).
 pub fn sink(feed: StylusFeed) -> impl Fn(Option<Sample>) + Send + 'static {
-    move |s| feed.set(s.map(pen_sample))
+    move |s| {
+        let s = s.map(pen_sample);
+        match s {
+            Some(p) => pen_trace::row(
+                "sample",
+                format_args!("{:.5},{:.2},{:.2},{:.2},{}", p.pressure, p.tilt_x, p.tilt_y, p.rotation, u8::from(p.eraser)),
+            ),
+            None => pen_trace::row("sample", format_args!(",,,,")),
+        }
+        feed.set(s);
+    }
+}
+
+/// The X11 reader's raw events and device lists as `PHOTOCRAFT_PEN_TRACE` rows.
+#[cfg(target_os = "linux")]
+fn raw_trace(raw: &photocraft_tablet::x11::Raw) {
+    use photocraft_tablet::x11::{Raw, RawKind};
+    match raw {
+        Raw::Devices(devices) => {
+            for d in devices {
+                let axes: Vec<String> = d.valuators.iter().map(|(n, label, min, max)| format!("{n}={}={min}={max}", pen_trace::field(label))).collect();
+                pen_trace::row("dev", format_args!("{},{},{}", d.id, pen_trace::field(&d.name), axes.join("|")));
+            }
+        }
+        Raw::Event { time_ms, device, kind, button, valuators } => {
+            let kind = match kind {
+                RawKind::Motion => "motion",
+                RawKind::Press => "press",
+                RawKind::Release => "release",
+            };
+            let values: Vec<String> = valuators.iter().map(|(n, v)| format!("{n}={v}")).collect();
+            pen_trace::row("raw", format_args!("{time_ms},{device},{kind},{button},{}", values.join("|")));
+        }
+    }
 }
 
 /// Install the AppKit tablet monitor (main thread, once winit created the shared application:
@@ -84,7 +118,8 @@ pub fn spawn_x11(feed: &StylusFeed, display: Option<DisplayKind>) {
         log::info!("tablet pressure: not available on this display server ({display:?})");
         return;
     }
-    if let Err(e) = photocraft_tablet::x11::spawn(None, sink(feed.clone())) {
+    let trace: Option<photocraft_tablet::x11::Trace> = pen_trace::enabled().then(|| Box::new(raw_trace) as _);
+    if let Err(e) = photocraft_tablet::x11::spawn_traced(None, sink(feed.clone()), trace) {
         log::warn!("{e}");
     }
 }

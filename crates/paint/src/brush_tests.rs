@@ -290,7 +290,8 @@ fn tilt_direction_and_rotation_drive_angle() {
     let mut flat = StrokePoint::new(0.0, 0.0, 1.0);
     flat.tilt_x = 90.0;
     let d = dabs_of(&b, &[flat]);
-    assert!(d[0].radius <= 0.5 + 1e-6);
+    // Minimum 0: a flat pen is size 0, which paints nothing (Krita's too-small dab rule).
+    assert!(d.is_empty(), "{d:?}");
 }
 
 #[test]
@@ -1109,4 +1110,218 @@ fn half_coverage_radius_is_the_tips_50_percent_contour() {
     }
     assert_eq!(half_coverage_radius(10.5, 1.0), 10.5);
     assert!(half_coverage_radius(10.5, f32::NAN).is_finite());
+}
+
+/// One dab at `pressure` (a single-point stroke paints one dab).
+fn dab_at(b: &BrushSettings, pressure: f32) -> Dab {
+    dabs_of(b, &[StrokePoint::new(50.0, 50.0, pressure)]).into_iter().next().unwrap()
+}
+
+#[test]
+fn the_size_response_curve_shapes_pressure_for_size() {
+    let mut b = BrushSettings { size: 100.0, spacing: 0.25, pressure_size: true, ..Default::default() };
+    // Linear by default (Photoshop): diameter = pressure × size.
+    assert!((dab_at(&b, 0.3).radius - 15.0).abs() < 1e-3);
+    b.pressure_response = PressureResponse::krita_basic_5();
+    let (light, firm) = (dab_at(&b, 0.2).radius, dab_at(&b, 0.4).radius);
+    // Krita's size curve: thin under light pressure, climbing fast above it, so a pen that only
+    // reports 0.2..0.4 still gets a clearly varying line.
+    assert!(light < 5.0, "{light}");
+    assert!(firm > 2.5 * light, "{light} → {firm}");
+    assert!((dab_at(&b, 1.0).radius - 50.0).abs() < 1e-3, "full pressure is still the full size");
+    // Shape Dynamics › Size › Pen Pressure goes through the same curve, above its minimum.
+    b.pressure_size = false;
+    b.shape_dynamics.enabled = true;
+    b.shape_dynamics.size.control = Control::PenPressure;
+    b.shape_dynamics.size.minimum = 0.0;
+    assert!((dab_at(&b, 0.2).radius - light).abs() < 1e-3);
+}
+
+#[test]
+fn pressure_for_flow_goes_through_the_flow_curve() {
+    let mut b = BrushSettings { size: 20.0, pressure_size: false, ..Default::default() };
+    assert_eq!(dab_at(&b, 0.05).alpha, 1.0, "off by default: flow ignores pressure");
+    b.pressure_flow = true;
+    assert!((dab_at(&b, 0.05).alpha - 0.05).abs() < 1e-6, "linear curve: flow = pressure");
+    b.pressure_response = PressureResponse::krita_basic_5();
+    // Krita's flow curve: full ink from a light touch, fading only in the last few percent as
+    // the pen lifts off.
+    assert!(dab_at(&b, 0.2).alpha > 0.99);
+    let lifting = dab_at(&b, 0.02).alpha;
+    assert!(lifting > 0.0 && lifting < 0.3, "{lifting}");
+    // Transfer › Flow › Pen Pressure takes over the shortcut and uses the same curve.
+    b.transfer.enabled = true;
+    b.transfer.flow.control = Control::PenPressure;
+    assert!((dab_at(&b, 0.02).alpha - lifting).abs() < 1e-6);
+}
+
+#[test]
+fn the_opacity_curve_applies_to_pressure_for_opacity() {
+    let mut b = BrushSettings { pressure_size: false, pressure_opacity: true, ..Default::default() };
+    assert!((dab_at(&b, 0.5).opacity - 0.5).abs() < 1e-6);
+    b.pressure_response.opacity = crate::ResponseCurve::new(&[[0.0, 0.0], [0.4, 1.0], [1.0, 1.0]]);
+    assert!(dab_at(&b, 0.5).opacity > 0.999);
+}
+
+#[test]
+fn brushes_saved_before_pressure_response_load_linear() {
+    let mut v = serde_json::to_value(BrushSettings::default()).unwrap();
+    let o = v.as_object_mut().unwrap();
+    assert!(o.remove("pressureResponse").is_some() && o.remove("pressureFlow").is_some());
+    let b: BrushSettings = serde_json::from_value(v).unwrap();
+    assert!(b.pressure_response.is_linear() && !b.pressure_flow);
+    // And a stored response round-trips.
+    let k = BrushSettings { pressure_flow: true, pressure_response: PressureResponse::krita_basic_5(), ..Default::default() };
+    let back: BrushSettings = serde_json::from_value(serde_json::to_value(&k).unwrap()).unwrap();
+    assert_eq!(back, k);
+}
+
+fn curved(pts: &[StrokePoint]) -> Vec<StrokePoint> {
+    let mut c = crate::dynamics::CurveSmoother::new();
+    let mut out = Vec::new();
+    for p in pts {
+        c.push(*p, &mut out);
+    }
+    c.finish(&mut out);
+    out
+}
+
+fn timed(x: f64, y: f64, pressure: f32, time: f64) -> StrokePoint {
+    StrokePoint { time, ..StrokePoint::new(x, y, pressure) }
+}
+
+#[test]
+fn krita_basic_smoothing_keeps_straight_lines_straight_and_ends_on_the_pen() {
+    let pts: Vec<StrokePoint> = (0..6).map(|i| timed(10.0 + 40.0 * f64::from(i), 50.0, 0.5, 5.0 * f64::from(i))).collect();
+    let out = curved(&pts);
+    assert!(out.iter().all(|p| (p.y - 50.0).abs() < 1e-9), "{out:?}");
+    assert_eq!((out[0].x, out.last().unwrap().x), (10.0, 210.0));
+    // Every input point is passed through (the curve interpolates, it doesn't lag).
+    for p in &pts {
+        assert!(out.iter().any(|q| (q.x - p.x).abs() < 1e-9), "{} missing", p.x);
+    }
+}
+
+#[test]
+fn krita_basic_smoothing_rounds_a_sparsely_sampled_circle() {
+    // 12 samples round a circle of radius 100: straight chords sag 3.4 px between them.
+    let r = 100.0;
+    let pts: Vec<StrokePoint> =
+        (0..=12).map(|i| f64::from(i) * std::f64::consts::TAU / 12.0).enumerate().map(|(i, a)| timed(200.0 + r * a.cos(), 200.0 + r * a.sin(), 0.5, 5.0 * i as f64)).collect();
+    let sag = |pts: &[StrokePoint]| -> f64 {
+        pts.windows(2).map(|w| ((w[0].x + w[1].x) / 2.0 - 200.0).hypot((w[0].y + w[1].y) / 2.0 - 200.0)).map(|d| (r - d).abs()).fold(0.0, f64::max)
+    };
+    let out = curved(&pts);
+    assert!(out.len() > pts.len() * 3, "the segments are subdivided: {}", out.len());
+    // Away from the two open ends (whose tangents only see one side), the curve hugs the circle.
+    let inner = &out[out.len() / 6..out.len() * 5 / 6];
+    assert!(sag(&pts) > 3.0 && sag(inner) < 1.0, "polygon {} → curve {}", sag(&pts), sag(inner));
+}
+
+#[test]
+fn krita_basic_smoothing_mixes_pressure_along_each_curve() {
+    let pts = [timed(0.0, 0.0, 0.2, 0.0), timed(60.0, 40.0, 0.8, 5.0), timed(120.0, 0.0, 0.2, 10.0), timed(180.0, 40.0, 0.6, 15.0)];
+    let out = curved(&pts);
+    // Between two input points the pressure moves steadily from one to the other.
+    let seg: Vec<f32> = out.iter().filter(|p| p.x > 0.0 && p.x <= 60.0).map(|p| p.pressure).collect();
+    assert!(seg.len() > 3 && seg.windows(2).all(|w| w[1] >= w[0] - 1e-6) && (seg[seg.len() - 1] - 0.8).abs() < 1e-6, "{seg:?}");
+}
+
+#[test]
+fn krita_basic_smoothing_draws_the_held_points_segment_and_survives_hostile_input() {
+    let mut c = crate::dynamics::CurveSmoother::new();
+    let mut out = Vec::new();
+    for p in [timed(0.0, 0.0, 1.0, 0.0), timed(30.0, 10.0, 1.0, 5.0), timed(60.0, 0.0, 1.0, 10.0)] {
+        c.push(p, &mut out);
+    }
+    assert!(c.pending(), "the segment to the newest point waits for the next one");
+    c.push(timed(60.0, 0.0, 1.0, 26.0), &mut out);
+    assert!(!c.pending() && (out.last().unwrap().x - 60.0).abs() < 1e-9, "a held pen's repeat draws it");
+    // Repeats, NaN, infinities and huge jumps never panic or emit non-finite points beyond the
+    // ones given.
+    for bad in [f64::NAN, f64::INFINITY, -1e300, 1e300] {
+        let pts = [timed(0.0, 0.0, 0.5, 0.0), timed(0.0, 0.0, 0.5, 0.0), timed(bad, 5.0, 0.5, 1.0), timed(10.0, bad, 0.5, f64::NAN), timed(20.0, 20.0, 0.5, 3.0)];
+        let out = curved(&pts);
+        assert!(out.len() < 10_000, "bounded: {}", out.len());
+    }
+}
+
+#[test]
+fn krita_basic_smoothing_is_off_by_default_and_paints_the_same_however_points_arrive() {
+    assert!(!Smoothing::default().curves);
+    let b = BrushSettings { smoothing: Smoothing { curves: true, ..Default::default() }, ..brush() };
+    let pts: Vec<StrokePoint> = (0..20).map(f64::from).map(|i| timed(10.0 + i * 15.0, 60.0 + 30.0 * (i / 3.0).sin(), 0.5, i * 5.0)).collect();
+    let whole = dabs_of(&b, &pts);
+    let mut g = crate::dynamics::DabGenerator::new(&b, 1.0);
+    let (mut dabs, mut dual) = (Vec::new(), Vec::new());
+    for chunk in pts.chunks(3) {
+        g.push(chunk, &mut dabs, &mut dual);
+    }
+    g.finish(&mut dabs, &mut dual);
+    assert_eq!(dabs.len(), whole.len());
+    assert!(dabs.iter().zip(&whole).all(|(a, b)| a.center == b.center && a.radius == b.radius));
+    // And it changes the stroke: the curve takes a different path from the polyline.
+    let plain = dabs_of(&brush(), &pts);
+    assert!(plain.len() != whole.len() || plain.iter().zip(&whole).any(|(a, b)| (a.center.x - b.center.x).abs() + (a.center.y - b.center.y).abs() > 0.1));
+}
+
+#[test]
+fn dabs_under_a_pixel_fade_with_their_width_and_vanishing_ones_are_skipped() {
+    let b = BrushSettings { size: 20.0, pressure_size: true, ..Default::default() };
+    // Krita's rule: under 0.01 px, no dab at all (a pen lifting off paints nothing)...
+    assert!(dabs_of(&b, &[StrokePoint::new(50.0, 50.0, 0.0)]).is_empty());
+    assert!(dabs_of(&b, &[StrokePoint::new(50.0, 50.0, 0.0004)]).is_empty());
+    // ...and a sub-pixel dab covers one pixel at most at the coverage of its real width (its
+    // opacity ceiling, so overlapping dabs can't build a solid hairline).
+    let thin = dab_at(&b, 0.01);
+    assert!((thin.radius - 0.5).abs() < 1e-6 && (thin.opacity - 0.2).abs() < 1e-4 && thin.alpha == 1.0, "{thin:?}");
+    assert_eq!(dab_at(&b, 0.5).opacity, 1.0, "a pixel or wider has the full ceiling");
+    // The Pencil keeps its hard one-pixel minimum.
+    let pencil = BrushSettings { aliased: true, ..b.clone() };
+    assert_eq!(dab_at(&pencil, 0.01).opacity, 1.0);
+    // A lifting stroke's tail now fades out: its last dabs get lighter, never a solid line.
+    let pts: Vec<StrokePoint> = (0..=10).map(|i| StrokePoint::new(10.0 + 10.0 * f64::from(i), 50.0, 0.1 * (10 - i) as f32)).collect();
+    let d = dabs_of(&b, &pts);
+    let tail: Vec<f32> = d.iter().filter(|q| q.radius <= 0.5).map(|q| q.opacity).collect();
+    assert!(!tail.is_empty() && tail.windows(2).all(|w| w[1] <= w[0] + 1e-6) && tail.iter().all(|a| *a < 1.0), "{tail:?}");
+}
+
+#[test]
+fn kritas_auto_spacing_spaces_dabs_with_the_square_root_of_their_size() {
+    let line = |b: &BrushSettings| dabs_of(b, &line(0.0, 100.0, 50.0)).len();
+    let fixed = BrushSettings { size: 4.0, spacing: 0.1, pressure_size: false, ..Default::default() };
+    let auto = BrushSettings { auto_spacing: Some(0.8), ..fixed.clone() };
+    // 4 px: fixed 10 % spacing is 0.5 px (its minimum); Krita's 0.8 × √4 = 1.6 px.
+    assert!((line(&fixed) as f64 - 201.0).abs() <= 2.0, "{}", line(&fixed));
+    assert!((line(&auto) as f64 - 63.5).abs() <= 2.0, "{}", line(&auto));
+    // Large tips: √ grows slowly, so big Krita brushes are dense (100 px → 8 px apart).
+    let big = BrushSettings { size: 100.0, ..auto.clone() };
+    assert!((line(&big) as f64 - 13.5).abs() <= 2.0, "{}", line(&big));
+    // Hostile coefficients fall back to the brush's own spacing, never a hang.
+    for c in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+        assert_eq!(line(&BrushSettings { auto_spacing: Some(c), ..fixed.clone() }), line(&fixed));
+    }
+}
+
+#[test]
+fn the_krita_preset_uses_kritas_spline_and_spacing() {
+    let p = crate::presets::builtin().into_iter().find(|p| p.name == "Krita Basic-5 Size").unwrap();
+    assert_eq!(p.brush.auto_spacing, Some(0.8));
+    assert_eq!(p.brush.pressure_response.spline, CurveSpline::Natural);
+    // Krita's curve: a 40 px brush at pressure 0.2 paints a ~1.25 px line (1.5699·0.2³ + 0.0934·0.2).
+    let d = dab_at(&BrushSettings { pressure_size: true, ..p.brush.clone() }, 0.2);
+    assert!((d.radius * 2.0 - 40.0 * 0.03128).abs() < 0.02, "{}", d.radius * 2.0);
+    let v = serde_json::to_value(&p.brush).unwrap();
+    assert_eq!(v["pressureResponse"]["spline"], "natural");
+    assert_eq!(v["autoSpacing"], 0.8f32 as f64);
+}
+
+#[test]
+fn a_sub_pixel_line_stays_faint_however_many_dabs_overlap() {
+    // A 0.3 px line: hundreds of overlapping dabs must not build it into a solid 1 px hairline.
+    let b = BrushSettings { size: 30.0, pressure_size: true, spacing: 0.01, hardness: 1.0, ..Default::default() };
+    let pts = [StrokePoint::new(10.0, 20.5, 0.01), StrokePoint::new(90.0, 20.5, 0.01)];
+    let surf = paint(&b, &pts, 100, 40);
+    let column: f32 = (0..40).map(|y| surf.rgba(50, y)[3]).sum();
+    assert!(column > 0.15 && column < 0.45, "the line's coverage is its width: {column}");
 }

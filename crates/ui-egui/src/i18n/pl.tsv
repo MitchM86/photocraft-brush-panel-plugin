@@ -3446,3 +3446,10 @@ cameraRaw	Roughness	Chropowatość
 	Previous Document	Poprzedni dokument
 	W x H x Resolution	Szer. x Wys. x Rozdzielczość
 	Front Image	Obraz na wierzchu
+	Always use pressure for flow	Zawsze używaj nacisku do przepływu
+	Pressure for Flow	Nacisk dla przepływu
+	Size Pressure Curve	Krzywa nacisku: rozmiar
+	Opacity Pressure Curve	Krzywa nacisku: krycie
+	Flow Pressure Curve	Krzywa nacisku: przepływ
+	Basic Smoothing (Krita)	Podstawowe wygładzanie (Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	Łączy próbki pióra krzywymi zamiast prostych linii, bez opóźnienia

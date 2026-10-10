@@ -2845,3 +2845,10 @@ fontWeight	Italic	Italique
 	Previous Document	Document précédent
 	W x H x Resolution	L x H x Résolution
 	Front Image	Image de premier plan
+	Always use pressure for flow	Toujours utiliser la pression pour le flux
+	Pressure for Flow	Pression pour le flux
+	Size Pressure Curve	Courbe de pression : taille
+	Opacity Pressure Curve	Courbe de pression : opacité
+	Flow Pressure Curve	Courbe de pression : flux
+	Basic Smoothing (Krita)	Lissage de base (Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	Relie les échantillons du stylet par des courbes au lieu de lignes droites, sans retard

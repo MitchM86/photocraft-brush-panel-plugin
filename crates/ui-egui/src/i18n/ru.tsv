@@ -2711,3 +2711,10 @@ fontWeight	Italic	Курсив
 	W x H x Resolution	Ш x В x Разрешение
 	Front Image	Изображение переднего плана
 	Swaps height and width	Меняет местами высоту и ширину
+	Always use pressure for flow	Всегда использовать нажим для потока
+	Pressure for Flow	Нажим для потока
+	Size Pressure Curve	Кривая нажима: размер
+	Opacity Pressure Curve	Кривая нажима: непрозрачность
+	Flow Pressure Curve	Кривая нажима: поток
+	Basic Smoothing (Krita)	Базовое сглаживание (Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	Соединяет отсчёты пера кривыми вместо прямых линий, без задержки

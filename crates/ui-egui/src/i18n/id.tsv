@@ -2832,3 +2832,10 @@ fontWeight	Italic	Miring
 	Previous Document	Dokumen Sebelumnya
 	W x H x Resolution	L x T x Resolusi
 	Front Image	Gambar Depan
+	Always use pressure for flow	Selalu pakai tekanan untuk aliran
+	Pressure for Flow	Tekanan untuk Aliran
+	Size Pressure Curve	Kurva Tekanan Ukuran
+	Opacity Pressure Curve	Kurva Tekanan Opasitas
+	Flow Pressure Curve	Kurva Tekanan Aliran
+	Basic Smoothing (Krita)	Penghalusan Dasar (Krita)
+	Join the pen's samples with curves instead of straight lines, without lag	Menyambung sampel pena dengan kurva, bukan garis lurus, tanpa jeda
