@@ -877,3 +877,68 @@ fn hand_tool_offers_scale_buttons_and_requests_the_right_view() {
     assert!(h.state().ui.views[0].fill_pending);
     assert!(!h.state().ui.views[0].fit_pending);
 }
+
+/// Drag from `from` to `to` with the primary button, in a few moves.
+fn drag(h: &mut Harness<'static, PhotocraftApp>, from: egui::Pos2, to: egui::Pos2) {
+    h.event(egui::Event::PointerMoved(from));
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton { pos: from, button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+    h.run_steps(1);
+    for k in 1..=4 {
+        let t = k as f32 / 4.0;
+        h.event(egui::Event::PointerMoved(from + (to - from) * t));
+        h.run_steps(1);
+    }
+    h.event(egui::Event::PointerButton { pos: to, button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
+    h.run_steps(3);
+}
+
+fn panel_rect(h: &Harness<'static, PhotocraftApp>) -> egui::Rect {
+    h.ctx.memory(|m| m.area_rect(egui::Id::new("brush-settings"))).expect("the panel is shown")
+}
+
+#[test]
+fn the_brush_settings_window_resizes_and_its_contents_follow() {
+    use egui_kittest::kittest::Queryable;
+    for tab in [0, 1] {
+        let mut h = harness(tab, 1);
+        let r0 = panel_rect(&h);
+        // Opens at the size the fixed panel had (562 × 662 with its frame), whichever tab.
+        assert!((r0.width() - 562.0).abs() < 1.5 && (r0.height() - 662.0).abs() < 3.0, "default size as before: {r0:?}");
+        // The section list's last entry (settings) or the presets footer (brushes) sits low in
+        // the window; after a resize it follows the bottom edge.
+        let probe = |h: &Harness<'static, PhotocraftApp>| {
+            if tab == 0 { h.get_by_label("Update the current brush with these settings").rect().top() } else { h.get_by_label(&format!("{} presets", h.state().session.tools.presets.len())).rect().top() }
+        };
+        let y0 = probe(&h);
+        drag(&mut h, r0.right_bottom() - vec2(3.0, 3.0), r0.right_bottom() + vec2(160.0, 140.0));
+        let r1 = panel_rect(&h);
+        assert!(r1.width() > r0.width() + 120.0 && r1.height() > r0.height() + 100.0, "{tab}: {r0:?} → {r1:?}");
+        assert!(probe(&h) > y0 + 100.0, "{tab}: the contents follow the bottom edge: {y0} → {}", probe(&h));
+        // Never smaller than the minimum, however far it is dragged in.
+        let r1 = panel_rect(&h);
+        drag(&mut h, r1.right_bottom() - vec2(3.0, 3.0), r1.left_top() + vec2(20.0, 20.0));
+        let r2 = panel_rect(&h);
+        assert!(r2.width() >= MIN_SIZE.0 - 1.0 && r2.height() >= MIN_SIZE.1 - 1.0, "{tab}: {r2:?}");
+    }
+}
+
+#[test]
+fn a_resized_brush_panel_keeps_its_size_across_tabs() {
+    let mut h = harness(0, 1);
+    let r0 = panel_rect(&h);
+    drag(&mut h, r0.right_bottom() - vec2(3.0, 3.0), r0.right_bottom() + vec2(160.0, 140.0));
+    let resized = panel_rect(&h);
+    for (tab, frames) in [(1, 1), (1, 6), (0, 1), (0, 6), (1, 6)] {
+        // Click the tab, as a user does.
+        let at = panel_rect(&h).left_top() + if tab == 1 { vec2(159.0, 22.0) } else { vec2(63.0, 22.0) };
+        h.event(egui::Event::PointerMoved(at));
+        h.run_steps(1);
+        h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
+        h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
+        h.run_steps(frames);
+        assert_eq!(h.state().ui.brush_tab, tab, "the click switched tabs");
+        let r = panel_rect(&h);
+        assert!((r.width() - resized.width()).abs() < 2.0 && (r.height() - resized.height()).abs() < 2.0, "tab {tab}: {resized:?} → {r:?}");
+    }
+}

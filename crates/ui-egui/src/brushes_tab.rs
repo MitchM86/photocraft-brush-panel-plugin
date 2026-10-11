@@ -17,7 +17,7 @@ use photocraft_engine::paint::{BrushPreset, MAX_BRUSH_SIZE};
 use serde_json::json;
 
 use crate::brush_panel::{
-    BrushesPanelState, BrushesView, Renaming, UNGROUPED, WIDTH, commit_gesture, full_uv, grouped_presets, new_preset_name, run_or_status,
+    BrushesPanelState, BrushesView, Renaming, UNGROUPED, commit_gesture, full_uv, grouped_presets, new_preset_name, run_or_status,
 };
 use crate::brush_preview;
 use crate::theme::{self, Tokens};
@@ -875,7 +875,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.label(RichText::new(tl!("Size")).color(t.text_dim));
         let mut lv = b.size.max(1.0).ln();
-        ui.add_sized(vec2(WIDTH - 140.0, 18.0), |ui: &mut egui::Ui| {
+        ui.add_sized(vec2((ui.available_width() - 120.0).max(120.0), 18.0), |ui: &mut egui::Ui| {
             let r = widgets::slider(ui, &mut lv, 0.0..=MAX_BRUSH_SIZE.ln(), None);
             if r.changed() {
                 b.size = lv.exp().round().clamp(1.0, MAX_BRUSH_SIZE);
@@ -892,7 +892,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         icons::paint(ui, egui::Rect::from_min_size(ui.cursor().min + vec2(0.0, 3.0), vec2(16.0, 16.0)), "search", 14.0, t.text_faint);
         ui.add_space(20.0);
-        ui.add(egui::TextEdit::singleline(&mut app.ui.brushes_panel.filter).hint_text(tl!("Search Brushes")).desired_width(WIDTH - 120.0));
+        ui.add(egui::TextEdit::singleline(&mut app.ui.brushes_panel.filter).hint_text(tl!("Search Brushes")).desired_width((ui.available_width() - 80.0).max(120.0)));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let view = &mut app.ui.brushes_panel.view;
             if icons::button(ui, "grid-2x2", 24.0, *view == BrushesView::Grid, "Grid view").clicked() {
@@ -904,11 +904,29 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         });
     });
     ui.add_space(6.0);
-    let acts = preset_list(ui, &app.session.tools.presets, app.session.tools.current_preset.as_deref(), &mut app.ui.brushes_panel, PANEL_LIST);
-    apply(app, acts);
-    ui.add_space(4.0);
-    widgets::hairline(ui);
-    ui.add_space(4.0);
+    // The count / buttons row is a footer panel and the list fills the (resizable) window above
+    // it: egui's panel layout, so the window keeps its size when the tab changes.
+    egui::Panel::bottom(ui.id().with("brushes-footer")).resizable(false).show_separator_line(false).frame(egui::Frame::NONE).show(ui, |ui| {
+        ui.add_space(4.0);
+        widgets::hairline(ui);
+        ui.add_space(4.0);
+        footer(app, ui);
+    });
+    egui::CentralPanel::no_frame().show(ui, |ui| {
+        let max_height = ui.available_height().max(160.0);
+        let acts = preset_list(ui, &app.session.tools.presets, app.session.tools.current_preset.as_deref(), &mut app.ui.brushes_panel, ListLayout { max_height, ..PANEL_LIST });
+        apply(app, acts);
+    });
+    // Forget previews of presets that no longer exist.
+    let names: std::collections::HashSet<&str> = app.session.tools.presets.iter().map(|p| p.name.as_str()).collect();
+    brush_preview::with_cache(ui.ctx(), |c| {
+        c.retain(|slot| slot.split_once(':').is_none_or(|(_, n)| names.contains(n)));
+    });
+}
+
+/// The Brushes tab's footer: the preset count and the delete / new / import buttons.
+fn footer(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    let t = Tokens::get(ui.ctx());
     ui.horizontal(|ui| {
         ui.label(RichText::new(format!("{} presets", app.session.tools.presets.len())).color(t.text_faint));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -927,11 +945,6 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let _ = app.open_dialog_file();
             }
         });
-    });
-    // Forget previews of presets that no longer exist.
-    let names: std::collections::HashSet<&str> = app.session.tools.presets.iter().map(|p| p.name.as_str()).collect();
-    brush_preview::with_cache(ui.ctx(), |c| {
-        c.retain(|slot| slot.split_once(':').is_none_or(|(_, n)| names.contains(n)));
     });
 }
 

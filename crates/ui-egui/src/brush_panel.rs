@@ -45,9 +45,15 @@ pub const SECTIONS: [(&str, bool); 13] = [
     ("Protect Texture", true),
 ];
 
-/// Panel width and the stroke strip's size.
+/// Panel width at its default size, and the stroke strip's height.
 pub(crate) const WIDTH: f32 = 540.0;
-const STRIP: (u32, u32) = (488, 76);
+const STRIP_H: u32 = 76;
+/// The panel's default content height (the section body's 450 pt scroll area plus the rest) and
+/// its smallest size: resizing the window makes the section body and the strip follow.
+const DEFAULT_H: f32 = 662.0;
+const MIN_SIZE: (f32, f32) = (460.0, 420.0);
+/// The section body's smallest height.
+const MIN_BODY_H: f32 = 150.0;
 
 /// How the Brushes tab lists presets.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -316,44 +322,63 @@ fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let before = app.session.tools.brush.clone();
     let mut b = before.clone();
     let section = app.ui.brush_section.min(SECTIONS.len() - 1);
-    ui.horizontal_top(|ui| {
-        section_list(app, ui, &mut b);
-        widgets::vline(ui, 482.0);
-        ui.vertical(|ui| {
-            ui.set_width(WIDTH - 190.0);
-            let name = SECTIONS.get(section).map_or("Brush Tip Shape", |entry| entry.0);
-            ui.label(RichText::new(tl!(name)).font(theme::semibold(12.5)).color(t.text));
-            ui.add_space(6.0);
-            let on = section_flag(&mut b, section).is_none_or(|f| *f);
-            egui::ScrollArea::vertical().id_salt(("brush-section", section)).max_height(450.0).auto_shrink([false, false]).show(ui, |ui| {
-                ui.set_width(WIDTH - 204.0);
-                // A section that's off shows its options greyed out (Photoshop). A tip picked in
-                // the grid copies the tip fields only — the dynamics sections stay (Photoshop).
-                // The picked preset is recorded by name (`brush.presets.setCurrent`, identity, so
-                // look-alike duplicates stay distinct), since the engine can't infer it from the
-                // brush afterwards.
-                ui.add_enabled_ui(on, |ui| section_body(ui, &mut b, section, &app.session.tools.presets, app.session.tools.current_preset.as_deref()))
-                    .inner
-                    .inspect(|name| run_or_status(app, "brush.presets.setCurrent", json!({ "name": name })));
-                crate::brush_sections::response_curves(ui, &mut b, section);
+    // The window is resizable: the strip and its buttons are a footer panel, and the section list
+    // and body take exactly what it leaves (egui's panel layout, so nothing measures the window
+    // and the size stays put when the tab changes).
+    let width = ui.available_width().max(MIN_SIZE.0 - 22.0);
+    egui::Panel::bottom(ui.id().with("brush-settings-footer")).resizable(false).show_separator_line(false).frame(egui::Frame::NONE).show(ui, |ui| {
+        ui.add_space(6.0);
+        widgets::hairline(ui);
+        ui.add_space(6.0);
+        settings_footer(app, ui, &mut b, width);
+    });
+    egui::CentralPanel::no_frame().show(ui, |ui| {
+        ui.horizontal_top(|ui| {
+            section_list(app, ui, &mut b);
+            widgets::vline(ui, ui.available_height().max(MIN_BODY_H));
+            ui.vertical(|ui| {
+                ui.set_width(width - 190.0);
+                let name = SECTIONS.get(section).map_or("Brush Tip Shape", |entry| entry.0);
+                ui.label(RichText::new(tl!(name)).font(theme::semibold(12.5)).color(t.text));
+                ui.add_space(6.0);
+                let on = section_flag(&mut b, section).is_none_or(|f| *f);
+                let body_h = ui.available_height().max(MIN_BODY_H);
+                egui::ScrollArea::vertical().id_salt(("brush-section", section)).max_height(body_h).auto_shrink([false, false]).show(ui, |ui| {
+                    ui.set_width(width - 204.0);
+                    // A section that's off shows its options greyed out (Photoshop). A tip picked
+                    // in the grid copies the tip fields only — the dynamics sections stay
+                    // (Photoshop). The picked preset is recorded by name
+                    // (`brush.presets.setCurrent`, identity, so look-alike duplicates stay
+                    // distinct), since the engine can't infer it from the brush afterwards.
+                    ui.add_enabled_ui(on, |ui| section_body(ui, &mut b, section, &app.session.tools.presets, app.session.tools.current_preset.as_deref()))
+                        .inner
+                        .inspect(|name| run_or_status(app, "brush.presets.setCurrent", json!({ "name": name })));
+                    crate::brush_sections::response_curves(ui, &mut b, section);
+                });
             });
         });
     });
-    ui.add_space(6.0);
-    widgets::hairline(ui);
-    ui.add_space(6.0);
+    commit_gesture(app, ui.ctx(), &before, &b);
+}
+
+/// The settings tab's footer: the stroke strip and the new / reset / update buttons.
+fn settings_footer(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSettings, width: f32) {
+    let t = Tokens::get(ui.ctx());
     ui.horizontal(|ui| {
-        let (r, _) = ui.allocate_exact_size(vec2(STRIP.0 as f32, STRIP.1 as f32), Sense::hover());
+        // In steps of 8 pt (488 at the default size), so dragging the window's edge doesn't
+        // re-render the stroke every frame.
+        let strip_w = (((width - 52.0) / 8.0).floor() * 8.0).max(200.0) as u32;
+        let (r, _) = ui.allocate_exact_size(vec2(strip_w as f32, STRIP_H as f32), Sense::hover());
         ui.painter().rect_filled(r, t.radius_sm, t.field);
-        let tex = brush_preview::stroke_texture(ui.ctx(), "settings-strip", &b, STRIP.0, STRIP.1, t.text);
+        let tex = brush_preview::stroke_texture(ui.ctx(), "settings-strip", b, strip_w, STRIP_H, t.text);
         ui.painter().image(tex.id(), r, full_uv(), Color32::WHITE);
         ui.vertical(|ui| {
             if icons::button(ui, "square-plus", 24.0, false, tl!("Create new brush from these settings")).clicked() {
                 let name = new_preset_name(&app.session.tools.presets);
-                run_or_status(app, "brush.presets.save", json!({ "name": name, "brush": serde_json::to_value(&b).unwrap_or(Value::Null) }));
+                run_or_status(app, "brush.presets.save", json!({ "name": name, "brush": serde_json::to_value(&*b).unwrap_or(Value::Null) }));
             }
             if icons::button(ui, "undo-2", 24.0, false, tl!("Reset the brush to the defaults")).clicked() {
-                b = BrushSettings { color: b.color, background: b.background, smoothing: b.smoothing.clone(), locks: b.locks.clone(), ..Default::default() };
+                *b = BrushSettings { color: b.color, background: b.background, smoothing: b.smoothing.clone(), locks: b.locks.clone(), ..Default::default() };
             }
             // Overwrite the preset the current brush was picked from (Photoshop's "update the
             // selected brush"): no new preset, the brush keeps its place in the list.
@@ -362,11 +387,10 @@ fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 ui.add_enabled_ui(current.is_some(), |ui| icons::button(ui, "check", 24.0, false, tl!("Update the current brush with these settings"))).inner;
             update.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, current.is_some(), "Update the current brush with these settings"));
             if update.clicked() {
-                run_or_status(app, "brush.presets.update", json!({ "brush": serde_json::to_value(&b).unwrap_or(Value::Null) }));
+                run_or_status(app, "brush.presets.update", json!({ "brush": serde_json::to_value(&*b).unwrap_or(Value::Null) }));
             }
         });
     });
-    commit_gesture(app, ui.ctx(), &before, &b);
 }
 
 pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
@@ -385,11 +409,15 @@ pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
     egui::Window::new(tl!("Brush Settings"))
         .id(egui::Id::new("brush-settings"))
         .title_bar(false)
-        .resizable(false)
+        // Drag an edge or the corner to resize (Photoshop's panels); egui remembers the size
+        // with the window layout.
+        .resizable(true)
+        // The frame's margins and stroke count in the window size.
+        .default_size(vec2(WIDTH + 22.0, DEFAULT_H))
+        .min_size(vec2(MIN_SIZE.0, MIN_SIZE.1))
         .frame(frame)
         .default_pos(egui::pos2((canvas.right() - WIDTH - 30.0).max(canvas.left() + 8.0), canvas.top() + 24.0))
         .show(ctx, |ui| {
-            ui.set_width(WIDTH);
             ui.horizontal(|ui| {
                 let mut tab = app.ui.brush_tab;
                 for (i, name) in [tl!("Brush Settings"), tl!("Brushes")].iter().enumerate() {
