@@ -1132,3 +1132,70 @@ fn a_rearranged_workspace_renders() {
         let _ = img.save(std::path::Path::new(&dir).join("dock-rearranged.png"));
     }
 }
+
+fn rail_frame(h: &Harness<'static, PhotocraftApp>) -> RailFrame {
+    h.ctx.data(|d| d.get_temp::<RailFrame>(rail_frame_id())).expect("the rail drew")
+}
+
+fn click_at(h: &mut Harness<'static, PhotocraftApp>, at: Pos2) {
+    h.event(egui::Event::PointerMoved(at));
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton { pos: at, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
+    h.event(egui::Event::PointerButton { pos: at, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
+    h.run_steps(3);
+}
+
+#[test]
+fn panels_collapse_to_icons_in_the_rail_and_pop_out_beside_it() {
+    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+        let pro = is_pro(theme);
+        let (app, _, _) = app_with_layers();
+        let mut h = harness(app, vec2(1400.0, 900.0), theme);
+        let strip = |h: &Harness<'static, PhotocraftApp>, g: Group| last_strips(&h.ctx).into_iter().find(|s| s.group == g).unwrap();
+        // Navigator's group isn't shown by default: use Swatches.
+        let (_, sr) = strip(&h, Group::Color).tabs.into_iter().find(|(i, _)| h.state().ui.dock.panels(Group::Color, pro)[*i] == Panel::Swatches).unwrap();
+        let rail = rail_frame(&h).rect;
+        drag_to(&mut h, sr.center(), pos2(rail.center().x, rail.bottom() - 40.0));
+        let (g, _) = h.state().ui.dock.locate(Panel::Swatches, pro);
+        assert!(h.state().ui.dock.is_iconic(g), "{theme:?}: {g:?} {:?}", h.state().ui.dock.rail);
+        assert!(!h.state().ui.dock.panels(Group::Color, pro).contains(&Panel::Swatches));
+        h.run_steps(2);
+        let icon = rail_frame(&h).icons.into_iter().find(|(x, _)| *x == g).expect("its icon").1;
+        assert!(floating_frames(&h).iter().all(|f| f.group != g), "{theme:?}: closed until clicked");
+        // A click pops it out beside the rail; a second click closes it.
+        click_at(&mut h, icon.center());
+        let f = floating_frames(&h).into_iter().find(|f| f.group == g).unwrap_or_else(|| panic!("{theme:?}: popped out"));
+        assert!(f.rect.right() <= icon.left(), "{theme:?}: left of the rail: {:?} vs {icon:?}", f.rect);
+        click_at(&mut h, icon.center());
+        assert!(floating_frames(&h).iter().all(|f| f.group != g), "{theme:?}: closed again");
+        // A click elsewhere closes it too.
+        click_at(&mut h, icon.center());
+        click_at(&mut h, pos2(300.0, 300.0));
+        assert!(floating_frames(&h).iter().all(|f| f.group != g), "{theme:?}: a click outside closes it");
+        // Dragging the icon onto the Color strip docks it back; the rail group is gone.
+        let cs = strip(&h, Group::Color);
+        drag_to(&mut h, icon.center(), cs.tabs[0].1.center());
+        assert_eq!(h.state().ui.dock.locate(Panel::Swatches, pro).0, Group::Color, "{theme:?}");
+        assert!(h.state().ui.dock.rail.is_empty(), "{theme:?}");
+        let back: DockLayout = serde_json::from_value(serde_json::to_value(&h.state().ui.dock).unwrap()).unwrap();
+        assert_eq!(&back, &h.state().ui.dock);
+    }
+}
+
+/// `PHOTOCRAFT_UI_SHOT=<dir>`: Swatches and Navigator collapsed to icons, Swatches popped out.
+#[test]
+fn a_rail_popout_renders() {
+    let (mut app, _, _) = app_with_layers();
+    app.ui.dock.move_panel(Panel::Swatches, PanelDrop::Rail(0), true).unwrap();
+    app.ui.dock.move_panel(Panel::Navigator, PanelDrop::Rail(1), true).unwrap();
+    let mut h = harness(app, vec2(1400.0, 900.0), ThemeKind::ProMedium);
+    let icon = rail_frame(&h).icons[0].1;
+    click_at(&mut h, icon.center());
+    h.run_steps(2);
+    assert!(floating_frames(&h).len() == 1);
+    if let Some(dir) = std::env::var_os("PHOTOCRAFT_UI_SHOT")
+        && let Ok(img) = h.render()
+    {
+        let _ = img.save(std::path::Path::new(&dir).join("dock-rail-popout.png"));
+    }
+}

@@ -166,6 +166,31 @@ impl Panel {
         matches!(self, Panel::Layers | Panel::History | Panel::BrushSettings | Panel::Brushes)
     }
 
+    /// The icon a panel shows when collapsed into the icon rail.
+    pub fn icon(self) -> &'static str {
+        match self {
+            Panel::Color => "droplet",
+            Panel::Swatches => "swatch-book",
+            Panel::Gradients => "blend",
+            Panel::Patterns => "grid-3x3",
+            Panel::Properties => "sliders-horizontal",
+            Panel::Adjustments => "adjustment-layer",
+            Panel::Character => "type",
+            Panel::Paragraph => "align-left",
+            Panel::Navigator => "navigation",
+            Panel::Histogram => "gauge",
+            Panel::Info => "info",
+            Panel::History => "clock",
+            Panel::Actions => "play",
+            Panel::LayerComps => "copy",
+            Panel::Layers => "layers",
+            Panel::Channels => "layer-mask",
+            Panel::Paths => "pen-tool",
+            Panel::BrushSettings => "brush",
+            Panel::Brushes => "brush-cleaning",
+        }
+    }
+
     /// The shortest a group holding this panel can be (Brush Settings' section list and strip).
     pub fn min_height(self) -> f32 {
         match self {
@@ -353,6 +378,10 @@ pub struct DockLayout {
     /// Settings floats unless docked (in `order`).
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub floating: BTreeMap<Group, [f32; 4]>,
+    /// Groups collapsed to icons in the icon rail (Photoshop's iconic column), top to bottom: a
+    /// click on an icon opens its panel beside the rail.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub rail: Vec<Group>,
 }
 
 /// Where a dragged panel goes.
@@ -364,6 +393,8 @@ pub enum PanelDrop {
     NewGroup(Option<Group>),
     /// A floating window of its own at this point (screen points), torn out of its group.
     Float([f32; 2]),
+    /// A group of its own in the icon rail, at this position among the rail's groups.
+    Rail(usize),
 }
 
 /// Gap between groups; it is also the splitter's grab area.
@@ -417,7 +448,7 @@ impl DockLayout {
     fn free_extra(&self) -> Option<u8> {
         (0..MAX_EXTRA).find(|n| {
             let g = Group::Extra(*n);
-            !self.tabs.get(&g).is_some_and(|l| !l.is_empty()) && !self.order.contains(&g) && !self.floating.contains_key(&g)
+            !self.tabs.get(&g).is_some_and(|l| !l.is_empty()) && !self.order.contains(&g) && !self.floating.contains_key(&g) && !self.rail.contains(&g)
         })
     }
 
@@ -473,6 +504,16 @@ impl DockLayout {
                 self.floating.insert(g, [x - 24.0, y - 12.0, w, h]);
                 (g, 0)
             }
+            PanelDrop::Rail(i) => {
+                // Already alone there: keep its place.
+                if src.len() == 1 && self.rail.iter().position(|x| *x == from).is_some_and(|at| at == i || at + 1 == i) {
+                    return None;
+                }
+                let g = Group::Extra(self.free_extra()?);
+                self.tabs.insert(g, vec![p]);
+                self.rail.insert(i.min(self.rail.len()), g);
+                (g, 0)
+            }
         };
         src.retain(|x| *x != p);
         self.tabs.insert(from, src);
@@ -490,6 +531,7 @@ impl DockLayout {
             self.collapsed.retain(|x| *x != g);
             self.hidden_tabs.remove(&g);
             self.floating.remove(&g);
+            self.rail.retain(|x| *x != g);
         }
     }
 
@@ -516,7 +558,7 @@ impl DockLayout {
     /// Every group: the docked ones in display order, then the floating ones.
     pub fn groups(&self) -> Vec<Group> {
         let mut out = self.order();
-        for g in self.floating.keys().copied().chain([Group::Brush]) {
+        for g in self.floating.keys().copied().chain(self.rail.iter().copied()).chain([Group::Brush]) {
             if !out.contains(&g) {
                 out.push(g);
             }
@@ -526,21 +568,26 @@ impl DockLayout {
 
     /// Is `g` a floating window rather than part of the dock column?
     pub fn is_floating(&self, g: Group) -> bool {
-        self.floating.contains_key(&g) || (g == Group::Brush && !self.order.contains(&g))
+        !self.rail.contains(&g) && (self.floating.contains_key(&g) || (g == Group::Brush && !self.order.contains(&g)))
+    }
+
+    /// Is `g` collapsed to icons in the icon rail?
+    pub fn is_iconic(&self, g: Group) -> bool {
+        self.rail.contains(&g)
     }
 
     /// Every docked group once, in display order (floating ones are left out).
     pub fn order(&self) -> Vec<Group> {
         let mut out: Vec<Group> = Vec::with_capacity(Group::ALL.len());
         for g in &self.order {
-            if !out.contains(g) && !self.floating.contains_key(g) {
+            if !out.contains(g) && !self.floating.contains_key(g) && !self.rail.contains(g) {
                 out.push(*g);
             }
         }
         // Missing groups slot in below their default predecessor, so a group new to an old
         // saved layout (Character) never lands below Layers and takes over as the filler.
         for (i, g) in Group::ALL.iter().enumerate() {
-            if out.contains(g) || self.floating.contains_key(g) {
+            if out.contains(g) || self.floating.contains_key(g) || self.rail.contains(g) {
                 continue;
             }
             let prev = Group::ALL.iter().take(i).rev().find_map(|p| out.iter().position(|x| x == p));
@@ -800,6 +847,148 @@ fn floating_frames_id() -> egui::Id {
     egui::Id::new("dock-floating-frames")
 }
 
+/// The icon rail as drawn this frame: its rectangle and the icons of the groups collapsed into it.
+#[derive(Clone, Debug)]
+struct RailFrame {
+    frame: u64,
+    rect: Rect,
+    icons: Vec<(Group, Rect)>,
+}
+
+fn rail_frame_id() -> egui::Id {
+    egui::Id::new("dock-rail-frame")
+}
+
+/// The rail group whose panel is popped out beside the rail (egui memory; one at a time).
+fn rail_popout_id() -> egui::Id {
+    egui::Id::new("dock-rail-popout")
+}
+
+/// Draw the panels collapsed to icons in the icon rail (below its fixed buttons), inside the rail
+/// `rail` (its whole rectangle). A click opens or closes the panel beside the rail; dragging an
+/// icon moves the panel like dragging its tab.
+pub fn rail_icons(app: &mut PhotocraftApp, ui: &mut egui::Ui, rail: Rect, box_size: f32) {
+    let t = Tokens::get(ui.ctx());
+    let locked = app.session.prefs().workspace_locked;
+    let open: Option<Group> = ui.ctx().data(|d| d.get_temp::<Option<Group>>(rail_popout_id())).flatten();
+    let mut icons: Vec<(Group, Rect)> = Vec::new();
+    let groups = app.ui.dock.rail.clone();
+    if !groups.is_empty() {
+        ui.add_space(4.0);
+        let r = ui.cursor();
+        ui.painter().line_segment([pos2(r.left() + 4.0, r.top()), pos2(r.left() + box_size - 4.0, r.top())], Stroke::new(1.0, t.separator));
+        ui.add_space(5.0);
+    }
+    let mut toggle: Option<(Group, usize)> = None;
+    for g in groups {
+        let selected = *g.tab_mut(&mut app.ui.dock_tabs);
+        for (i, p) in app.ui.dock.visible_panels(g, t.pro) {
+            let on = open == Some(g) && selected == i;
+            let resp = crate::icons::rail_button_sense(ui, p.icon(), box_size, on, tl!(p.name()), Sense::click_and_drag());
+            if resp.clicked() {
+                toggle = Some((g, i));
+            }
+            if !locked && resp.drag_started() {
+                ui.ctx().data_mut(|d| d.insert_temp::<Option<PanelDrag>>(panel_drag_id(), Some(PanelDrag { panel: p })));
+            }
+            icons.push((g, resp.rect));
+        }
+    }
+    if let Some((g, i)) = toggle {
+        let close = open == Some(g) && *g.tab_mut(&mut app.ui.dock_tabs) == i;
+        *g.tab_mut(&mut app.ui.dock_tabs) = i;
+        *g.shown_mut(&mut app.ui.panels) = true;
+        ui.ctx().data_mut(|d| d.insert_temp::<Option<Group>>(rail_popout_id(), (!close).then_some(g)));
+    }
+    let frame = ui.ctx().cumulative_frame_nr();
+    ui.ctx().data_mut(|d| d.insert_temp(rail_frame_id(), RailFrame { frame, rect: rail, icons }));
+}
+
+/// The rail group popped out beside the rail: its panel in a card next to the rail (left of it, or
+/// of the dock when the dock is left of the rail), its tabs on top. It closes on a click elsewhere,
+/// on its icon, or its close button.
+fn rail_popout(app: &mut PhotocraftApp, ctx: &egui::Context, frames: &mut Vec<FloatingFrame>) {
+    let Some(g) = ctx.data(|d| d.get_temp::<Option<Group>>(rail_popout_id())).flatten() else { return };
+    let frame_nr = ctx.cumulative_frame_nr();
+    let rail = ctx.data(|d| d.get_temp::<RailFrame>(rail_frame_id())).filter(|r| r.frame == frame_nr);
+    let t = Tokens::get(ctx);
+    let visible = app.ui.dock.visible_panels(g, t.pro);
+    let (Some(rail), false) = (rail, visible.is_empty() || !app.ui.dock.is_iconic(g)) else {
+        ctx.data_mut(|d| d.insert_temp::<Option<Group>>(rail_popout_id(), None));
+        return;
+    };
+    let w = visible.iter().map(|(_, p)| p.min_width()).fold(300.0, f32::max).max(if visible.iter().any(|(_, p)| p.min_width() > 0.0) { 562.0 } else { 300.0 });
+    let h: f32 = if visible.iter().any(|(_, p)| p.min_width() > 0.0) { 662.0 } else { 420.0 };
+    let column_left = ctx.data(|d| d.get_temp::<DockColumn>(column_id())).filter(|c| c.frame == frame_nr).map(|c| c.area.left());
+    let right = column_left.filter(|l| *l < rail.rect.left()).unwrap_or(rail.rect.left()) - 6.0;
+    let top = rail.icons.iter().find(|(x, _)| *x == g).map_or(rail.rect.top(), |(_, r)| r.top());
+    let screen = ctx.content_rect();
+    let pos = pos2((right - w).max(screen.left() + 4.0), top.min(screen.bottom() - h - 4.0).max(screen.top() + 4.0));
+    let locked = app.session.prefs().workspace_locked;
+    let selected = *g.tab_mut(&mut app.ui.dock_tabs);
+    let mut sel = visible.iter().position(|(i, _)| *i == selected).unwrap_or(0);
+    let mut close = false;
+    let id = egui::Id::new(("dock-rail-popout", g.key()));
+    let out = egui::Area::new(id).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
+        egui::Frame::NONE
+            .fill(t.card)
+            .stroke(Stroke::new(1.0, t.card_border))
+            .corner_radius(egui::CornerRadius::same(t.radius_lg as u8))
+            .shadow(egui::Shadow { offset: [0, 8], blur: 24, spread: 0, color: t.shadow })
+            .inner_margin(egui::Margin::same(10))
+            .show(ui, |ui| {
+                ui.set_width(w - 20.0);
+                ui.set_height(h - 20.0);
+                let mut tabs: Vec<(usize, Rect)> = Vec::new();
+                let header = ui
+                    .horizontal(|ui| {
+                        for (k, (i, p)) in visible.iter().enumerate() {
+                            let resp = widgets::pill_tab_sense(ui, p.name(), k == sel, Sense::click_and_drag());
+                            if resp.clicked() {
+                                sel = k;
+                            }
+                            if !locked && resp.drag_started() {
+                                ui.ctx().data_mut(|d| d.insert_temp::<Option<PanelDrag>>(panel_drag_id(), Some(PanelDrag { panel: *p })));
+                            }
+                            tabs.push((*i, resp.rect));
+                        }
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if crate::icons::button(ui, "x", 20.0, false, tl!("Close")).clicked() {
+                                close = true;
+                            }
+                        });
+                    })
+                    .response
+                    .rect;
+                ui.add_space(6.0);
+                widgets::hairline(ui);
+                ui.add_space(6.0);
+                if let Some(&(_, p)) = visible.get(sel) {
+                    if p.scrolls_itself() {
+                        ui.set_min_height(ui.available_height());
+                        crate::panels::dock_body(app, ui, p);
+                    } else {
+                        egui::ScrollArea::vertical().id_salt(("rail-scroll", g.key(), p.name())).auto_shrink([false, false]).show(ui, |ui| crate::panels::dock_body(app, ui, p));
+                    }
+                }
+                (header, tabs)
+            })
+            .inner
+    });
+    if let Some(&(i, _)) = visible.get(sel) {
+        *g.tab_mut(&mut app.ui.dock_tabs) = i;
+    }
+    let rect = out.response.rect;
+    let (header, tabs) = out.inner;
+    // A press outside the card and the rail closes it (not while a panel is being dragged).
+    let dragging = ctx.data(|d| d.get_temp::<Option<PanelDrag>>(panel_drag_id())).flatten().is_some();
+    let pressed_outside = ctx.input(|i| i.pointer.any_pressed() && i.pointer.interact_pos().is_some_and(|p| !rect.contains(p) && !rail.rect.contains(p)));
+    if close || (pressed_outside && !dragging) {
+        ctx.data_mut(|d| d.insert_temp::<Option<Group>>(rail_popout_id(), None));
+    }
+    frames.push(FloatingFrame { frame: frame_nr, group: g, rect, header, tabs });
+}
+
 /// Where Brush Settings opens before it is moved: right of the canvas, below its top.
 fn default_float_rect(g: Group, canvas: Rect) -> [f32; 4] {
     let (w, h) = if g == Group::Brush { (crate::brush_panel::WIDTH + 22.0, crate::brush_panel::DEFAULT_H) } else { (300.0, 380.0) };
@@ -899,6 +1088,7 @@ pub fn floating_windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
             }
         }
     }
+    rail_popout(app, ctx, &mut frames);
     ctx.data_mut(|d| d.insert_temp(floating_frames_id(), frames));
 }
 
@@ -912,6 +1102,16 @@ fn drop_target(ctx: &egui::Context, layout: &DockLayout, pro: bool, p: egui::Pos
         let all = layout.panels(f.group, pro).len();
         let at = if f.header.contains(p) { f.tabs.iter().find(|(_, tr)| p.x < tr.center().x).map_or(all, |(i, _)| *i) } else { all };
         return PanelDrop::Into(f.group, at);
+    }
+    // The icon rail: a group of its own there, before the first icon below the pointer.
+    if let Some(r) = ctx.data(|d| d.get_temp::<RailFrame>(rail_frame_id())).filter(|r| r.frame == frame && r.rect.contains(p)) {
+        let mut groups: Vec<Group> = Vec::new();
+        for (g, ir) in &r.icons {
+            if ir.center().y < p.y && !groups.contains(g) {
+                groups.push(*g);
+            }
+        }
+        return PanelDrop::Rail(groups.len());
     }
     if let Some(c) = ctx.data(|d| d.get_temp::<DockColumn>(column_id())).filter(|c| c.frame == frame)
         && let Some(to) = panel_drop_at(&c.rects, &c.strips, c.strip_h, layout, pro, p)
@@ -964,6 +1164,24 @@ pub fn end_drag(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     None => c.rects.last().map_or(c.area.top(), |(_, r)| r.bottom() + GAP / 2.0),
                 };
                 fg.line_segment([pos2(c.area.left(), y), pos2(c.area.right(), y)], Stroke::new(3.0, t.accent));
+            }
+        }
+        // Into the icon rail: a line where its icon will go.
+        PanelDrop::Rail(i) => {
+            if let Some(r) = ctx.data(|x| x.get_temp::<RailFrame>(rail_frame_id())).filter(|r| r.frame == frame) {
+                fg.rect_stroke(r.rect, t.radius_sm, Stroke::new(2.0, t.accent), egui::StrokeKind::Inside);
+                let mut seen: Vec<Group> = Vec::new();
+                let mut y = None;
+                for (g, ir) in &r.icons {
+                    if !seen.contains(g) {
+                        if seen.len() == i {
+                            y = Some(ir.top() - 2.0);
+                        }
+                        seen.push(*g);
+                    }
+                }
+                let y = y.unwrap_or_else(|| r.icons.last().map_or(r.rect.top() + 4.0, |(_, ir)| ir.bottom() + 2.0));
+                fg.line_segment([pos2(r.rect.left() + 3.0, y), pos2(r.rect.right() - 3.0, y)], Stroke::new(3.0, t.accent));
             }
         }
         // Torn out: the window it will make.

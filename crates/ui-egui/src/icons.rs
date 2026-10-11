@@ -179,8 +179,14 @@ pub fn button_with_icon_size(ui: &mut egui::Ui, name: &str, box_size: f32, icon_
 
 /// Rail toggle: "on" gets a quiet filled background and full-strength icon (no accent).
 pub fn rail_button(ui: &mut egui::Ui, name: &str, box_size: f32, on: bool, tooltip: &str) -> Response {
+    rail_button_sense(ui, name, box_size, on, tooltip, Sense::click())
+}
+
+/// [`rail_button`] that also senses `sense` (a panel collapsed to an icon is clicked to open it
+/// and dragged to move it; a short press still counts as a click).
+pub fn rail_button_sense(ui: &mut egui::Ui, name: &str, box_size: f32, on: bool, tooltip: &str, sense: Sense) -> Response {
     let t = Tokens::get(ui.ctx());
-    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(box_size), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(box_size), sense);
     if on {
         ui.painter().rect_filled(rect, t.radius_sm, t.card);
         ui.painter().rect_stroke(rect, t.radius_sm, egui::Stroke::new(1.0, t.card_border), egui::StrokeKind::Inside);

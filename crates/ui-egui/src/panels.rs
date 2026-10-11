@@ -1470,6 +1470,8 @@ pub fn right_dock(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         crate::dock::rail_click(app, g, docked);
                     }
                 }
+                // Panels collapsed to icons here (dragged onto the rail).
+                crate::dock::rail_icons(app, ui, r, rb);
             },
         );
     }
