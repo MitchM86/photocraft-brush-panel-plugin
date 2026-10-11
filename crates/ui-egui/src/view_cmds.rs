@@ -207,39 +207,29 @@ fn snap_slot<'a>(s: &'a mut SnapTo, key: &str) -> Option<&'a mut bool> {
 }
 
 /// Window › <panel>: (panel, dock tab) for panels that live as tabs of a dock card.
-fn panel_tab(app: &PhotocraftApp, id: &str) -> Option<(&'static str, usize)> {
-    let pro = matches!(app.ui.theme, crate::theme::ThemeKind::Pro | crate::theme::ThemeKind::ProMedium);
+/// The dock panel a `window.panel.*` (or `type.panels.*`) item opens.
+fn panel_of(app: &PhotocraftApp, id: &str) -> Option<crate::dock::Panel> {
+    use crate::dock::Panel;
+    let _ = app;
     Some(match id {
-        "window.panel.info" => ("navigator", 2),
-        "window.panel.histogram" => ("navigator", 1),
-        "window.panel.navigator" => ("navigator", 0),
-        "window.panel.actions" => ("history", 1),
-        "window.panel.layerComps" => ("history", 2),
-        "window.panel.history" => ("history", 0),
-        "window.panel.channels" => ("layers", 1),
-        "window.panel.paths" => ("layers", 2),
-        "window.panel.layers" => ("layers", 0),
-        "window.panel.adjustments" => ("properties", 1),
-        "window.panel.properties" => ("properties", 0),
+        "window.panel.info" => Panel::Info,
+        "window.panel.histogram" => Panel::Histogram,
+        "window.panel.navigator" => Panel::Navigator,
+        "window.panel.actions" => Panel::Actions,
+        "window.panel.layerComps" => Panel::LayerComps,
+        "window.panel.history" => Panel::History,
+        "window.panel.channels" => Panel::Channels,
+        "window.panel.paths" => Panel::Paths,
+        "window.panel.layers" => Panel::Layers,
+        "window.panel.adjustments" => Panel::Adjustments,
+        "window.panel.properties" => Panel::Properties,
         // Their own Character | Paragraph group, so Properties stays open (#150).
-        "window.panel.character" | "type.panels.character" => ("character", 0),
-        "window.panel.paragraph" | "type.panels.paragraph" => ("character", 1),
-        "window.panel.swatches" => ("color", usize::from(pro)),
-        "window.panel.color" => ("color", usize::from(!pro)),
+        "window.panel.character" | "type.panels.character" => Panel::Character,
+        "window.panel.paragraph" | "type.panels.paragraph" => Panel::Paragraph,
+        "window.panel.swatches" => Panel::Swatches,
+        "window.panel.color" => Panel::Color,
         _ => return None,
     })
-}
-
-fn panel_state<'a>(app: &'a mut PhotocraftApp, panel: &str) -> (&'a mut bool, &'a mut usize) {
-    let (p, t) = (&mut app.ui.panels, &mut app.ui.dock_tabs);
-    match panel {
-        "navigator" => (&mut p.navigator, &mut t.navigator),
-        "history" => (&mut p.history, &mut t.history),
-        "layers" => (&mut p.layers, &mut t.layers),
-        "color" => (&mut p.color, &mut t.color),
-        "character" => (&mut p.character, &mut t.character),
-        _ => (&mut p.properties, &mut t.properties),
-    }
 }
 
 /// Ids handled here (live menu items).
@@ -364,17 +354,8 @@ pub fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
     {
         return Some(o.arrange == k);
     }
-    if let Some((panel, tab)) = panel_tab(app, id) {
-        let (p, t) = (&app.ui.panels, &app.ui.dock_tabs);
-        let (vis, cur) = match panel {
-            "navigator" => (p.navigator, t.navigator),
-            "history" => (p.history, t.history),
-            "layers" => (p.layers, t.layers),
-            "color" => (p.color, t.color),
-            "character" => (p.character, t.character),
-            _ => (p.properties, t.properties),
-        };
-        return Some(vis && cur == tab);
+    if let Some(panel) = panel_of(app, id) {
+        return Some(crate::dock::panel_selected(app, panel, false));
     }
     if let Some(c) = type_checked(app, id) {
         return Some(c);
@@ -473,23 +454,19 @@ fn flag_param(p: &Value, cur: bool) -> bool {
 }
 
 fn run(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, p: &Value) -> Result<Value, String> {
-    if let Some((panel, tab)) = panel_tab(app, id) {
-        let group = crate::dock::Group::from_key(panel);
-        let collapsed = group.is_some_and(|g| app.ui.dock.is_collapsed(g));
-        let (vis, cur) = panel_state(app, panel);
+    if let Some(panel) = panel_of(app, id) {
+        // The panel is found wherever it is docked.
+        let (g, tab) = crate::dock::locate(app, panel);
         // Like Photoshop: choosing a visible panel's menu item again hides it. A collapsed
         // group is expanded instead, so the menu item always brings the panel back (#129).
-        if *vis && *cur == tab && !collapsed && !id.starts_with("type.panels.") {
-            *vis = false;
+        let visible = if crate::dock::panel_selected(app, panel, true) && !id.starts_with("type.panels.") {
+            *g.shown_mut(&mut app.ui.panels) = false;
+            false
         } else {
-            *vis = true;
-            *cur = tab;
-        }
-        let visible = *vis;
-        if let Some(g) = group.filter(|_| visible) {
-            crate::dock::reveal(app, g);
-        }
-        return Ok(json!({"panel": panel, "tab": tab, "visible": visible}));
+            crate::dock::show_panel(app, panel);
+            true
+        };
+        return Ok(json!({"panel": g.key(), "tab": tab, "visible": visible}));
     }
     if id == "view.rotateView" {
         return crate::rotate_view::command(app, p);

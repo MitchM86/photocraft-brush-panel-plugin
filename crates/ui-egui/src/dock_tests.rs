@@ -820,3 +820,84 @@ fn tab_hides_all_panels_and_shift_tab_only_the_dock() {
     v.as_object_mut().unwrap().remove("dock");
     assert!(serde_json::from_value::<crate::state::Panels>(v).unwrap().dock);
 }
+
+#[test]
+fn every_panel_is_in_exactly_one_group_and_moved_panels_leave_home() {
+    let once = |d: &DockLayout, pro: bool| {
+        let all: Vec<Panel> = Group::ALL.iter().flat_map(|g| d.panels(*g, pro)).collect();
+        for p in Panel::ALL {
+            assert_eq!(all.iter().filter(|x| **x == p).count(), 1, "{p:?} in {all:?}");
+        }
+    };
+    for pro in [true, false] {
+        let mut d = DockLayout::default();
+        // The default layout: each group's home panels, named as its tabs.
+        for g in Group::ALL {
+            assert_eq!(d.panels(g, pro).iter().map(|p| p.name()).collect::<Vec<_>>(), g.tabs(pro).to_vec(), "{g:?}");
+        }
+        once(&d, pro);
+        // Gradients moved into the Layers group, after Channels.
+        d.tabs.insert(Group::Layers, vec![Panel::Layers, Panel::Channels, Panel::Gradients, Panel::Paths]);
+        assert!(!d.panels(Group::Color, pro).contains(&Panel::Gradients));
+        assert_eq!(d.locate(Panel::Gradients, pro), (Group::Layers, 2));
+        assert_eq!(d.visible_tabs(Group::Layers, pro).iter().map(|(_, n)| *n).collect::<Vec<_>>(), ["Layers", "Channels", "Gradients", "Paths"]);
+        once(&d, pro);
+        // A panel listed twice stays in the first group (in group order); home panels missing
+        // from their own group's list come back to it.
+        d.tabs.insert(Group::Color, vec![Panel::Gradients, Panel::Color]);
+        assert_eq!(d.locate(Panel::Gradients, pro).0, Group::Color);
+        let color = d.panels(Group::Color, pro);
+        assert!(color.contains(&Panel::Swatches) && color.contains(&Panel::Patterns), "{color:?}");
+        once(&d, pro);
+    }
+}
+
+#[test]
+fn layouts_without_moved_panels_load_and_moved_ones_round_trip() {
+    let old: DockLayout = serde_json::from_value(json!({"order": ["layers", "color"], "heights": {"layers": 300.0}, "collapsed": ["navigator"]})).unwrap();
+    assert!(old.tabs.is_empty());
+    assert_eq!(old.panels(Group::Layers, true), Group::Layers.home_panels(true));
+    assert!(serde_json::to_value(&old).unwrap().get("tabs").is_none(), "nothing extra saved for an unchanged layout");
+    let mut moved = DockLayout::default();
+    moved.tabs.insert(Group::Layers, vec![Panel::Layers, Panel::LayerComps]);
+    let v = serde_json::to_value(&moved).unwrap();
+    assert_eq!(v["tabs"]["layers"], json!(["layers", "layerComps"]));
+    let back: DockLayout = serde_json::from_value(v).unwrap();
+    assert_eq!(back, moved);
+    assert_eq!(back.locate(Panel::LayerComps, true), (Group::Layers, 1));
+    // Hostile input: unknown panels make the saved layout unreadable as a whole, which keeps
+    // the defaults (dock::apply ignores it) instead of half-applying it.
+    assert!(serde_json::from_value::<DockLayout>(json!({"tabs": {"layers": ["nope"]}})).is_err());
+}
+
+#[test]
+fn a_panel_moved_to_another_group_shows_there_and_the_window_menu_finds_it() {
+    let (mut app, _, _) = app_with_layers();
+    app.ui.dock.tabs.insert(Group::Layers, vec![Panel::Layers, Panel::Channels, Panel::Gradients, Panel::Paths]);
+    let mut h = harness(app, vec2(1300.0, 850.0), ThemeKind::ProMedium);
+    let strip = |h: &Harness<'static, PhotocraftApp>, g: Group| last_strips(&h.ctx).into_iter().find(|s| s.group == g).unwrap();
+    assert_eq!(strip(&h, Group::Layers).tabs.iter().map(|(i, _)| *i).collect::<Vec<_>>(), [0, 1, 2, 3]);
+    assert!(strip(&h, Group::Color).tabs.len() == 3, "Gradients left the Color group");
+    // Clicking the moved tab selects it in its new group.
+    let at = strip(&h, Group::Layers).tabs[2].1.center();
+    h.event(egui::Event::PointerMoved(at));
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton { pos: at, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
+    h.event(egui::Event::PointerButton { pos: at, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
+    h.run_steps(3);
+    assert_eq!(h.state().ui.dock_tabs.layers, 2);
+    assert_eq!(crate::preset_panels::checked(h.state(), "window.panel.gradients"), Some(true));
+    // Window › Gradients hides it where it is now, and brings it back there.
+    let ctx = h.ctx.clone();
+    crate::menus::invoke(h.state_mut(), &ctx, "window.panel.gradients", json!({})).unwrap();
+    h.run_steps(2);
+    assert!(!h.state().ui.panels.layers && h.state().ui.panels.color, "the group holding Gradients closed, Color stayed");
+    crate::menus::invoke(h.state_mut(), &ctx, "window.panel.gradients", json!({})).unwrap();
+    h.run_steps(2);
+    assert!(h.state().ui.panels.layers && h.state().ui.dock_tabs.layers == 2);
+    // So does a menu item handled by the view commands (Window › Layer Comps).
+    h.state_mut().ui.dock.tabs.insert(Group::Navigator, vec![Panel::Navigator, Panel::Histogram, Panel::Info, Panel::LayerComps]);
+    crate::menus::invoke(h.state_mut(), &ctx, "window.panel.layerComps", json!({})).unwrap();
+    h.run_steps(2);
+    assert!(h.state().ui.panels.navigator && h.state().ui.dock_tabs.navigator == 3);
+}

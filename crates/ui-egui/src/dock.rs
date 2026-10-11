@@ -6,6 +6,10 @@
 //! group to its tab strip, and drag a tab strip to move the group up or down the column
 //! (unless Window › Workspace › Lock Workspace is on).
 //!
+//! Every tab is a [`Panel`]. A group shows its home panels ([`Group::home_panels`]) unless the
+//! layout moved panels between groups ([`DockLayout::tabs`]); either way each panel is in exactly
+//! one group, and the panel bodies, menus and commands find panels by [`Panel`], not by position.
+//!
 //! The layout is [`DockLayout`] in `UiState::dock` (serialisable, drivable with `ui.set`), saved
 //! with Window › Workspace › New Workspace…, reset by Reset Workspace, and remembered across
 //! launches in the preferences (`panelLayout`) while Remember Workspace Changes is on.
@@ -37,6 +41,96 @@ pub enum Group {
     History,
     /// Layers | Channels | Paths.
     Layers,
+}
+
+/// One dock panel: a tab of a group.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Panel {
+    Color,
+    Swatches,
+    Gradients,
+    Patterns,
+    Properties,
+    Adjustments,
+    Character,
+    Paragraph,
+    Navigator,
+    Histogram,
+    Info,
+    History,
+    Actions,
+    LayerComps,
+    Layers,
+    Channels,
+    Paths,
+}
+
+impl Panel {
+    pub const ALL: [Panel; 17] = [
+        Panel::Color,
+        Panel::Swatches,
+        Panel::Gradients,
+        Panel::Patterns,
+        Panel::Properties,
+        Panel::Adjustments,
+        Panel::Character,
+        Panel::Paragraph,
+        Panel::Navigator,
+        Panel::Histogram,
+        Panel::Info,
+        Panel::History,
+        Panel::Actions,
+        Panel::LayerComps,
+        Panel::Layers,
+        Panel::Channels,
+        Panel::Paths,
+    ];
+
+    /// The tab label (English; translated where it is drawn).
+    pub fn name(self) -> &'static str {
+        match self {
+            Panel::Color => "Color",
+            Panel::Swatches => "Swatches",
+            Panel::Gradients => "Gradients",
+            Panel::Patterns => "Patterns",
+            Panel::Properties => "Properties",
+            Panel::Adjustments => "Adjustments",
+            Panel::Character => "Character",
+            Panel::Paragraph => "Paragraph",
+            Panel::Navigator => "Navigator",
+            Panel::Histogram => "Histogram",
+            Panel::Info => "Info",
+            Panel::History => "History",
+            Panel::Actions => "Actions",
+            Panel::LayerComps => "Layer Comps",
+            Panel::Layers => "Layers",
+            Panel::Channels => "Channels",
+            Panel::Paths => "Paths",
+        }
+    }
+
+    /// The panel with this tab label.
+    pub fn from_name(name: &str) -> Option<Panel> {
+        Panel::ALL.into_iter().find(|p| p.name() == name)
+    }
+
+    /// The group the panel belongs to in the default workspace.
+    pub fn home(self) -> Group {
+        match self {
+            Panel::Color | Panel::Swatches | Panel::Gradients | Panel::Patterns => Group::Color,
+            Panel::Properties | Panel::Adjustments => Group::Properties,
+            Panel::Character | Panel::Paragraph => Group::Character,
+            Panel::Navigator | Panel::Histogram | Panel::Info => Group::Navigator,
+            Panel::History | Panel::Actions | Panel::LayerComps => Group::History,
+            Panel::Layers | Panel::Channels | Panel::Paths => Group::Layers,
+        }
+    }
+
+    /// Panels that lay out their own scrolling list and footer (they fill the group).
+    pub fn scrolls_itself(self) -> bool {
+        matches!(self, Panel::Layers | Panel::History)
+    }
 }
 
 impl Group {
@@ -110,12 +204,25 @@ impl Group {
         }
     }
 
-    /// Tabs that lay out their own scrolling list and footer (they fill the group).
-    pub fn scrolls_itself(self, tab: usize) -> bool {
-        matches!((self, tab), (Group::Layers, 0) | (Group::History, 0))
+    /// The group's panels in the default workspace, in tab order ([`Self::tabs`]' panels).
+    pub fn home_panels(self, pro: bool) -> &'static [Panel] {
+        match self {
+            Group::Color if pro => &[Panel::Color, Panel::Swatches, Panel::Gradients, Panel::Patterns],
+            Group::Color => &[Panel::Swatches, Panel::Color, Panel::Gradients, Panel::Patterns],
+            Group::Properties => &[Panel::Properties, Panel::Adjustments],
+            Group::Character => &[Panel::Character, Panel::Paragraph],
+            Group::Navigator => &[Panel::Navigator, Panel::Histogram, Panel::Info],
+            Group::History => &[Panel::History, Panel::Actions, Panel::LayerComps],
+            Group::Layers => &[Panel::Layers, Panel::Channels, Panel::Paths],
+        }
     }
 
-    fn tab_mut(self, tabs: &mut DockTabs) -> &mut usize {
+    /// Home tabs that lay out their own scrolling list and footer (they fill the group).
+    pub fn scrolls_itself(self, tab: usize) -> bool {
+        self.home_panels(true).get(tab).is_some_and(|p| p.scrolls_itself())
+    }
+
+    pub(crate) fn tab_mut(self, tabs: &mut DockTabs) -> &mut usize {
         match self {
             Group::Color => &mut tabs.color,
             Group::Properties => &mut tabs.properties,
@@ -142,7 +249,7 @@ impl Group {
         }
     }
 
-    fn shown_mut(self, panels: &mut Panels) -> &mut bool {
+    pub(crate) fn shown_mut(self, panels: &mut Panels) -> &mut bool {
         match self {
             Group::Color => &mut panels.color,
             Group::Properties => &mut panels.properties,
@@ -168,6 +275,10 @@ pub struct DockLayout {
     /// Names of tabs hidden by Close (not positions: Color/Swatches swap with the theme).
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub hidden_tabs: BTreeMap<Group, Vec<String>>,
+    /// Groups whose panels were rearranged: their tabs in order. A group missing here shows its
+    /// home panels less any listed elsewhere (see [`DockLayout::panels`]).
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub tabs: BTreeMap<Group, Vec<Panel>>,
 }
 
 /// Gap between groups; it is also the splitter's grab area.
@@ -176,15 +287,50 @@ pub const GAP: f32 = 6.0;
 const MAX_HEIGHT: f32 = 4000.0;
 
 impl DockLayout {
+    /// `group`'s panels in tab order (hidden ones included; their indices are the tab indices
+    /// `dockTabs` and the commands use). Each panel is in exactly one group: a group's own list
+    /// when it has one (first listing wins), else its home panels less those listed elsewhere;
+    /// a panel listed nowhere returns to its home group.
+    pub fn panels(&self, group: Group, pro: bool) -> Vec<Panel> {
+        let listed_elsewhere = |p: &Panel, before_only: bool| self.tabs.iter().any(|(g, list)| *g != group && (!before_only || *g < group) && list.contains(p));
+        let mut out: Vec<Panel> = Vec::new();
+        match self.tabs.get(&group) {
+            Some(list) => {
+                for p in list {
+                    if !out.contains(p) && !listed_elsewhere(p, true) {
+                        out.push(*p);
+                    }
+                }
+                for p in group.home_panels(pro) {
+                    if !out.contains(p) && !listed_elsewhere(p, false) {
+                        out.push(*p);
+                    }
+                }
+            }
+            None => out.extend(group.home_panels(pro).iter().copied().filter(|p| !listed_elsewhere(p, false))),
+        }
+        out
+    }
+
+    /// Visible panels with their tab indices.
+    pub fn visible_panels(&self, group: Group, pro: bool) -> Vec<(usize, Panel)> {
+        let hidden = self.hidden_tabs.get(&group);
+        self.panels(group, pro).into_iter().enumerate().filter(|(_, p)| !hidden.is_some_and(|xs| xs.iter().any(|x| x.as_str() == p.name()))).collect()
+    }
+
     /// Visible tabs, retaining their original indices for commands and panel bodies.
     pub fn visible_tabs(&self, group: Group, pro: bool) -> Vec<(usize, &'static str)> {
-        let hidden = self.hidden_tabs.get(&group);
-        group.tabs(pro).iter().copied().enumerate().filter(|(_, name)| !hidden.is_some_and(|xs| xs.iter().any(|x| x.as_str() == *name))).collect()
+        self.visible_panels(group, pro).into_iter().map(|(i, p)| (i, p.name())).collect()
+    }
+
+    /// The group `p` is in and its tab index there.
+    pub fn locate(&self, p: Panel, pro: bool) -> (Group, usize) {
+        Group::ALL.into_iter().find_map(|g| self.panels(g, pro).iter().position(|x| *x == p).map(|i| (g, i))).unwrap_or((p.home(), 0))
     }
 
     /// Hide one tab; it can be reopened through Window › Panel.
     pub fn hide_tab(&mut self, group: Group, tab: usize, pro: bool) {
-        let Some(&name) = group.tabs(pro).get(tab) else { return };
+        let Some(name) = self.panels(group, pro).get(tab).map(|p| p.name()) else { return };
         let hidden = self.hidden_tabs.entry(group).or_default();
         if !hidden.iter().any(|x| x.as_str() == name) {
             hidden.push(name.to_owned());
@@ -193,7 +339,7 @@ impl DockLayout {
 
     /// Restore the tab requested by the Window menu or icon rail.
     pub fn show_tab(&mut self, group: Group, tab: usize, pro: bool) {
-        let Some(&name) = group.tabs(pro).get(tab) else { return };
+        let Some(name) = self.panels(group, pro).get(tab).map(|p| p.name()) else { return };
         if let Some(hidden) = self.hidden_tabs.get_mut(&group) {
             hidden.retain(|n| n != name);
             if hidden.is_empty() {
@@ -348,6 +494,35 @@ pub fn rail_click(app: &mut PhotocraftApp, g: Group, docked: bool) {
     }
 }
 
+fn is_pro(app: &PhotocraftApp) -> bool {
+    matches!(app.ui.theme, crate::theme::ThemeKind::Pro | crate::theme::ThemeKind::ProMedium)
+}
+
+/// Where `p` is in the live layout: its group and tab index.
+pub fn locate(app: &PhotocraftApp, p: Panel) -> (Group, usize) {
+    app.ui.dock.locate(p, is_pro(app))
+}
+
+/// Is `p` its group's selected tab, with the group open (collapsed counts when `expanded` is false)?
+pub fn panel_selected(app: &PhotocraftApp, p: Panel, expanded: bool) -> bool {
+    let (g, i) = locate(app, p);
+    let mut tabs = app.ui.dock_tabs;
+    g.shown(&app.ui.panels) && *g.tab_mut(&mut tabs) == i && (!expanded || !app.ui.dock.is_collapsed(g))
+}
+
+/// Make `p` its group's selected tab (wherever it is docked).
+pub fn select_tab(app: &mut PhotocraftApp, p: Panel) {
+    let (g, i) = locate(app, p);
+    *g.tab_mut(&mut app.ui.dock_tabs) = i;
+}
+
+/// Bring `p` up wherever it is docked: its group shown and expanded, `p` selected and unhidden.
+pub fn show_panel(app: &mut PhotocraftApp, p: Panel) {
+    let (g, i) = locate(app, p);
+    *g.tab_mut(&mut app.ui.dock_tabs) = i;
+    reveal(app, g);
+}
+
 /// Per-group interactions collected while drawing, applied afterwards.
 enum Action {
     ToggleCollapse(Group),
@@ -388,7 +563,7 @@ fn strips_id() -> egui::Id {
 
 /// Draw the `shown` groups (any order; the layout decides) filling `ui`. `body` draws one
 /// group's tab content.
-pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, shown: &[Group], mut body: impl FnMut(&mut PhotocraftApp, &mut egui::Ui, Group, usize)) {
+pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, shown: &[Group], mut body: impl FnMut(&mut PhotocraftApp, &mut egui::Ui, Panel)) {
     let t = Tokens::get(ui.ctx());
     let strip = if t.pro { 28.0 } else { 40.0 };
     let order: Vec<Group> = app.ui.dock.order().into_iter().filter(|g| shown.contains(g)).collect();
@@ -405,29 +580,30 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, shown: &[Group], mut bod
         child.set_clip_rect(rect.intersect(ui.clip_rect()));
         child.spacing_mut().item_spacing.y = if t.pro { 0.0 } else { 6.0 };
         let before = *g.tab_mut(&mut app.ui.dock_tabs);
-        let visible = app.ui.dock.visible_tabs(g, t.pro);
+        let visible = app.ui.dock.visible_panels(g, t.pro);
         if visible.is_empty() {
             continue;
         }
         let indices: Vec<usize> = visible.iter().map(|(i, _)| *i).collect();
-        let tabs: Vec<&str> = visible.iter().map(|(_, name)| *name).collect();
+        let panels: Vec<Panel> = visible.iter().map(|(_, p)| *p).collect();
+        let tabs: Vec<&str> = panels.iter().map(|p| p.name()).collect();
         let mut sel = indices.iter().position(|i| *i == before).unwrap_or(0);
         let resp = widgets::card_ex(&mut child, g.key(), &tabs, &mut sel, collapsed, |ui, shown_tab| {
-            let Some(&tab) = indices.get(shown_tab) else { return };
+            let Some(&panel) = panels.get(shown_tab) else { return };
             let inner = ui.available_height().max(0.0);
-            if g.scrolls_itself(tab) {
+            if panel.scrolls_itself() {
                 ui.set_min_height(inner);
-                body(app, ui, g, tab);
+                body(app, ui, panel);
             } else {
                 // The pro Color field stretches to the group's height instead of a fixed 120 pt.
-                if t.pro && g == Group::Color && tab == 0 {
+                if t.pro && panel == Panel::Color {
                     ui.data_mut(|d| d.insert_temp(crate::panels::color_field_fill_id(), inner));
                 }
                 egui::ScrollArea::vertical()
-                    .id_salt(("dock-scroll", g.key(), tab))
+                    .id_salt(("dock-scroll", g.key(), panel.name()))
                     .max_height(inner)
                     .auto_shrink([false, false])
-                    .show(ui, |ui| body(app, ui, g, tab));
+                    .show(ui, |ui| body(app, ui, panel));
             }
         });
         strips.push(StripRects {
@@ -470,11 +646,11 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, shown: &[Group], mut bod
         egui::Popup::menu(&resp.menu).show(|ui| {
             crate::widgets::style_spectrum_popup_menu(ui);
             ui.set_min_width(170.0);
-            if tabs.get(sel) == Some(&"Layers") {
+            if panels.get(sel) == Some(&Panel::Layers) {
                 crate::layer_row_ui::panel_menu(app, ui);
                 ui.separator();
             }
-            if tabs.get(sel) == Some(&"Swatches") {
+            if panels.get(sel) == Some(&Panel::Swatches) {
                 crate::swatches_ui::panel_menu(app, ui);
                 ui.separator();
             }

@@ -1520,29 +1520,30 @@ fn dock_panels(app: &mut PhotocraftApp, ui: &mut egui::Ui, p: &crate::state::Pan
     });
 }
 
-/// One dock group's tab content; `dock` bounds it and scrolls it when it's taller.
-fn dock_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, group: crate::dock::Group, tab: usize) {
-    use crate::dock::Group;
+/// One dock panel's content; `dock` bounds it and scrolls it when it's taller.
+fn dock_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, panel: crate::dock::Panel) {
+    use crate::dock::Panel;
     let pro = Tokens::get(ui.ctx()).pro;
-    match (group, tab) {
-        (Group::Color, 2) => crate::preset_panels::gradients_panel(app, ui),
-        (Group::Color, 3) => crate::preset_panels::patterns_panel(app, ui),
-        (Group::Color, 0) if pro => color_field(app, ui),
-        (Group::Color, _) if pro => crate::swatches_ui::panel(app, ui),
-        (Group::Color, 0) => crate::swatches_ui::panel(app, ui),
-        (Group::Color, _) => color_picker(app, ui),
-        (Group::Properties, 0) => properties_body(app, ui),
-        (Group::Properties, _) => adjustments_grid(app, ui),
-        (Group::Character, tab) => crate::type_tool::character_panel(app, ui, tab == 1),
-        (Group::Navigator, 0) => navigator(app, ui),
-        (Group::Navigator, 1) => crate::tone::histogram_panel(app, ui),
-        (Group::Navigator, _) => info_panel(app, ui),
-        (Group::History, 0) => history(app, ui),
-        (Group::History, 1) => crate::actions::panel(app, ui),
-        (Group::History, _) => crate::comps_ui::panel(app, ui),
-        (Group::Layers, 0) => layers(app, ui),
-        (Group::Layers, 1) => channels(app, ui),
-        (Group::Layers, _) => crate::vector_ui::paths_panel(app, ui),
+    match panel {
+        Panel::Gradients => crate::preset_panels::gradients_panel(app, ui),
+        Panel::Patterns => crate::preset_panels::patterns_panel(app, ui),
+        // Pro's Color tab is the colour field; Studio's is the full picker.
+        Panel::Color if pro => color_field(app, ui),
+        Panel::Color => color_picker(app, ui),
+        Panel::Swatches => crate::swatches_ui::panel(app, ui),
+        Panel::Properties => properties_body(app, ui),
+        Panel::Adjustments => adjustments_grid(app, ui),
+        Panel::Character => crate::type_tool::character_panel(app, ui, false),
+        Panel::Paragraph => crate::type_tool::character_panel(app, ui, true),
+        Panel::Navigator => navigator(app, ui),
+        Panel::Histogram => crate::tone::histogram_panel(app, ui),
+        Panel::Info => info_panel(app, ui),
+        Panel::History => history(app, ui),
+        Panel::Actions => crate::actions::panel(app, ui),
+        Panel::LayerComps => crate::comps_ui::panel(app, ui),
+        Panel::Layers => layers(app, ui),
+        Panel::Channels => channels(app, ui),
+        Panel::Paths => crate::vector_ui::paths_panel(app, ui),
     }
 }
 
@@ -2898,7 +2899,7 @@ fn adjustments_grid(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     });
     if let Some(id) = run {
         let _ = app.run(&id, json!({}));
-        app.ui.dock_tabs.properties = 0;
+        crate::dock::select_tab(app, crate::dock::Panel::Properties);
     }
 }
 
