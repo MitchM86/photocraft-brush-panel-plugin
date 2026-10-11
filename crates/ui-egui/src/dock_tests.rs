@@ -423,7 +423,7 @@ fn the_rail_and_window_menu_never_lose_a_panel() {
     assert!(app.ui.panels.color && !app.ui.dock.is_collapsed(Group::Color));
     app.ui.dock.set_collapsed(Group::Color, true);
     crate::menus::invoke(&mut app, &ctx, "window.panel.gradients", json!({})).unwrap();
-    assert!(app.ui.panels.color && !app.ui.dock.is_collapsed(Group::Color) && app.ui.dock_tabs.color == 2);
+    assert!(app.ui.panels.color && !app.ui.dock.is_collapsed(Group::Color) && crate::dock::panel_selected(&app, Panel::Gradients, true));
     // Hidden panels come back from the Window menu, expanded, on their tab.
     app.ui.panels.history = false;
     app.ui.dock.set_collapsed(Group::History, true);
@@ -498,17 +498,17 @@ fn closing_tabs_keeps_stable_names_across_themes_and_workspace_round_trips() {
     let mut dock = DockLayout::default();
     // In Pro the first Color group tab is Color; in Studio it is Swatches.
     dock.hide_tab(Group::Color, 0, true);
-    assert_eq!(dock.visible_tabs(Group::Color, true).iter().map(|(_, n)| *n).collect::<Vec<_>>(), vec!["Swatches", "Gradients", "Patterns"]);
-    assert_eq!(dock.visible_tabs(Group::Color, false).iter().map(|(_, n)| *n).collect::<Vec<_>>(), vec!["Swatches", "Gradients", "Patterns"]);
+    assert_eq!(dock.visible_tabs(Group::Color, true).iter().map(|(_, n)| *n).collect::<Vec<_>>(), vec!["Color Wheel", "Swatches", "Gradients", "Patterns"]);
+    assert_eq!(dock.visible_tabs(Group::Color, false).iter().map(|(_, n)| *n).collect::<Vec<_>>(), vec!["Swatches", "Color Wheel", "Gradients", "Patterns"]);
     dock.hide_tab(Group::Color, 999, true);
     assert_eq!(dock.hidden_tabs[&Group::Color], vec!["Color"]);
     let saved = serde_json::to_value(&dock).unwrap();
     let mut restored: DockLayout = serde_json::from_value(saved).unwrap();
     assert_eq!(restored, dock);
-    // Window › Color (Studio index 1) brings back precisely that tab.
-    restored.show_tab(Group::Color, 1, false);
+    // Window › Color (Studio index 2) brings back precisely that tab.
+    restored.show_tab(Group::Color, 2, false);
     assert!(restored.hidden_tabs.is_empty());
-    assert_eq!(restored.visible_tabs(Group::Color, false).len(), 4);
+    assert_eq!(restored.visible_tabs(Group::Color, false).len(), 5);
 }
 
 fn right_click_tab(h: &mut Harness<'static, PhotocraftApp>, group: Group, original_index: usize) {
@@ -879,7 +879,7 @@ fn a_panel_moved_to_another_group_shows_there_and_the_window_menu_finds_it() {
     let mut h = harness(app, vec2(1300.0, 850.0), ThemeKind::ProMedium);
     let strip = |h: &Harness<'static, PhotocraftApp>, g: Group| last_strips(&h.ctx).into_iter().find(|s| s.group == g).unwrap();
     assert_eq!(strip(&h, Group::Layers).tabs.iter().map(|(i, _)| *i).collect::<Vec<_>>(), [0, 1, 2, 3]);
-    assert!(strip(&h, Group::Color).tabs.len() == 3, "Gradients left the Color group");
+    assert!(strip(&h, Group::Color).tabs.len() == Group::Color.home_panels(true).len() - 1, "Gradients left the Color group");
     // Clicking the moved tab selects it in its new group.
     let at = strip(&h, Group::Layers).tabs[2].1.center();
     h.event(egui::Event::PointerMoved(at));

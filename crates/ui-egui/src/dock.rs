@@ -75,6 +75,7 @@ impl<'de> Deserialize<'de> for Group {
 #[serde(rename_all = "camelCase")]
 pub enum Panel {
     Color,
+    ColorWheel,
     Swatches,
     Gradients,
     Patterns,
@@ -96,8 +97,9 @@ pub enum Panel {
 }
 
 impl Panel {
-    pub const ALL: [Panel; 19] = [
+    pub const ALL: [Panel; 20] = [
         Panel::Color,
+        Panel::ColorWheel,
         Panel::Swatches,
         Panel::Gradients,
         Panel::Patterns,
@@ -122,6 +124,7 @@ impl Panel {
     pub fn name(self) -> &'static str {
         match self {
             Panel::Color => "Color",
+            Panel::ColorWheel => "Color Wheel",
             Panel::Swatches => "Swatches",
             Panel::Gradients => "Gradients",
             Panel::Patterns => "Patterns",
@@ -151,7 +154,7 @@ impl Panel {
     /// The group the panel belongs to in the default workspace.
     pub fn home(self) -> Group {
         match self {
-            Panel::Color | Panel::Swatches | Panel::Gradients | Panel::Patterns => Group::Color,
+            Panel::Color | Panel::ColorWheel | Panel::Swatches | Panel::Gradients | Panel::Patterns => Group::Color,
             Panel::Properties | Panel::Adjustments => Group::Properties,
             Panel::Character | Panel::Paragraph => Group::Character,
             Panel::Navigator | Panel::Histogram | Panel::Info => Group::Navigator,
@@ -163,13 +166,14 @@ impl Panel {
 
     /// Panels that lay out their own scrolling list and footer (they fill the group).
     pub fn scrolls_itself(self) -> bool {
-        matches!(self, Panel::Layers | Panel::History | Panel::BrushSettings | Panel::Brushes)
+        matches!(self, Panel::Layers | Panel::History | Panel::BrushSettings | Panel::Brushes | Panel::ColorWheel)
     }
 
     /// The icon a panel shows when collapsed into the icon rail.
     pub fn icon(self) -> &'static str {
         match self {
             Panel::Color => "droplet",
+            Panel::ColorWheel => "palette",
             Panel::Swatches => "swatch-book",
             Panel::Gradients => "blend",
             Panel::Patterns => "grid-3x3",
@@ -276,8 +280,8 @@ impl Group {
     pub fn tabs(self, pro: bool) -> &'static [&'static str] {
         match self {
             // Photoshop Essentials: Color | Swatches | Gradients | Patterns.
-            Group::Color if pro => &["Color", "Swatches", "Gradients", "Patterns"],
-            Group::Color => &["Swatches", "Color", "Gradients", "Patterns"],
+            Group::Color if pro => &["Color", "Color Wheel", "Swatches", "Gradients", "Patterns"],
+            Group::Color => &["Swatches", "Color Wheel", "Color", "Gradients", "Patterns"],
             Group::Properties => &["Properties", "Adjustments"],
             Group::Character => &["Character", "Paragraph"],
             Group::Navigator => &["Navigator", "Histogram", "Info"],
@@ -291,8 +295,9 @@ impl Group {
     /// The group's panels in the default workspace, in tab order ([`Self::tabs`]' panels).
     pub fn home_panels(self, pro: bool) -> &'static [Panel] {
         match self {
-            Group::Color if pro => &[Panel::Color, Panel::Swatches, Panel::Gradients, Panel::Patterns],
-            Group::Color => &[Panel::Swatches, Panel::Color, Panel::Gradients, Panel::Patterns],
+            // The Color Wheel between Color and Swatches.
+            Group::Color if pro => &[Panel::Color, Panel::ColorWheel, Panel::Swatches, Panel::Gradients, Panel::Patterns],
+            Group::Color => &[Panel::Swatches, Panel::ColorWheel, Panel::Color, Panel::Gradients, Panel::Patterns],
             Group::Properties => &[Panel::Properties, Panel::Adjustments],
             Group::Character => &[Panel::Character, Panel::Paragraph],
             Group::Navigator => &[Panel::Navigator, Panel::Histogram, Panel::Info],

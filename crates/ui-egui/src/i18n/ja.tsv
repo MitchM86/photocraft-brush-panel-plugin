@@ -3453,3 +3453,12 @@ fontWeight	Italic	斜体
 	Flow Pressure Curve	筆圧カーブ(流量)
 	Basic Smoothing (Krita)	基本の補正(Krita)
 	Join the pen's samples with curves instead of straight lines, without lag	ペンのサンプルを直線ではなく曲線でつなぎます(遅延なし)
+	Color Wheel	カラーホイール
+	No Harmony	ハーモニーなし
+	Complementary	補色
+	Analogous	類似色
+	Triad	トライアド
+	Split Complementary	スプリットコンプリメンタリー
+	Tetrad	テトラード
+	Recent Colors	最近使用した色
+	Click to edit the foreground or the background color	クリックして描画色または背景色を編集

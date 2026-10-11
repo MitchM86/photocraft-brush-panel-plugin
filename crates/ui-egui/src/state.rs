@@ -1001,6 +1001,9 @@ pub struct UiState {
     /// Which chip the Color panel edits.
     #[serde(default)]
     pub color_panel: ColorPanelState,
+    /// The Color Wheel panel's shape, wheel, harmony and recent colours.
+    #[serde(default)]
+    pub color_wheel: crate::color_wheel_ui::ColorWheelState,
     /// Brush Settings: selected section (0 = Brush Tip Shape). Its tab is the dock's
     /// (`dock_tabs.brush`, a `dock::Group::Brush` like the other panel groups).
     #[serde(default)]
@@ -1105,6 +1108,7 @@ impl Default for UiState {
             dock_tabs: DockTabs::default(),
             dock: Default::default(),
             color_panel: Default::default(),
+            color_wheel: Default::default(),
             brush_section: 0,
             brushes_panel: Default::default(),
             selection_mode: 0,

@@ -1096,7 +1096,7 @@ mod tests {
         h.get_by_label("Gradients").click();
         h.run_steps(2);
         assert!(h.state().ui.panels.color, "the Gradients panel opened");
-        assert_eq!(h.state().ui.dock_tabs.color, 2, "on the Gradients tab");
+        assert!(crate::dock::panel_selected(h.state(), crate::dock::Panel::Gradients, false), "on the Gradients tab");
         assert_eq!(h.state().session.active().unwrap().doc.layers.len(), 1, "no document layers edited");
     }
 

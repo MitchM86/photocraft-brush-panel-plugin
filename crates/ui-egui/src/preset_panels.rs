@@ -1121,11 +1121,11 @@ mod tests {
             assert!(crate::menus::is_live(id), "{id}");
         }
         invoke(&mut app, &ctx, "window.panel.gradients", Value::Null).unwrap();
-        assert!(app.ui.panels.color && app.ui.dock_tabs.color == 2);
+        assert!(app.ui.panels.color && crate::dock::panel_selected(&app, crate::dock::Panel::Gradients, false));
         assert_eq!(checked(&app, "window.panel.gradients"), Some(true));
         assert_eq!(checked(&app, "window.panel.patterns"), Some(false));
         invoke(&mut app, &ctx, "window.panel.patterns", Value::Null).unwrap();
-        assert_eq!(app.ui.dock_tabs.color, 3);
+        assert!(crate::dock::panel_selected(&app, crate::dock::Panel::Patterns, false));
         // Choosing it again hides the card.
         invoke(&mut app, &ctx, "window.panel.patterns", Value::Null).unwrap();
         assert!(!app.ui.panels.color);

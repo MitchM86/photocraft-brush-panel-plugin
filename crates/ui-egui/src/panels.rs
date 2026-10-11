@@ -1544,6 +1544,7 @@ pub(crate) fn dock_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, panel: crate
         // Pro's Color tab is the colour field; Studio's is the full picker.
         Panel::Color if pro => color_field(app, ui),
         Panel::Color => color_picker(app, ui),
+        Panel::ColorWheel => crate::color_wheel_ui::panel(app, ui),
         Panel::Swatches => crate::swatches_ui::panel(app, ui),
         Panel::Properties => properties_body(app, ui),
         Panel::Adjustments => adjustments_grid(app, ui),
