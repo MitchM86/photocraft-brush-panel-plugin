@@ -483,6 +483,9 @@ pub struct PhotocraftApp {
     fonts_ready: bool,
     /// Screen rect of the main canvas last frame (for overlays and the navigator).
     pub last_canvas_rect: egui::Rect,
+    /// Bumped when the dock layout is replaced as a whole (a workspace, Reset, `ui.set {dock}`):
+    /// floating windows then take their place and size from the layout, not egui's memory.
+    pub(crate) dock_generation: u64,
     /// Physical pixels per egui point of the canvas last frame (`ctx.pixels_per_point`, which
     /// folds in both the display scale and Interface › UI Scale). The canvas maps document pixels
     /// to physical pixels, so point-space geometry divides the view zoom by this (see
@@ -653,6 +656,7 @@ impl PhotocraftApp {
             last_window_title: String::new(),
             fonts_ready: false,
             last_canvas_rect: egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0)),
+            dock_generation: 0,
             ppp: 1.0,
             drop_canvas_rect: None,
             tab_strip: None,

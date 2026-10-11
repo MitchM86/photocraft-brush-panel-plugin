@@ -1199,3 +1199,51 @@ fn a_rail_popout_renders() {
         let _ = img.save(std::path::Path::new(&dir).join("dock-rail-popout.png"));
     }
 }
+
+#[test]
+fn an_applied_layout_places_floating_windows_where_it_says() {
+    let (mut app, _, _) = app_with_layers();
+    app.ui.panels.brush_settings = true;
+    let mut h = harness(app, vec2(1500.0, 950.0), ThemeKind::ProMedium);
+    h.run_steps(2);
+    let before = floating_frames(&h).into_iter().find(|f| f.group == Group::Brush).unwrap().rect;
+    // A workspace that keeps Brush Settings elsewhere and smaller.
+    let mut layout = DockLayout::default();
+    layout.floating.insert(Group::Brush, [120.0, 90.0, 520.0, 500.0]);
+    let saved = json!({"panels": h.state().ui.panels, "dock": layout});
+    apply(h.state_mut(), &saved);
+    h.run_steps(3);
+    let after = floating_frames(&h).into_iter().find(|f| f.group == Group::Brush).unwrap().rect;
+    assert_ne!(before.min, after.min);
+    assert!((after.left() - 120.0).abs() < 2.0 && (after.top() - 90.0).abs() < 2.0, "{after:?}");
+    assert!((after.width() - 520.0).abs() < 3.0 && (after.height() - 500.0).abs() < 3.0, "{after:?}");
+}
+
+#[test]
+fn a_floating_window_dragged_by_its_body_docks_whole() {
+    let (mut app, _, _) = app_with_layers();
+    app.ui.panels.brush_settings = true;
+    let mut h = harness(app, vec2(1500.0, 950.0), ThemeKind::ProMedium);
+    h.run_steps(2);
+    let f = floating_frames(&h).into_iter().find(|f| f.group == Group::Brush).unwrap();
+    // The header's empty part: right of the tabs, left of the close button.
+    let grab = pos2(f.tabs.last().unwrap().1.right() + 40.0, f.header.center().y);
+    // Onto the canvas: it just moves, still floating with both tabs.
+    drag_to(&mut h, grab, grab + vec2(-120.0, 60.0));
+    h.run_steps(2);
+    assert!(h.state().ui.dock.is_floating(Group::Brush));
+    let f = floating_frames(&h).into_iter().find(|f| f.group == Group::Brush).unwrap();
+    assert!((f.rect.left() - (grab.x - 120.0 - (grab.x - f.rect.left()))).abs() < 200.0);
+    // Into the gap above Layers: docked there as one group, both tabs, the column widened.
+    let grab = pos2(f.tabs.last().unwrap().1.right() + 40.0, f.header.center().y);
+    let lr = rect_of(&h, Group::Layers);
+    drag_to(&mut h, grab, pos2(lr.center().x, lr.top() - GAP / 2.0));
+    h.run_steps(4);
+    let d = &h.state().ui.dock;
+    assert!(!d.is_floating(Group::Brush) && d.order().contains(&Group::Brush), "{:?}", d);
+    assert_eq!(d.panels(Group::Brush, true), [Panel::BrushSettings, Panel::Brushes]);
+    let order = d.order();
+    assert_eq!(order.iter().position(|g| *g == Group::Brush).unwrap() + 1, order.iter().position(|g| *g == Group::Layers).unwrap());
+    assert!(floating_frames(&h).is_empty());
+    assert!(rect_of(&h, Group::Brush).width() >= Panel::BrushSettings.min_width());
+}

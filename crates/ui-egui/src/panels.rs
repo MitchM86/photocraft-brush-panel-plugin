@@ -1508,8 +1508,8 @@ fn dock_panels(app: &mut PhotocraftApp, ui: &mut egui::Ui, p: &crate::state::Pan
     .into_iter()
     .filter_map(|(g, on)| on.then_some(g))
     .collect();
-    // Groups made by dragging a panel between groups.
-    shown.extend(app.ui.dock.order().into_iter().filter(|g| matches!(g, Group::Extra(_)) && g.shown(p)));
+    // Groups made by dragging a panel between groups, and Brush Settings once docked.
+    shown.extend(app.ui.dock.order().into_iter().filter(|g| matches!(g, Group::Extra(_) | Group::Brush) && g.shown(p)));
     if shown.is_empty() {
         return;
     }

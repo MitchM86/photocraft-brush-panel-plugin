@@ -1338,6 +1338,7 @@ pub fn apply_workspace(app: &mut PhotocraftApp) {
     // Presets use the default group order, heights and tabs (Reset brings everything back).
     app.ui.dock = Default::default();
     app.ui.dock_tabs = Default::default();
+    crate::dock::layout_replaced(app);
     let p = &mut app.ui.panels;
     let (nav, color, layers, history, props) = match app.ui.workspace.as_str() {
         "Photography" => (true, false, true, true, true),

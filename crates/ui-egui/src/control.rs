@@ -557,6 +557,7 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
                 // Dock group order, heights and collapsed groups (see `dock::DockLayout`).
                 if let Some(v) = dock {
                     app.ui.dock = v;
+                    crate::dock::layout_replaced(app);
                 }
                 if let Some(v) = color_panel {
                     app.ui.color_panel = v;

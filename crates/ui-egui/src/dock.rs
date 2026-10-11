@@ -521,6 +521,45 @@ impl DockLayout {
         Some((group, index))
     }
 
+    /// Dock the floating (or iconic) group `g` as a whole: its panels into another group's tabs, or
+    /// the group itself into the column or the icon rail. Returns where it is now; `None` for a drop
+    /// that leaves it floating.
+    pub fn dock_group(&mut self, g: Group, to: PanelDrop, pro: bool) -> Option<(Group, usize)> {
+        match to {
+            PanelDrop::Into(t, i) if t != g => {
+                let moving = self.panels(g, pro);
+                let first = moving.first().copied()?;
+                let mut dst = self.panels(t, pro);
+                let i = i.min(dst.len());
+                for (k, p) in moving.iter().enumerate() {
+                    dst.insert(i + k, *p);
+                }
+                self.tabs.insert(t, dst);
+                self.tabs.insert(g, Vec::new());
+                self.prune_extra();
+                self.locate(first, pro).into()
+            }
+            PanelDrop::NewGroup(before) => {
+                self.floating.remove(&g);
+                self.rail.retain(|x| *x != g);
+                let mut order = self.order();
+                order.retain(|x| *x != g);
+                let pos = before.and_then(|b| order.iter().position(|x| *x == b)).unwrap_or(order.len());
+                order.insert(pos, g);
+                self.order = order;
+                Some((g, 0))
+            }
+            PanelDrop::Rail(i) => {
+                self.floating.remove(&g);
+                self.order.retain(|x| *x != g);
+                self.rail.retain(|x| *x != g);
+                self.rail.insert(i.min(self.rail.len()), g);
+                Some((g, 0))
+            }
+            _ => None,
+        }
+    }
+
     /// Forget user-made groups that have no panels left.
     fn prune_extra(&mut self) {
         let empty: Vec<Group> = self.tabs.iter().filter(|(g, l)| matches!(g, Group::Extra(_)) && l.is_empty()).map(|(g, _)| *g).collect();
@@ -808,6 +847,50 @@ pub fn drop_panel(app: &mut PhotocraftApp, p: Panel, to: PanelDrop) -> bool {
     true
 }
 
+/// A floating window being dragged by its body (egui memory): over the dock or the rail it
+/// docks as a whole.
+fn group_drag_id() -> egui::Id {
+    egui::Id::new("dock-group-drag")
+}
+
+/// Where a floating window dragged to `p` would dock: the column or the rail (`None`: it just moves).
+fn group_drop_target(ctx: &egui::Context, layout: &DockLayout, pro: bool, p: egui::Pos2) -> Option<PanelDrop> {
+    let frame = ctx.cumulative_frame_nr();
+    if let Some(r) = ctx.data(|d| d.get_temp::<RailFrame>(rail_frame_id())).filter(|r| r.frame == frame && r.rect.contains(p)) {
+        let mut groups: Vec<Group> = Vec::new();
+        for (g, ir) in &r.icons {
+            if ir.center().y < p.y && !groups.contains(g) {
+                groups.push(*g);
+            }
+        }
+        return Some(PanelDrop::Rail(groups.len()));
+    }
+    let c = ctx.data(|d| d.get_temp::<DockColumn>(column_id())).filter(|c| c.frame == frame)?;
+    panel_drop_at(&c.rects, &c.strips, c.strip_h, layout, pro, p)
+}
+
+/// Finish or preview a floating window dragged by its body (see [`group_drop_target`]).
+fn end_group_drag(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    let Some(g) = ctx.data(|x| x.get_temp::<Option<Group>>(group_drag_id())).flatten() else { return };
+    let t = Tokens::get(ctx);
+    let Some(p) = ctx.input(|i| i.pointer.latest_pos()) else { return };
+    let to = group_drop_target(ctx, &app.ui.dock, t.pro, p);
+    if !ctx.input(|i| i.pointer.any_down()) {
+        ctx.data_mut(|x| x.insert_temp::<Option<Group>>(group_drag_id(), None));
+        if let Some(to) = to.filter(|_| !app.session.prefs().workspace_locked)
+            && let Some((group, index)) = app.ui.dock.dock_group(g, to, t.pro)
+        {
+            *group.tab_mut(&mut app.ui.dock_tabs) = index;
+            *group.shown_mut(&mut app.ui.panels) = true;
+            app.ui.dock.set_collapsed(group, false);
+        }
+        return;
+    }
+    if let Some(to) = to {
+        preview_drop(ctx, &t, to, None);
+    }
+}
+
 /// A panel being dragged by its tab (egui memory): it and the group it came from.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct PanelDrag {
@@ -989,6 +1072,20 @@ fn rail_popout(app: &mut PhotocraftApp, ctx: &egui::Context, frames: &mut Vec<Fl
     frames.push(FloatingFrame { frame: frame_nr, group: g, rect, header, tabs });
 }
 
+/// The dock layout was replaced as a whole: floating windows take their place and size from it.
+pub fn layout_replaced(app: &mut PhotocraftApp) {
+    app.dock_generation = app.dock_generation.wrapping_add(1);
+}
+
+/// A floating window's egui id. Brush Settings keeps its old id until a layout is applied, so its
+/// remembered place and size carry over; a new generation forgets egui's memory of all of them.
+fn float_id(g: Group, generation: u64) -> egui::Id {
+    match (g, generation) {
+        (Group::Brush, 0) => egui::Id::new("brush-settings"),
+        _ => egui::Id::new(("dock-float", g.key(), generation)),
+    }
+}
+
 /// Where Brush Settings opens before it is moved: right of the canvas, below its top.
 fn default_float_rect(g: Group, canvas: Rect) -> [f32; 4] {
     let (w, h) = if g == Group::Brush { (crate::brush_panel::WIDTH + 22.0, crate::brush_panel::DEFAULT_H) } else { (300.0, 380.0) };
@@ -1014,8 +1111,7 @@ pub fn floating_windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let min_h = if visible.iter().any(|(_, p)| p.min_width() > 0.0) { crate::brush_panel::MIN_SIZE.1 } else { 160.0 };
         let stored = app.ui.dock.floating.get(&g).copied();
         let r = stored.filter(|r| r.iter().all(|v| v.is_finite())).unwrap_or_else(|| default_float_rect(g, canvas));
-        // Brush Settings keeps its window id, so its remembered place and size carry over.
-        let id = if g == Group::Brush { egui::Id::new("brush-settings") } else { egui::Id::new(("dock-float", g.key())) };
+        let id = float_id(g, app.dock_generation);
         let frame = egui::Frame::NONE
             .fill(t.card)
             .stroke(Stroke::new(1.0, t.card_border))
@@ -1077,6 +1173,10 @@ pub fn floating_windows(app: &mut PhotocraftApp, ctx: &egui::Context) {
             *g.shown_mut(&mut app.ui.panels) = false;
         }
         if let Some(w) = shown {
+            // Dragged by its body: over the dock or the rail it docks as a whole on release.
+            if !locked && w.response.dragged() && ctx.data(|d| d.get_temp::<Option<PanelDrag>>(panel_drag_id())).flatten().is_none() {
+                ctx.data_mut(|d| d.insert_temp::<Option<Group>>(group_drag_id(), Some(g)));
+            }
             let rect = w.response.rect;
             let (header, tabs) = w.inner.unwrap_or((Rect::NOTHING, Vec::new()));
             frames.push(FloatingFrame { frame: frame_nr, group: g, rect, header, tabs });
@@ -1125,6 +1225,7 @@ fn drop_target(ctx: &egui::Context, layout: &DockLayout, pro: bool, p: egui::Pos
 /// would land (a group or window outlined with the insertion point, a line for a new group, the
 /// panel's name at the pointer), and drop it where the button is released.
 pub fn end_drag(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    end_group_drag(app, ctx);
     let Some(d) = ctx.data(|x| x.get_temp::<Option<PanelDrag>>(panel_drag_id())).flatten() else { return };
     let t = Tokens::get(ctx);
     let Some(p) = ctx.input(|i| i.pointer.latest_pos()) else { return };
@@ -1136,6 +1237,13 @@ pub fn end_drag(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
         return;
     }
+    preview_drop(ctx, &t, to, Some(d.panel));
+}
+
+/// Show where a drag would land: a group or window outlined with the insertion point, a line for a
+/// new group or rail icon, the window a torn-out panel makes, and the dragged panel's name.
+fn preview_drop(ctx: &egui::Context, t: &Tokens, to: PanelDrop, panel: Option<Panel>) {
+    let Some(p) = ctx.input(|i| i.pointer.latest_pos()) else { return };
     ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
     let fg = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("dock-panel-drag-layer")));
     let frame = ctx.cumulative_frame_nr();
@@ -1186,13 +1294,15 @@ pub fn end_drag(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
         // Torn out: the window it will make.
         PanelDrop::Float(at) => {
-            let (w, h) = if d.panel.min_width() > 0.0 { (d.panel.min_width().max(562.0), 662.0) } else { (300.0, 380.0) };
+            let wide = panel.is_some_and(|p| p.min_width() > 0.0);
+            let (w, h) = if wide { (562.0, 662.0) } else { (300.0, 380.0) };
             let r = Rect::from_min_size(pos2(at[0] - 24.0, at[1] - 12.0), vec2(w, h));
             fg.rect_filled(r, t.radius_lg, t.accent.gamma_multiply(0.08));
             fg.rect_stroke(r, t.radius_lg, Stroke::new(1.5, t.accent.gamma_multiply(0.7)), egui::StrokeKind::Inside);
         }
     }
-    let label = ctx.fonts_mut(|f| f.layout_no_wrap(tl!(d.panel.name()).to_owned(), crate::theme::medium(12.5), t.text));
+    let Some(panel) = panel else { return };
+    let label = ctx.fonts_mut(|f| f.layout_no_wrap(tl!(panel.name()).to_owned(), crate::theme::medium(12.5), t.text));
     let chip = Rect::from_min_size(p + vec2(14.0, 10.0), label.size() + vec2(16.0, 8.0));
     fg.rect_filled(chip, t.radius_sm, t.card);
     fg.rect_stroke(chip, t.radius_sm, Stroke::new(1.0, t.accent), egui::StrokeKind::Inside);
@@ -1569,6 +1679,7 @@ pub fn apply(app: &mut PhotocraftApp, v: &Value) {
     }
     if let Some(d) = v.get("dock").and_then(|d| serde_json::from_value(d.clone()).ok()) {
         app.ui.dock = d;
+        layout_replaced(app);
     }
     app.ui.timeline.open = v.get("timelineOpen").and_then(Value::as_bool).unwrap_or(false);
     if !app.ui.timeline.open {
