@@ -116,17 +116,23 @@ fn arrange_layouts_floating_windows_and_matching() {
     let six = cells("sixUp", egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(900.0, 600.0)), 3).unwrap();
     assert_eq!((six.len(), six[1].min.x), (6, 300.0));
     menu(&mut app, &ctx, "window.arrange.floatAllInWindows", json!({})).unwrap();
-    assert_eq!(app.ui.windows.len(), 3);
+    assert_eq!(app.ui.floating_docs.len(), 3, "floating windows over the workspace");
+    assert!(app.ui.windows.is_empty(), "not OS windows");
     app.ui.views[2].zoom = 3.0;
     app.ui.views[2].center = [1.0, 2.0];
+    app.session.set_active(2);
     menu(&mut app, &ctx, "window.arrange.matchAll", json!({})).unwrap();
     assert!(app.ui.views.iter().all(|v| v.zoom == 3.0 && v.center == [1.0, 2.0]));
-    assert!(app.ui.windows.iter().all(|w| w.view.zoom == 3.0));
     menu(&mut app, &ctx, "window.arrange.consolidateAllToTabs", json!({})).unwrap();
-    assert!(app.ui.windows.is_empty());
+    assert!(app.ui.floating_docs.is_empty());
     assert_eq!(app.ui.view.arrange, "tabs");
+    menu(&mut app, &ctx, "window.arrange.floatInWindow", json!({})).unwrap();
+    assert_eq!(app.ui.floating_docs.len(), 1);
+    // Tiling docks them again.
+    menu(&mut app, &ctx, "window.arrange.twoUpVertical", json!({})).unwrap();
+    assert!(app.ui.floating_docs.is_empty());
     menu(&mut app, &ctx, "window.arrange.newWindowForDocument", json!({})).unwrap();
-    assert_eq!(app.ui.windows.len(), 1);
+    assert_eq!(app.ui.windows.len(), 1, "New Window for Document is still an OS window");
 }
 
 #[test]

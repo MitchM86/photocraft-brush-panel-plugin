@@ -991,6 +991,15 @@ pub struct UiState {
     pub views: Vec<View>,
     pub dialogs: Vec<Dialog>,
     pub windows: Vec<DocWindow>,
+    /// Documents floating in windows over the workspace (see `doc_float`). Session-only.
+    #[serde(skip)]
+    pub floating_docs: Vec<crate::doc_float::FloatingDoc>,
+    /// The docked document the tab area shows while the active one floats. Session-only.
+    #[serde(skip)]
+    pub docked_doc: Option<photocraft_doc::DocId>,
+    /// The document area's split panes (see `doc_panes`). Session-only.
+    #[serde(skip)]
+    pub panes: crate::doc_panes::PaneLayout,
     pub theme: crate::theme::ThemeKind,
     pub workspace: String,
     pub palette_open: bool,
@@ -1102,6 +1111,9 @@ impl Default for UiState {
             views: Vec::new(),
             dialogs: Vec::new(),
             windows: Vec::new(),
+            floating_docs: Vec::new(),
+            docked_doc: None,
+            panes: Default::default(),
             theme: crate::theme::ThemeKind::ProMedium,
             workspace: "Essentials".into(),
             palette_open: false,

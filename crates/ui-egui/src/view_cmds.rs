@@ -607,6 +607,8 @@ pub(crate) fn float_window(app: &mut PhotocraftApp, doc: usize, offset: usize) -
 
 fn arrange(app: &mut PhotocraftApp, k: &str) -> Result<Value, String> {
     if LAYOUTS.contains(&k) {
+        // Tiling takes the floating documents back into the tab area too (Photoshop).
+        crate::doc_float::dock_all(app);
         app.ui.view.arrange = k.to_string();
         // Each document fits its new cell.
         app.ui.views.iter_mut().for_each(|v| v.fit_pending = true);
@@ -616,16 +618,23 @@ fn arrange(app: &mut PhotocraftApp, k: &str) -> Result<Value, String> {
         "consolidateAllToTabs" => {
             app.ui.view.arrange = "tabs".into();
             app.ui.windows.clear();
+            crate::doc_float::dock_all(app);
             Ok(json!({"arrange": "tabs"}))
         }
-        "newWindowForDocument" | "floatInWindow" => {
+        // Another OS window on the same document (another monitor).
+        "newWindowForDocument" => {
             let doc = app.session.active_index().ok_or("no document")?;
             Ok(json!({"window": float_window(app, doc, 0)}))
         }
+        // Floating windows over the workspace, as a tab dragged off the strip makes (`doc_float`).
+        "floatInWindow" => {
+            let doc = app.session.active_index().ok_or("no document")?;
+            crate::doc_float::float(app, doc, None)?;
+            Ok(json!({"floating": app.ui.floating_docs.len()}))
+        }
         "floatAllInWindows" | "cascade" => {
-            let n = app.session.documents().len();
-            let ids: Vec<u64> = (0..n).map(|d| float_window(app, d, d)).collect();
-            Ok(json!({"windows": ids}))
+            crate::doc_float::float_all(app);
+            Ok(json!({"floating": app.ui.floating_docs.len()}))
         }
         "matchZoom" | "matchLocation" | "matchRotation" | "matchAll" => {
             let i = app.session.active_index().ok_or("no document")?;

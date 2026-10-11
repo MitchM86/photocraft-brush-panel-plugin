@@ -1461,10 +1461,13 @@ pub fn document_area(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// Window › Arrange tiles: each document shown with its tile in `rect`, or `None` when the
 /// active document fills the area.
 pub(crate) fn arranged_cells(app: &PhotocraftApp, rect: Rect) -> Option<Vec<(usize, Rect)>> {
-    let idx = app.session.active_index()?;
-    let n = app.session.documents().len();
+    // Floating documents keep their windows; the docked ones share the area.
+    let docked = crate::doc_float::docked(app);
+    let idx = crate::doc_float::shown_docked(app)?;
+    let at = docked.iter().position(|d| *d == idx)?;
+    let n = docked.len();
     let cells = crate::view_cmds::cells(&app.ui.view.arrange, rect, n)?;
-    let mut shown: Vec<(usize, Rect)> = (0..n).map(|k| (idx + k) % n).zip(cells).collect();
+    let mut shown: Vec<(usize, Rect)> = (0..n).filter_map(|k| docked.get((at + k) % n).copied()).zip(cells).collect();
     shown.sort_by_key(|(d, _)| *d);
     Some(shown)
 }
@@ -1472,6 +1475,7 @@ pub(crate) fn arranged_cells(app: &PhotocraftApp, rect: Rect) -> Option<Vec<(usi
 fn documents(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     app.drop_canvas_rect = None;
     app.tab_strip = None;
+    crate::doc_panes::sync(app);
     retain_gpu_documents(app);
     crate::transform_tool::track_steps(app, ui.ctx());
     crate::symmetry_ui::track(app, ui.ctx());
@@ -1485,6 +1489,11 @@ fn documents(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if n == 0 && !opening {
         // Auto show the Home Screen is off: an empty workspace, like Photoshop.
         paint_dots(ui, ui.available_rect_before_wrap());
+        return;
+    }
+    // Split panes (`doc_panes`): each with its own tab strip and document.
+    if !app.ui.panes.single() && !app.ui.view.hides_tabs() && app.jobs.focus.is_none() && app.ui.view.arrange == "tabs" {
+        crate::doc_panes::show(app, ui);
         return;
     }
     if !app.ui.view.hides_tabs() || opening {
@@ -1525,18 +1534,48 @@ fn documents(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
         return;
     }
-    let view = app.ui.views[idx].clone();
-    canvas_view(app, ui, idx, rect, view, true);
+    // The docked document the tab area shows; while a floating one is active it's shown without
+    // the tools, and a click in it makes it active.
+    let pane = app.ui.panes.focused;
+    if let Some(strip) = app.tab_strip.clone() {
+        let area = Rect::from_min_max(strip.rect.min, rect.max);
+        crate::doc_panes::record(ui.ctx(), area, vec![(pane, area, strip)]);
+    } else {
+        crate::doc_panes::record(ui.ctx(), rect, Vec::new());
+    }
+    let Some(d) = crate::doc_panes::shown(app, pane) else {
+        paint_dots(ui, rect);
+        return;
+    };
+    let view = app.ui.views[d].clone();
+    let v = canvas_view(app, ui, d, rect, view, d == idx);
+    if d != idx {
+        app.ui.views[d] = v;
+        if ui.input(|i| i.pointer.primary_pressed()) && ui.rect_contains_pointer(rect) {
+            app.session.set_active(d);
+        }
+    }
 }
 
-/// The tab strip; returns where its document tabs are.
+/// The focused pane's tab strip; returns where its document tabs are.
 fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
+    let pane = app.ui.panes.focused;
+    pane_tabs(app, ui, pane)
+}
+
+/// Pane `pane`'s tab strip (`doc_panes`): its documents' tabs, files opening in the background
+/// on the focused pane's.
+pub(crate) fn pane_tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui, pane: crate::doc_panes::PaneId) -> TabStrip {
     let t = crate::theme::Tokens::get(ui.ctx());
     if t.pro {
-        return pro_tabs(app, ui);
+        return pro_tabs(app, ui, pane);
     }
-    let active = app.session.active_index();
+    // Other panes' and floating documents (`doc_float`) have no tab here; the strip marks the
+    // pane's shown document.
+    let active = crate::doc_panes::shown(app, pane);
     let tab_count = app.session.documents().len();
+    let floating: Vec<bool> = (0..tab_count).map(|i| !crate::doc_panes::in_pane(app, i, pane)).collect();
+    let mut tear = None;
     let mut doc_tabs = Vec::with_capacity(tab_count);
     let mut activate = None;
     let mut close = None;
@@ -1553,13 +1592,17 @@ fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
     let meta_font = egui::FontId::proportional(if large_tabs { 12.0 } else { 10.5 });
     // Files opening in the background (#210) are tabs too; they share the fit's index space,
     // after the documents.
-    let opening = crate::jobs_ui::open_tabs(app);
+    let opening = if pane == app.ui.panes.focused { crate::jobs_ui::open_tabs(app) } else { Vec::new() };
     // Every tab's natural width, whether or not it stays on the strip.
     let natural: Vec<f32> = app
         .session
         .documents()
         .iter()
-        .map(|st| {
+        .enumerate()
+        .map(|(i, st)| {
+            if floating.get(i).copied().unwrap_or(false) {
+                return 0.0;
+            }
             let name = format!("{}{}", st.doc.name, if st.is_dirty() { " *" } else { "" });
             ui.painter().layout_no_wrap(name, font.clone(), t.text).size().x
                 + ui.painter().layout_no_wrap(format!("{}/{}", mode_label(&st.doc), st.doc.depth.bits()), meta_font.clone(), t.text_faint).size().x
@@ -1575,13 +1618,14 @@ fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
         .jobs
         .focus
         .and_then(|job| opening.iter().position(|(open, _, _)| *open == job))
-        .map_or_else(|| app.session.active_index().unwrap_or(0), |p| tab_count + p);
+        .map_or_else(|| crate::doc_panes::shown(app, pane).unwrap_or(0), |p| tab_count + p);
     let frame = egui::Frame::NONE.fill(t.canvas).inner_margin(egui::Margin { left: 8, right: 8, top: 6, bottom: 4 }).show(ui, |ui| {
         let (row, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), tab_h), Sense::hover());
-        let f = crate::tab_strip::fit(&natural, selected, row.width(), DOC_TAB_MIN_W, crate::tab_strip::CHEVRON_W);
+        let mut f = crate::tab_strip::fit(&natural, selected, row.width(), DOC_TAB_MIN_W, crate::tab_strip::CHEVRON_W);
+        f.overflow.retain(|i| !floating.get(*i).copied().unwrap_or(false));
         let mut x = row.left();
         let mut placed: Vec<(usize, Rect)> = Vec::with_capacity(f.shown.len());
-        for &(i, w) in &f.shown {
+        for &(i, w) in f.shown.iter().filter(|(i, _)| !floating.get(*i).copied().unwrap_or(false)) {
             // The old horizontal layout put 4 pt between tabs; `w` carries it, the tab doesn't.
             let r = Rect::from_min_size(egui::pos2(x, row.top()), egui::vec2((w - STUDIO_TAB_GAP).max(8.0), row.height()));
             placed.push((i, r));
@@ -1627,17 +1671,27 @@ fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
             } else if resp.clicked() {
                 activate = Some(i);
             }
-            // Drag a tab sideways to reorder it (#217); a line shows where it will land.
+            // Drag a tab sideways to reorder it (#217); a line shows where it will land. Dragged off the
+            // strip it floats in a window of its own (`doc_float`), as in Photoshop.
             if resp.dragged()
                 && let Some(p) = resp.interact_pointer_pos()
             {
-                tab_drop_line(ui, &placed, p.x, &t);
+                if crate::doc_float::torn_off(row, p) {
+                    crate::doc_panes::preview(app, ui.ctx(), crate::doc_panes::target(app, ui.ctx(), i, p));
+                } else {
+                    tab_drop_line(ui, &placed, p.x, &t);
+                }
             }
             if resp.drag_stopped() {
-                let x = resp.interact_pointer_pos().or_else(|| ui.input(|i| i.pointer.interact_pos())).map_or(r.center().x, |p| p.x);
-                let to = tab_move_target(i, tab_drop_index(&placed, x));
-                if to != i {
-                    tab_move = Some((i, to));
+                let at = resp.interact_pointer_pos().or_else(|| ui.input(|i| i.pointer.interact_pos()));
+                if let Some(p) = at.filter(|p| crate::doc_float::torn_off(row, *p)) {
+                    let p = crate::doc_panes::target(app, ui.ctx(), i, p);
+                    tear = Some((i, p));
+                } else {
+                    let to = tab_move_target(i, tab_drop_index(&placed, at.map_or(r.center().x, |p| p.x)));
+                    if to != i {
+                        tab_move = Some((i, to));
+                    }
                 }
             }
             let has_path = st.path.is_some();
@@ -1694,6 +1748,12 @@ fn tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
     }
     if let Some(i) = close {
         let _ = crate::menus::invoke(app, ui.ctx(), "file.close", json!({"document": i}));
+    }
+    if let Some((i, to)) = tear
+        && let Err(e) = crate::doc_panes::apply(app, i, to)
+    {
+        app.ui.status = e;
+        app.ui.status_error = true;
     }
     if let Some((from, to)) = tab_move
         && let Err(e) = crate::menus::invoke(app, ui.ctx(), "document.move", json!({"document": from, "to": to}))
@@ -1813,10 +1873,12 @@ fn pro_tab_title(app: &PhotocraftApp, i: usize) -> String {
 /// Photoshop document tabs: "name @ 33.3% (RGB/8)" on a dark strip; active tab matches panels.
 /// Tabs that don't fit shrink and elide, and the ones that still don't fit move into a » menu at
 /// the end of the strip; the active document's tab always stays on the strip (#1276).
-fn pro_tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
+fn pro_tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui, pane: crate::doc_panes::PaneId) -> TabStrip {
     let t = crate::theme::Tokens::get(ui.ctx());
-    let active = app.session.active_index().filter(|_| app.jobs.focus.is_none());
+    // Floating documents (`doc_float`) have windows, not tabs; the strip marks the docked one shown.
+    let active = crate::doc_panes::shown(app, pane).filter(|_| app.jobs.focus.is_none());
     let (mut activate, mut close) = (None, None);
+    let mut tear = None;
     let mut tab_action = None;
     let mut tab_move = None;
     let tab_count = app.session.documents().len();
@@ -1830,20 +1892,28 @@ fn pro_tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
     ui.painter().rect_filled(strip, 0.0, t.tab_strip);
     // Files opening in the background (#210) are tabs too ("name (Opening… 45%)" with a progress
     // underline); they share the fit's index space, after the documents.
-    let opening = crate::jobs_ui::open_tabs(app);
+    let opening = if pane == app.ui.panes.focused { crate::jobs_ui::open_tabs(app) } else { Vec::new() };
     let mut titles: Vec<String> = (0..tab_count).map(|i| pro_tab_title(app, i)).collect();
     titles.extend(opening.iter().map(|(_, name, frac)| format!("{name} ({} {:.0}%)", tl!("Opening…"), frac * 100.0)));
     // Every tab's natural width, whether or not it stays on the strip.
-    let natural: Vec<f32> = titles.iter().map(|title| ui.painter().layout_no_wrap(title.clone(), font.clone(), t.text).size().x + DOC_TAB_PAD).collect();
+    let floating: Vec<bool> = (0..tab_count).map(|i| !crate::doc_panes::in_pane(app, i, pane)).collect();
+    let natural: Vec<f32> = titles
+        .iter()
+        .enumerate()
+        .map(|(i, title)| {
+            if floating.get(i).copied().unwrap_or(false) { 0.0 } else { ui.painter().layout_no_wrap(title.clone(), font.clone(), t.text).size().x + DOC_TAB_PAD }
+        })
+        .collect();
     let selected = app
         .jobs
         .focus
         .and_then(|job| opening.iter().position(|(open, _, _)| *open == job))
-        .map_or_else(|| app.session.active_index().unwrap_or(0), |p| tab_count + p);
-    let f = crate::tab_strip::fit(&natural, selected, strip.width(), DOC_TAB_MIN_W, crate::tab_strip::CHEVRON_W);
+        .map_or_else(|| crate::doc_panes::shown(app, pane).unwrap_or(0), |p| tab_count + p);
+    let mut f = crate::tab_strip::fit(&natural, selected, strip.width(), DOC_TAB_MIN_W, crate::tab_strip::CHEVRON_W);
+    f.overflow.retain(|i| !floating.get(*i).copied().unwrap_or(false));
     let mut x = strip.left();
     let mut placed: Vec<(usize, Rect)> = Vec::with_capacity(f.shown.len());
-    for &(i, w) in &f.shown {
+    for &(i, w) in f.shown.iter().filter(|(i, _)| !floating.get(*i).copied().unwrap_or(false)) {
         let r = Rect::from_min_size(egui::pos2(x, strip.top()), egui::vec2(w, strip.height()));
         placed.push((i, r));
         x = r.right();
@@ -1879,17 +1949,27 @@ fn pro_tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
         } else if resp.clicked() {
             activate = Some(i);
         }
-        // Drag a tab sideways to reorder it (#217); a line shows where it will land.
+        // Drag a tab sideways to reorder it (#217); a line shows where it will land. Dragged off the
+        // strip it floats in a window of its own (`doc_float`), as in Photoshop.
         if resp.dragged()
             && let Some(p) = resp.interact_pointer_pos()
         {
-            tab_drop_line(ui, &placed, p.x, &t);
+            if crate::doc_float::torn_off(strip, p) {
+                crate::doc_panes::preview(app, ui.ctx(), crate::doc_panes::target(app, ui.ctx(), i, p));
+            } else {
+                tab_drop_line(ui, &placed, p.x, &t);
+            }
         }
         if resp.drag_stopped() {
-            let x = resp.interact_pointer_pos().or_else(|| ui.input(|i| i.pointer.interact_pos())).map_or(r.center().x, |p| p.x);
-            let to = tab_move_target(i, tab_drop_index(&placed, x));
-            if to != i {
-                tab_move = Some((i, to));
+            let at = resp.interact_pointer_pos().or_else(|| ui.input(|i| i.pointer.interact_pos()));
+            if let Some(p) = at.filter(|p| crate::doc_float::torn_off(strip, *p)) {
+                let p = crate::doc_panes::target(app, ui.ctx(), i, p);
+                tear = Some((i, p));
+            } else {
+                let to = tab_move_target(i, tab_drop_index(&placed, at.map_or(r.center().x, |p| p.x)));
+                if to != i {
+                    tab_move = Some((i, to));
+                }
             }
         }
         let has_path = app.session.documents().get(i).is_some_and(|d| d.path.is_some());
@@ -1940,6 +2020,12 @@ fn pro_tabs(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> TabStrip {
     }
     if let Some(i) = close {
         let _ = crate::menus::invoke(app, ui.ctx(), "file.close", json!({"document": i}));
+    }
+    if let Some((i, to)) = tear
+        && let Err(e) = crate::doc_panes::apply(app, i, to)
+    {
+        app.ui.status = e;
+        app.ui.status_error = true;
     }
     if let Some((from, to)) = tab_move
         && let Err(e) = crate::menus::invoke(app, ui.ctx(), "document.move", json!({"document": from, "to": to}))
@@ -2030,7 +2116,7 @@ fn dots(ctx: &egui::Context, t: &crate::theme::Tokens) -> Option<egui::TextureId
     Some(id)
 }
 
-fn paint_dots(ui: &egui::Ui, rect: Rect) {
+pub(crate) fn paint_dots(ui: &egui::Ui, rect: Rect) {
     let t = crate::theme::Tokens::get(ui.ctx());
     if let Some(id) = dots(ui.ctx(), &t) {
         let uv = Rect::from_min_max(Pos2::ZERO, pos2(rect.width() / 22.0, rect.height() / 22.0));

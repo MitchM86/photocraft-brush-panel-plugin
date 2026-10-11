@@ -117,6 +117,8 @@ pub mod panels;
 pub mod parity;
 pub mod patch_preview;
 pub mod pdf_import_ui;
+pub mod doc_float;
+pub mod doc_panes;
 pub mod pen_trace;
 pub mod perspective_ui;
 pub mod pixel_grid;
@@ -1499,6 +1501,7 @@ impl eframe::App for PhotocraftApp {
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(backdrop)).show(ui, |ui| {
             canvas::document_area(self, ui);
         });
+        doc_float::windows(self, &ctx);
         panels::properties_window(self, &ctx);
         brush_panel::window(self, &ctx);
         preset_panels::windows(self, &ctx);
