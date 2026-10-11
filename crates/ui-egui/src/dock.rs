@@ -25,9 +25,9 @@ use crate::state::{DockTabs, Panels};
 use crate::theme::Tokens;
 use crate::widgets;
 
-/// A dock panel group (one tab strip).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+/// A dock panel group (one tab strip): a default group, or one made by dragging a panel between
+/// groups ([`Group::Extra`]). Serialised as its [`Group::key`] (`"layers"`, `"extra0"`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Group {
     /// Color | Swatches | Gradients | Patterns.
     Color,
@@ -41,6 +41,31 @@ pub enum Group {
     History,
     /// Layers | Channels | Paths.
     Layers,
+    /// A group the user made (by dropping a panel between groups); its panels are all in
+    /// [`DockLayout::tabs`].
+    Extra(u8),
+}
+
+/// Most user-made groups (more drops reuse the free ones).
+pub const MAX_EXTRA: u8 = 32;
+
+const EXTRA_KEYS: [&str; MAX_EXTRA as usize] = [
+    "extra0", "extra1", "extra2", "extra3", "extra4", "extra5", "extra6", "extra7", "extra8", "extra9", "extra10", "extra11", "extra12", "extra13", "extra14",
+    "extra15", "extra16", "extra17", "extra18", "extra19", "extra20", "extra21", "extra22", "extra23", "extra24", "extra25", "extra26", "extra27", "extra28",
+    "extra29", "extra30", "extra31",
+];
+
+impl Serialize for Group {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(self.key())
+    }
+}
+
+impl<'de> Deserialize<'de> for Group {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let key = String::deserialize(d)?;
+        Group::from_key(&key).ok_or_else(|| serde::de::Error::custom(format!("unknown dock group `{key}`")))
+    }
 }
 
 /// One dock panel: a tab of a group.
@@ -145,6 +170,7 @@ impl Group {
             Group::Navigator => "navigator",
             Group::History => "history",
             Group::Layers => "layers",
+            Group::Extra(n) => EXTRA_KEYS.get(usize::from(n)).copied().unwrap_or("extra0"),
         }
     }
 
@@ -158,6 +184,7 @@ impl Group {
             Group::Navigator => 210.0,
             Group::History => 200.0,
             Group::Layers => 320.0,
+            Group::Extra(_) => 220.0,
         }
     }
 
@@ -171,6 +198,7 @@ impl Group {
             Group::Navigator => 140.0,
             Group::History => 130.0,
             Group::Layers => 200.0,
+            Group::Extra(_) => 130.0,
         }
     }
 
@@ -201,6 +229,7 @@ impl Group {
             Group::Navigator => &["Navigator", "Histogram", "Info"],
             Group::History => &["History", "Actions", "Layer Comps"],
             Group::Layers => &["Layers", "Channels", "Paths"],
+            Group::Extra(_) => &[],
         }
     }
 
@@ -214,6 +243,7 @@ impl Group {
             Group::Navigator => &[Panel::Navigator, Panel::Histogram, Panel::Info],
             Group::History => &[Panel::History, Panel::Actions, Panel::LayerComps],
             Group::Layers => &[Panel::Layers, Panel::Channels, Panel::Paths],
+            Group::Extra(_) => &[],
         }
     }
 
@@ -230,11 +260,15 @@ impl Group {
             Group::Navigator => &mut tabs.navigator,
             Group::History => &mut tabs.history,
             Group::Layers => &mut tabs.layers,
+            Group::Extra(n) => tabs.extra.entry(n).or_insert(0),
         }
     }
 
-    /// The group for a `panels` / `dockTabs` key ("color", "properties", …).
+    /// The group for a `panels` / `dockTabs` key ("color", "properties", …, "extra3").
     pub fn from_key(key: &str) -> Option<Group> {
+        if let Some(n) = key.strip_prefix("extra").and_then(|n| n.parse::<u8>().ok()).filter(|n| *n < MAX_EXTRA) {
+            return Some(Group::Extra(n));
+        }
         Group::ALL.into_iter().find(|g| g.key() == key)
     }
 
@@ -246,6 +280,7 @@ impl Group {
             Group::Navigator => panels.navigator,
             Group::History => panels.history,
             Group::Layers => panels.layers,
+            Group::Extra(n) => panels.extra_groups.get(&n).copied().unwrap_or(true),
         }
     }
 
@@ -257,6 +292,7 @@ impl Group {
             Group::Navigator => &mut panels.navigator,
             Group::History => &mut panels.history,
             Group::Layers => &mut panels.layers,
+            Group::Extra(n) => panels.extra_groups.entry(n).or_insert(true),
         }
     }
 }
@@ -279,6 +315,15 @@ pub struct DockLayout {
     /// home panels less any listed elsewhere (see [`DockLayout::panels`]).
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub tabs: BTreeMap<Group, Vec<Panel>>,
+}
+
+/// Where a dragged panel goes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PanelDrop {
+    /// Into a group's tabs at this index (counting all its tabs, hidden ones included).
+    Into(Group, usize),
+    /// A new group of its own, just before this one (`None` = last).
+    NewGroup(Option<Group>),
 }
 
 /// Gap between groups; it is also the splitter's grab area.
@@ -325,7 +370,74 @@ impl DockLayout {
 
     /// The group `p` is in and its tab index there.
     pub fn locate(&self, p: Panel, pro: bool) -> (Group, usize) {
-        Group::ALL.into_iter().find_map(|g| self.panels(g, pro).iter().position(|x| *x == p).map(|i| (g, i))).unwrap_or((p.home(), 0))
+        self.order().into_iter().find_map(|g| self.panels(g, pro).iter().position(|x| *x == p).map(|i| (g, i))).unwrap_or((p.home(), 0))
+    }
+
+    /// A group number free for a new user-made group.
+    fn free_extra(&self) -> Option<u8> {
+        (0..MAX_EXTRA).find(|n| {
+            let g = Group::Extra(*n);
+            !self.tabs.get(&g).is_some_and(|l| !l.is_empty()) && !self.order.contains(&g)
+        })
+    }
+
+    /// Move panel `p` to `to` (its tab order there, or a new group). Returns the group it
+    /// ended up in and its tab index there, `None` when nothing changed (no free group slot, or
+    /// dropped where it already is). Groups left empty stay in place for their other state;
+    /// user-made ones are removed.
+    pub fn move_panel(&mut self, p: Panel, to: PanelDrop, pro: bool) -> Option<(Group, usize)> {
+        let (from, at) = self.locate(p, pro);
+        let mut src = self.panels(from, pro);
+        let (group, index) = match to {
+            PanelDrop::Into(g, i) => {
+                if g == from {
+                    // Reorder in place: the index counts the tabs before the panel left.
+                    let i = if i > at { i - 1 } else { i };
+                    let i = i.min(src.len().saturating_sub(1));
+                    if i == at {
+                        return None;
+                    }
+                    src.retain(|x| *x != p);
+                    src.insert(i, p);
+                    self.tabs.insert(from, src);
+                    return Some((from, i));
+                }
+                let mut dst = self.panels(g, pro);
+                let i = i.min(dst.len());
+                dst.insert(i, p);
+                self.tabs.insert(g, dst);
+                (g, i)
+            }
+            PanelDrop::NewGroup(before) => {
+                if src.len() == 1 && before.is_some_and(|b| b == from) {
+                    return None;
+                }
+                let g = Group::Extra(self.free_extra()?);
+                self.tabs.insert(g, vec![p]);
+                let mut order = self.order();
+                order.retain(|x| *x != g);
+                let pos = before.and_then(|b| order.iter().position(|x| *x == b)).unwrap_or(order.len());
+                order.insert(pos, g);
+                self.order = order;
+                (g, 0)
+            }
+        };
+        src.retain(|x| *x != p);
+        self.tabs.insert(from, src);
+        self.prune_extra();
+        Some((group, index))
+    }
+
+    /// Forget user-made groups that have no panels left.
+    fn prune_extra(&mut self) {
+        let empty: Vec<Group> = self.tabs.iter().filter(|(g, l)| matches!(g, Group::Extra(_)) && l.is_empty()).map(|(g, _)| *g).collect();
+        for g in empty {
+            self.tabs.remove(&g);
+            self.order.retain(|x| *x != g);
+            self.heights.remove(&g);
+            self.collapsed.retain(|x| *x != g);
+            self.hidden_tabs.remove(&g);
+        }
     }
 
     /// Hide one tab; it can be reopened through Window › Panel.
@@ -506,7 +618,7 @@ pub fn locate(app: &PhotocraftApp, p: Panel) -> (Group, usize) {
 /// Is `p` its group's selected tab, with the group open (collapsed counts when `expanded` is false)?
 pub fn panel_selected(app: &PhotocraftApp, p: Panel, expanded: bool) -> bool {
     let (g, i) = locate(app, p);
-    let mut tabs = app.ui.dock_tabs;
+    let mut tabs = app.ui.dock_tabs.clone();
     g.shown(&app.ui.panels) && *g.tab_mut(&mut tabs) == i && (!expanded || !app.ui.dock.is_collapsed(g))
 }
 
@@ -521,6 +633,76 @@ pub fn show_panel(app: &mut PhotocraftApp, p: Panel) {
     let (g, i) = locate(app, p);
     *g.tab_mut(&mut app.ui.dock_tabs) = i;
     reveal(app, g);
+}
+
+/// Drop a dragged panel: move it, select it where it lands (shown and expanded), and keep the
+/// tab its old group had selected.
+pub fn drop_panel(app: &mut PhotocraftApp, p: Panel, to: PanelDrop) -> bool {
+    let pro = is_pro(app);
+    let (from, _) = locate(app, p);
+    let keep = app.ui.dock.panels(from, pro).get(*from.tab_mut(&mut app.ui.dock_tabs)).copied();
+    let Some((group, index)) = app.ui.dock.move_panel(p, to, pro) else { return false };
+    if let Some(k) = keep.filter(|k| *k != p)
+        && let Some(i) = app.ui.dock.panels(from, pro).iter().position(|x| *x == k)
+    {
+        *from.tab_mut(&mut app.ui.dock_tabs) = i;
+    } else if from != group {
+        *from.tab_mut(&mut app.ui.dock_tabs) = 0;
+    }
+    *group.tab_mut(&mut app.ui.dock_tabs) = index;
+    *group.shown_mut(&mut app.ui.panels) = true;
+    app.ui.dock.set_collapsed(group, false);
+    // Per-group state of user-made groups that are gone.
+    let live: Vec<Group> = app.ui.dock.order();
+    app.ui.dock_tabs.extra.retain(|n, _| live.contains(&Group::Extra(*n)));
+    app.ui.panels.extra_groups.retain(|n, _| live.contains(&Group::Extra(*n)));
+    true
+}
+
+/// A panel being dragged by its tab (egui memory): it and the group it came from.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct PanelDrag {
+    panel: Panel,
+}
+
+fn panel_drag_id() -> egui::Id {
+    egui::Id::new("dock-panel-drag")
+}
+
+/// Where a panel dragged to `p` would land: a group's tab strip (at the tab under the pointer),
+/// a group's body (its last tab), or the gap between groups (a new group there).
+fn panel_drop_at(rects: &[(Group, Rect)], strips: &[StripRects], strip_h: f32, layout: &DockLayout, pro: bool, p: egui::Pos2) -> Option<PanelDrop> {
+    let first = rects.first()?;
+    let last = rects.last()?;
+    let column = Rect::from_min_max(pos2(first.1.left(), first.1.top() - GAP), pos2(last.1.right(), last.1.bottom() + 3.0 * GAP));
+    if !column.contains(p) {
+        return None;
+    }
+    // Edges: within this of a group's top or bottom border is a gap between groups.
+    let edge = GAP / 2.0 + 4.0;
+    for (k, (g, r)) in rects.iter().enumerate() {
+        if p.y < r.top() + edge.min(r.height() / 3.0) && p.y >= r.top() - GAP - 1.0 {
+            return Some(PanelDrop::NewGroup(Some(*g)));
+        }
+        let last_one = k + 1 == rects.len();
+        if last_one && p.y > r.bottom() - edge.min(r.height() / 3.0) {
+            return Some(PanelDrop::NewGroup(None));
+        }
+        if !r.contains(p) {
+            continue;
+        }
+        let all = layout.panels(*g, pro).len();
+        let strip = Rect::from_min_size(r.min, vec2(r.width(), strip_h));
+        if strip.contains(p)
+            && let Some(s) = strips.iter().find(|s| s.group == *g)
+        {
+            // Before the first tab whose middle is right of the pointer.
+            let at = s.tabs.iter().find(|(_, tr)| p.x < tr.center().x).map_or(all, |(i, _)| *i);
+            return Some(PanelDrop::Into(*g, at));
+        }
+        return Some(PanelDrop::Into(*g, all));
+    }
+    None
 }
 
 /// Per-group interactions collected while drawing, applied afterwards.
@@ -566,13 +748,17 @@ fn strips_id() -> egui::Id {
 pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, shown: &[Group], mut body: impl FnMut(&mut PhotocraftApp, &mut egui::Ui, Panel)) {
     let t = Tokens::get(ui.ctx());
     let strip = if t.pro { 28.0 } else { 40.0 };
-    let order: Vec<Group> = app.ui.dock.order().into_iter().filter(|g| shown.contains(g)).collect();
+    // Groups with no visible panel (all moved away or closed) take no room.
+    let order: Vec<Group> = app.ui.dock.order().into_iter().filter(|g| shown.contains(g) && !app.ui.dock.visible_panels(*g, t.pro).is_empty()).collect();
     let area = ui.available_rect_before_wrap();
     let heights = app.ui.dock.heights_for(&order, area.height(), strip);
     let locked = app.session.prefs().workspace_locked;
     let rects = rects_after_layout(&heights, area);
     let mut actions: Vec<Action> = Vec::new();
     let mut dragging: Option<Group> = None;
+    // A panel dragged by its tab (Photoshop): it moves alone, the strip background moves the group.
+    let mut panel_drag: Option<PanelDrag> = ui.ctx().data(|d| d.get_temp::<Option<PanelDrag>>(panel_drag_id())).flatten();
+    let mut panel_dropped: Option<(Panel, egui::Pos2)> = None;
     let mut strips: Vec<StripRects> = Vec::with_capacity(rects.len());
     for (i, (g, rect)) in rects.iter().copied().enumerate() {
         let collapsed = app.ui.dock.is_collapsed(g);
@@ -631,14 +817,26 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, shown: &[Group], mut bod
         if resp.strip.double_clicked() || resp.tab_double_clicked || (collapsed && resp.tab_clicked) {
             actions.push(Action::ToggleCollapse(g));
         }
-        if !locked && resp.strip.dragged() {
+        if !locked
+            && resp.strip.drag_started()
+            && let Some(o) = ui.input(|i| i.pointer.press_origin())
+            && let Some(&(vis, _)) = resp.tabs.iter().find(|(_, r)| r.contains(o))
+            && let Some(&panel) = panels.get(vis)
+        {
+            panel_drag = Some(PanelDrag { panel });
+        }
+        let this_panel_drag = panel_drag.is_some_and(|d| panels.contains(&d.panel));
+        if !locked && resp.strip.dragged() && !this_panel_drag {
             dragging = Some(g);
         }
         if !locked
             && resp.strip.drag_stopped()
             && let Some(p) = ui.ctx().pointer_interact_pos()
         {
-            actions.push(Action::Move(g, drop_before(&order, &rects, g, p.y)));
+            match panel_drag.filter(|_| this_panel_drag) {
+                Some(d) => panel_dropped = Some((d.panel, p)),
+                None => actions.push(Action::Move(g, drop_before(&order, &rects, g, p.y))),
+            }
         }
         if dragging == Some(g) {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
@@ -695,10 +893,46 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, shown: &[Group], mut bod
         };
         ui.painter().line_segment([pos2(area.left(), line_y), pos2(area.right(), line_y)], Stroke::new(3.0, t.accent));
     }
+    // While a panel is dragged: where it would land (a group outlined with the insertion point
+    // on its strip, or a line where a new group would go) and its name at the pointer.
+    if let (Some(d), Some(p), None) = (panel_drag, ui.ctx().pointer_interact_pos(), panel_dropped) {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+        let fg = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, ui.id().with("dock-panel-drag")));
+        match panel_drop_at(&rects, &strips, strip, &app.ui.dock, t.pro, p) {
+            Some(PanelDrop::Into(g, at)) => {
+                if let Some((_, r)) = rects.iter().find(|(x, _)| *x == g) {
+                    fg.rect_stroke(*r, t.radius_sm, Stroke::new(2.0, t.accent), egui::StrokeKind::Inside);
+                    if let Some(s) = strips.iter().find(|s| s.group == g) {
+                        let x = s.tabs.iter().find(|(i, _)| *i >= at).map_or_else(|| s.tabs.last().map_or(r.left() + 6.0, |(_, tr)| tr.right()), |(_, tr)| tr.left());
+                        fg.line_segment([pos2(x, r.top() + 3.0), pos2(x, r.top() + strip - 3.0)], Stroke::new(3.0, t.accent));
+                    }
+                }
+            }
+            Some(PanelDrop::NewGroup(before)) => {
+                let y = match before.and_then(|b| rects.iter().find(|(x, _)| *x == b)) {
+                    Some((_, r)) => r.top() - GAP / 2.0,
+                    None => rects.last().map_or(area.top(), |(_, r)| r.bottom() + GAP / 2.0),
+                };
+                fg.line_segment([pos2(area.left(), y), pos2(area.right(), y)], Stroke::new(3.0, t.accent));
+            }
+            None => {}
+        }
+        let label = egui::WidgetText::from(tl!(d.panel.name())).into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, egui::TextStyle::Body);
+        let chip = Rect::from_min_size(p + vec2(14.0, 10.0), label.size() + vec2(16.0, 8.0));
+        fg.rect_filled(chip, t.radius_sm, t.card);
+        fg.rect_stroke(chip, t.radius_sm, Stroke::new(1.0, t.accent), egui::StrokeKind::Inside);
+        fg.galley(chip.min + vec2(8.0, 4.0), label, t.text);
+    }
+    let landed = panel_dropped.and_then(|(panel, p)| panel_drop_at(&rects, &strips, strip, &app.ui.dock, t.pro, p).map(|to| (panel, to)));
+    let still_dragging = panel_dropped.is_none() && ui.input(|i| i.pointer.any_down());
     ui.ctx().data_mut(|d| {
         d.insert_temp(rects_id(), rects);
         d.insert_temp(strips_id(), strips);
+        d.insert_temp::<Option<PanelDrag>>(panel_drag_id(), panel_drag.filter(|_| still_dragging));
     });
+    if let Some((panel, to)) = landed {
+        drop_panel(app, panel, to);
+    }
     ui.advance_cursor_after_rect(area);
     for a in actions {
         match a {

@@ -352,6 +352,10 @@ pub struct Panels {
     /// floating window rather than a modal so the canvas stays usable while a gradient is edited.
     #[serde(default)]
     pub gradient_editor: bool,
+    /// Visibility of the groups made by dragging a panel between groups (`dock::Group::Extra`;
+    /// missing = shown).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub extra_groups: std::collections::BTreeMap<u8, bool>,
 }
 
 impl Default for Panels {
@@ -373,6 +377,7 @@ impl Default for Panels {
             rail: true,
             menu_bar: true,
             gradient_editor: false,
+            extra_groups: Default::default(),
         }
     }
 }
@@ -847,7 +852,7 @@ impl Default for Extras {
 }
 
 /// Selected tab per dock card.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DockTabs {
     pub properties: usize,
@@ -859,6 +864,9 @@ pub struct DockTabs {
     pub history: usize,
     /// Character | Paragraph.
     pub character: usize,
+    /// Groups made by dragging a panel between groups (`dock::Group::Extra`).
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub extra: std::collections::BTreeMap<u8, usize>,
 }
 
 /// Color panel state.

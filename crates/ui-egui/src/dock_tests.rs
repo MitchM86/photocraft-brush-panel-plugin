@@ -448,7 +448,7 @@ fn clicking_around_the_ui_keeps_the_panels_put() {
     });
     h.run_steps(8);
     let panels = h.state().ui.panels.clone();
-    let tabs = h.state().ui.dock_tabs;
+    let tabs = h.state().ui.dock_tabs.clone();
     let rects = last_rects(&h.ctx);
     assert!(rects.iter().any(|(g, _)| *g == Group::Layers), "{rects:?}");
     let layers = rect_of(&h, Group::Layers);
@@ -900,4 +900,138 @@ fn a_panel_moved_to_another_group_shows_there_and_the_window_menu_finds_it() {
     crate::menus::invoke(h.state_mut(), &ctx, "window.panel.layerComps", json!({})).unwrap();
     h.run_steps(2);
     assert!(h.state().ui.panels.navigator && h.state().ui.dock_tabs.navigator == 3);
+}
+
+#[test]
+fn panels_move_between_groups_reorder_and_make_new_groups() {
+    for pro in [true, false] {
+        let mut d = DockLayout::default();
+        // Into another group, at a tab position.
+        assert_eq!(d.move_panel(Panel::Gradients, PanelDrop::Into(Group::Layers, 1), pro), Some((Group::Layers, 1)));
+        assert_eq!(d.panels(Group::Layers, pro), [Panel::Layers, Panel::Gradients, Panel::Channels, Panel::Paths]);
+        assert!(!d.panels(Group::Color, pro).contains(&Panel::Gradients));
+        // Reorder within a group (the index counts the tabs before the move).
+        assert_eq!(d.move_panel(Panel::Gradients, PanelDrop::Into(Group::Layers, 4), pro), Some((Group::Layers, 3)));
+        assert_eq!(d.panels(Group::Layers, pro).last(), Some(&Panel::Gradients));
+        assert_eq!(d.move_panel(Panel::Gradients, PanelDrop::Into(Group::Layers, 3), pro), None, "dropped where it is");
+        // A new group of its own between Navigator and History.
+        let (g, i) = d.move_panel(Panel::Channels, PanelDrop::NewGroup(Some(Group::History)), pro).unwrap();
+        assert_eq!((g, i), (Group::Extra(0), 0));
+        let order = d.order();
+        let pos = |x: Group| order.iter().position(|o| *o == x).unwrap();
+        assert_eq!(pos(Group::Extra(0)) + 1, pos(Group::History), "{order:?}");
+        assert_eq!(d.panels(Group::Extra(0), pro), [Panel::Channels]);
+        // Its only panel moved on: the user-made group is gone.
+        d.move_panel(Panel::Channels, PanelDrop::Into(Group::Color, 0), pro).unwrap();
+        assert!(!d.order().contains(&Group::Extra(0)) && !d.tabs.contains_key(&Group::Extra(0)));
+        // Every panel still in exactly one group, and the layout round-trips.
+        let all: Vec<Panel> = d.order().iter().flat_map(|g| d.panels(*g, pro)).collect();
+        assert!(Panel::ALL.iter().all(|p| all.iter().filter(|x| *x == p).count() == 1), "{all:?}");
+        let back: DockLayout = serde_json::from_value(serde_json::to_value(&d).unwrap()).unwrap();
+        assert_eq!(back, d);
+    }
+    // Out of group slots: nothing moves, nothing panics.
+    let mut d = DockLayout::default();
+    for n in 0..MAX_EXTRA {
+        d.tabs.insert(Group::Extra(n), vec![]);
+        d.order.push(Group::Extra(n));
+    }
+    assert_eq!(d.move_panel(Panel::Info, PanelDrop::NewGroup(None), true), None);
+    assert_eq!(Group::from_key("extra7"), Some(Group::Extra(7)));
+    assert_eq!(Group::from_key("extra99"), None);
+}
+
+/// Press on `from`, drag to `to` in a few moves and release.
+fn drag_to(h: &mut Harness<'static, PhotocraftApp>, from: Pos2, to: Pos2) {
+    h.event(egui::Event::PointerMoved(from));
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton { pos: from, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
+    h.run_steps(1);
+    for k in 1..=6 {
+        h.event(egui::Event::PointerMoved(from + (to - from) * (k as f32 / 6.0)));
+        h.run_steps(1);
+    }
+    h.event(egui::Event::PointerButton { pos: to, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
+    h.run_steps(3);
+}
+
+#[test]
+fn dragging_a_tab_moves_that_panel_and_the_strip_still_moves_the_group() {
+    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+        let (app, _, _) = app_with_layers();
+        let mut h = harness(app, vec2(1300.0, 850.0), theme);
+        let pro = is_pro(theme);
+        let strip = |h: &Harness<'static, PhotocraftApp>, g: Group| last_strips(&h.ctx).into_iter().find(|s| s.group == g).unwrap();
+        let rect = |h: &Harness<'static, PhotocraftApp>, g: Group| last_rects(&h.ctx).into_iter().find(|(x, _)| *x == g).unwrap().1;
+        // Gradients tab onto the Layers group's strip, between Layers and Channels.
+        let (gi, gr) = strip(&h, Group::Color).tabs.into_iter().find(|(i, _)| h.state().ui.dock.panels(Group::Color, pro)[*i] == Panel::Gradients).unwrap();
+        let _ = gi;
+        let ls = strip(&h, Group::Layers);
+        let target = pos2(ls.tabs[1].1.left() + 3.0, ls.tabs[1].1.center().y);
+        drag_to(&mut h, gr.center(), target);
+        let d = &h.state().ui.dock;
+        assert_eq!(d.panels(Group::Layers, pro), [Panel::Layers, Panel::Gradients, Panel::Channels, Panel::Paths], "{theme:?}");
+        assert_eq!(h.state().ui.dock_tabs.layers, 1, "{theme:?}: the moved panel is selected where it landed");
+        assert!(!d.panels(Group::Color, pro).contains(&Panel::Gradients));
+        // Channels into the gap above Layers: a group of its own there.
+        let (_, cr) = strip(&h, Group::Layers).tabs.into_iter().find(|(i, _)| h.state().ui.dock.panels(Group::Layers, pro)[*i] == Panel::Channels).unwrap();
+        let lr = rect(&h, Group::Layers);
+        drag_to(&mut h, cr.center(), pos2(lr.center().x, lr.top() - GAP / 2.0));
+        let order: Vec<Group> = h.state().ui.dock.order();
+        let e = order.iter().copied().find(|g| matches!(g, Group::Extra(_))).expect("a new group");
+        assert_eq!(h.state().ui.dock.panels(e, pro), [Panel::Channels], "{theme:?}");
+        assert!(last_rects(&h.ctx).iter().any(|(g, _)| *g == e), "{theme:?}: the new group is drawn");
+        // The strip background (right of the tabs) still moves the whole group.
+        let before = h.state().ui.dock.order();
+        let cs = strip(&h, Group::Color);
+        let bg = pos2(cs.menu.left() - 12.0, cs.menu.center().y);
+        let lr = rect(&h, Group::Layers);
+        drag_to(&mut h, bg, pos2(lr.center().x, lr.bottom() - 4.0));
+        let after = h.state().ui.dock.order();
+        assert_ne!(after, before, "{theme:?}: the Color group moved");
+        assert_eq!(h.state().ui.dock.panels(Group::Color, pro).len(), 3, "{theme:?}: and kept its panels");
+        // Lock Workspace: tabs don't move.
+        h.state_mut().session.prefs.edit(|p| p.workspace_locked = true);
+        h.run_steps(2);
+        let locked_before = h.state().ui.dock.clone();
+        let (_, pr) = strip(&h, Group::Layers).tabs[0];
+        let cr2 = rect(&h, Group::Color);
+        drag_to(&mut h, pr.center(), cr2.center());
+        assert_eq!(h.state().ui.dock, locked_before, "{theme:?}");
+    }
+}
+
+/// What a panel drag shows (`PHOTOCRAFT_UI_SHOT=<dir>` saves frames mid-drag): the target group
+/// outlined with the insertion point, or the new-group line, and the panel's name at the pointer.
+#[test]
+fn a_panel_drag_shows_where_it_will_land() {
+    let (app, _, _) = app_with_layers();
+    let mut h = harness(app, vec2(1300.0, 850.0), ThemeKind::ProMedium);
+    let strip = |h: &Harness<'static, PhotocraftApp>, g: Group| last_strips(&h.ctx).into_iter().find(|s| s.group == g).unwrap();
+    let rect = |h: &Harness<'static, PhotocraftApp>, g: Group| last_rects(&h.ctx).into_iter().find(|(x, _)| *x == g).unwrap().1;
+    let from = strip(&h, Group::Color).tabs[2].1.center();
+    let ls = strip(&h, Group::Layers);
+    let targets = [("into", pos2(ls.tabs[1].1.left() + 3.0, ls.tabs[1].1.center().y)), ("new-group", pos2(rect(&h, Group::Layers).center().x, rect(&h, Group::Layers).top() - GAP / 2.0))];
+    for (name, to) in targets {
+        h.event(egui::Event::PointerMoved(from));
+        h.run_steps(1);
+        h.event(egui::Event::PointerButton { pos: from, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
+        h.run_steps(1);
+        for k in 1..=6 {
+            h.event(egui::Event::PointerMoved(from + (to - from) * (k as f32 / 6.0)));
+            h.run_steps(1);
+        }
+        assert!(h.ctx.data(|d| d.get_temp::<Option<PanelDrag>>(panel_drag_id())).flatten().is_some(), "{name}: dragging a panel");
+        if let Some(dir) = std::env::var_os("PHOTOCRAFT_UI_SHOT")
+            && let Ok(img) = h.render()
+        {
+            let _ = img.save(std::path::Path::new(&dir).join(format!("dock-drag-{name}.png")));
+        }
+        // Released back where it started: nothing moves.
+        h.event(egui::Event::PointerMoved(from));
+        h.run_steps(1);
+        h.event(egui::Event::PointerButton { pos: from, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
+        h.run_steps(2);
+        assert_eq!(h.state().ui.dock, DockLayout::default(), "{name}");
+    }
 }

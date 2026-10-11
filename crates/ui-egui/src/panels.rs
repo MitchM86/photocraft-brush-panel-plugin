@@ -1495,7 +1495,7 @@ pub fn request_dock_width(ctx: &egui::Context, w: f32) {
 fn dock_panels(app: &mut PhotocraftApp, ui: &mut egui::Ui, p: &crate::state::Panels, t: &Tokens) {
     use crate::dock::Group;
     // Floating in Studio, Properties docks only in Pro (Photoshop).
-    let shown: Vec<Group> = [
+    let mut shown: Vec<Group> = [
         (Group::Color, p.color),
         (Group::Properties, t.pro && p.properties),
         (Group::Character, p.character),
@@ -1506,6 +1506,8 @@ fn dock_panels(app: &mut PhotocraftApp, ui: &mut egui::Ui, p: &crate::state::Pan
     .into_iter()
     .filter_map(|(g, on)| on.then_some(g))
     .collect();
+    // Groups made by dragging a panel between groups.
+    shown.extend(app.ui.dock.order().into_iter().filter(|g| matches!(g, Group::Extra(_)) && g.shown(p)));
     if shown.is_empty() {
         return;
     }
