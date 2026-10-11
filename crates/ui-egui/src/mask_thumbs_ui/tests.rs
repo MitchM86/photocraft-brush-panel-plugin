@@ -442,9 +442,7 @@ fn clicking_the_vector_mask_targets_it_for_the_path_tools() {
     // The Pen adds a subpath to it.
     h.state_mut().ui.pen = Some(crate::vector_ui::PenPath {
         knots: vec![[[150.0, 10.0]; 3], [[190.0, 10.0]; 3], [[190.0, 40.0]; 3]],
-        unlinked: Vec::new(),
-        dragging: false,
-        adjusting_last: false,
+        ..Default::default()
     });
     crate::vector_ui::pen_commit(h.state_mut(), true);
     assert_eq!(layer(&h, masked).vector_mask.unwrap().path.subpaths.len(), 2);

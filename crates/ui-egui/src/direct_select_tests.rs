@@ -116,22 +116,88 @@ fn marquee_shift_and_empty_clicks_select_like_photoshop() {
     assert_eq!(app.ui.direct_selection.anchors.len(), 4, "⌥-click selects the whole subpath");
 }
 
+/// The Pen mid-path, as in the user's Photoshop recording: a corner at (30, 100), then a smooth
+/// point dragged out at (100, 100) with handles (60, 100) and (140, 100).
+fn drawing(app: &mut PhotocraftApp) {
+    click(app, [30.0, 100.0], Modifiers::NONE);
+    drag(app, [100.0, 100.0], [140.0, 100.0], Modifiers::NONE);
+    assert_eq!(pen_knots(app), vec![[[30.0, 100.0]; 3], [[100.0, 100.0], [60.0, 100.0], [140.0, 100.0]]]);
+}
+
+fn pen_knots(app: &PhotocraftApp) -> Vec<[[f64; 2]; 3]> {
+    app.ui.pen.as_ref().map(|p| p.knots.clone()).unwrap_or_default()
+}
+
 #[test]
-fn pen_with_command_edits_paths_and_ends_the_one_being_drawn() {
+fn pen_alt_drag_on_a_handle_end_moves_that_handle_alone() {
+    let mut app = app(Tool::Pen);
+    drawing(&mut app);
+    drag(&mut app, [140.0, 100.0], [140.0, 60.0], Modifiers::ALT);
+    let pen = app.ui.pen.as_ref().expect("still drawing");
+    assert_eq!(pen.knots, vec![[[30.0, 100.0]; 3], [[100.0, 100.0], [60.0, 100.0], [140.0, 60.0]]], "no point added; the incoming handle stays");
+    assert!(pen.unlinked.contains(&1), "the point is now a cusp");
+    // ⌥-click on the anchor itself still removes the outgoing handle; the incoming one stays.
+    click(&mut app, [100.0, 100.0], Modifiers::ALT);
+    assert_eq!(pen_knots(&app)[1], [[100.0, 100.0], [60.0, 100.0], [100.0, 100.0]]);
+    click(&mut app, [170.0, 100.0], Modifiers::NONE);
+    assert_eq!(pen_knots(&app).len(), 3, "drawing goes on");
+}
+
+#[test]
+fn pen_command_drag_on_a_handle_turns_a_smooth_points_handles_together() {
+    let mut app = app(Tool::Pen);
+    let before = steps(&app);
+    drawing(&mut app);
+    drag(&mut app, [140.0, 100.0], [100.0, 60.0], Modifiers::COMMAND);
+    assert_eq!(pen_knots(&app)[1], [[100.0, 100.0], [100.0, 140.0], [100.0, 60.0]], "both handles turn, keeping their lengths");
+    assert!(!app.ui.pen.as_ref().unwrap().unlinked.contains(&1), "still smooth");
+    // ⌘⌥ breaks them apart.
+    drag(&mut app, [100.0, 60.0], [130.0, 60.0], Modifiers::COMMAND | Modifiers::ALT);
+    assert_eq!(pen_knots(&app)[1], [[100.0, 100.0], [100.0, 140.0], [130.0, 60.0]]);
+    assert_eq!(steps(&app), before, "the path in progress is not in History yet");
+}
+
+#[test]
+fn pen_command_drag_on_an_anchor_moves_it_and_drawing_goes_on() {
+    let mut app = app(Tool::Pen);
+    drawing(&mut app);
+    drag(&mut app, [100.0, 100.0], [110.0, 120.0], Modifiers::COMMAND);
+    assert_eq!(pen_knots(&app)[1], [[110.0, 120.0], [70.0, 120.0], [150.0, 120.0]], "the anchor moves with its handles");
+    assert_eq!(app.ui.tool, Tool::Pen, "the Pen stays the tool");
+    click(&mut app, [170.0, 170.0], Modifiers::NONE);
+    assert_eq!(pen_knots(&app).len(), 3, "the next click continues the same path");
+    // ⌘ picks an earlier anchor too.
+    drag(&mut app, [30.0, 100.0], [30.0, 90.0], Modifiers::COMMAND);
+    assert_eq!(pen_knots(&app)[0][0], [30.0, 90.0]);
+    click(&mut app, [170.0, 30.0], Modifiers::NONE);
+    assert_eq!(pen_knots(&app).len(), 4, "and drawing still goes on from the last anchor");
+}
+
+#[test]
+fn pen_command_click_off_the_path_ends_it_and_the_next_path_adds_to_the_work_path() {
     let mut app = app(Tool::Pen);
     for p in [[30.0, 30.0], [90.0, 30.0]] {
         click(&mut app, p, Modifiers::NONE);
     }
-    assert_eq!(app.ui.pen.as_ref().map(|p| p.knots.len()), Some(2));
-    // ⌘-drag (Ctrl-drag off the Mac) on the second anchor: the path is finished and edited.
+    click(&mut app, [150.0, 150.0], Modifiers::COMMAND);
+    assert!(app.ui.pen.is_none(), "⌘-click on empty canvas ends the path");
+    // ⌘-drag now edits the finished path.
     drag(&mut app, [90.0, 30.0], [90.0, 70.0], Modifiers::COMMAND);
-    assert!(app.ui.pen.is_none());
-    assert_eq!(app.ui.tool, Tool::Pen, "the Pen stays the tool");
     let wp = work(&app);
     assert_eq!((wp.subpaths[0].closed, wp.subpaths[0].knots[1].anchor), (false, Point::new(90.0, 70.0)));
-    // Without ⌘ the Pen draws again.
-    click(&mut app, [150.0, 150.0], Modifiers::NONE);
-    assert_eq!(app.ui.pen.as_ref().map(|p| p.knots.len()), Some(1));
+    // Without ⌘ the Pen draws again, into the work path selected in the Paths panel.
+    for p in [[150.0, 150.0], [180.0, 150.0]] {
+        click(&mut app, p, Modifiers::NONE);
+    }
+    crate::vector_ui::pen_commit(&mut app, false);
+    assert_eq!(work(&app).subpaths.len(), 2, "the first path is kept");
+    // With no path selected a new work path replaces it, as in Photoshop.
+    app.ui.selected_path = None;
+    for p in [[20.0, 180.0], [60.0, 180.0]] {
+        click(&mut app, p, Modifiers::NONE);
+    }
+    crate::vector_ui::pen_commit(&mut app, false);
+    assert_eq!(work(&app).subpaths.len(), 1);
 }
 
 #[test]

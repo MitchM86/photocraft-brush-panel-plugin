@@ -26,6 +26,24 @@ pub struct PenPath {
     /// Re-dragging the final anchor changes its outgoing control only; the incoming curve stays put.
     #[serde(skip)]
     pub adjusting_last: bool,
+    /// The knot whose handles show and can be grabbed: the last one, unless ⌘ picked another.
+    #[serde(skip)]
+    pub focus: Option<usize>,
+    /// A ⌘ / ⌥ drag reshaping the path in progress.
+    #[serde(skip)]
+    pub edit: Option<PenEdit>,
+}
+
+/// Pen + ⌘ / ⌥ dragging part of the path being drawn, as in Photoshop.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PenEdit {
+    pub knot: usize,
+    /// 0 moves the anchor with its handles, 1 the incoming handle, 2 the outgoing one.
+    pub part: usize,
+    /// The handle moves alone (⌥, or a cusp) instead of turning the other one with it.
+    pub alone: bool,
+    /// Pointer minus the grabbed point at the press, so the point doesn't jump to the pointer.
+    pub grab: [f64; 2],
 }
 
 pub fn is_shape_tool(t: Tool) -> bool {
@@ -194,6 +212,79 @@ pub fn pen_down(app: &mut PhotocraftApp, x: f64, y: f64) {
     pen.knots.push([[x, y]; 3]);
     pen.dragging = true;
     pen.adjusting_last = false;
+    pen.focus = None;
+}
+
+/// The handles of the path in progress that show and can be grabbed, as (knot, 1 in / 2 out):
+/// the focused knot's, except retracted ones.
+fn pen_handles(pen: &PenPath) -> Vec<(usize, usize)> {
+    let Some(i) = pen.focus.filter(|&i| i < pen.knots.len()).or(pen.knots.len().checked_sub(1)) else { return Vec::new() };
+    let k = pen.knots[i];
+    [1, 2].into_iter().filter(|&h| k[h] != k[0]).map(|h| (i, h)).collect()
+}
+
+/// Pen + ⌥ / ⌘ press on the path being drawn, as in Photoshop: ⌥ on a shown handle moves that
+/// handle alone; ⌘ is Direct Selection on the path: a handle turns (a smooth point's other handle
+/// with it, ⌘⌥ alone), an anchor moves with its handles and becomes the focus. The path stays in
+/// progress, and the Pen goes on from its last anchor. False when the press missed the path.
+pub fn pen_modifier_down(app: &mut PhotocraftApp, x: f64, y: f64, mods: egui::Modifiers) -> bool {
+    let tol = 6.0 / app.point_zoom().max(0.01) as f64;
+    let Some(pen) = app.ui.pen.as_mut() else { return false };
+    let dist = |p: [f64; 2]| (p[0] - x).hypot(p[1] - y);
+    let near = |p: [f64; 2]| dist(p) < tol;
+    // A short handle can overlap its anchor: the nearer of the two wins.
+    let handle = pen_handles(pen).into_iter().find(|&(i, h)| near(pen.knots[i][h]) && dist(pen.knots[i][h]) < dist(pen.knots[i][0]));
+    let (knot, part) = match handle {
+        Some(h) if mods.alt || mods.command => h,
+        _ if mods.command => match pen.knots.iter().rposition(|k| near(k[0])) {
+            Some(i) => (i, 0),
+            None => return false,
+        },
+        _ => return false,
+    };
+    if part == 0 {
+        pen.focus = Some(knot);
+    }
+    let at = pen.knots[knot][part];
+    pen.edit = Some(PenEdit { knot, part, alone: mods.alt || pen.unlinked.contains(&knot), grab: [x - at[0], y - at[1]] });
+    pen.dragging = false;
+    true
+}
+
+/// Drag of a `pen_modifier_down` edit; false when none is in progress.
+pub fn pen_edit_move(app: &mut PhotocraftApp, x: f64, y: f64) -> bool {
+    let Some(pen) = app.ui.pen.as_mut() else { return false };
+    let Some(e) = pen.edit else { return false };
+    let Some(k) = pen.knots.get_mut(e.knot) else { return true };
+    let to = [x - e.grab[0], y - e.grab[1]];
+    if e.part == 0 {
+        let d = [to[0] - k[0][0], to[1] - k[0][1]];
+        for p in k.iter_mut() {
+            *p = [p[0] + d[0], p[1] + d[1]];
+        }
+        return true;
+    }
+    k[e.part] = to;
+    if e.alone {
+        if !pen.unlinked.contains(&e.knot) {
+            pen.unlinked.push(e.knot);
+        }
+    } else {
+        // A smooth point: the other handle keeps its length and points the opposite way.
+        let (a, o) = (k[0], 3 - e.part);
+        let len = (k[o][0] - a[0]).hypot(k[o][1] - a[1]);
+        let dir = [a[0] - to[0], a[1] - to[1]];
+        let d = dir[0].hypot(dir[1]);
+        if d > 1e-9 {
+            k[o] = [a[0] + dir[0] / d * len, a[1] + dir[1] / d * len];
+        }
+    }
+    true
+}
+
+/// Release of a `pen_modifier_down` edit; false when none was in progress.
+pub fn pen_edit_up(app: &mut PhotocraftApp) -> bool {
+    app.ui.pen.as_mut().and_then(|p| p.edit.take()).is_some()
 }
 
 pub fn pen_move(app: &mut PhotocraftApp, x: f64, y: f64) {
@@ -260,7 +351,18 @@ pub fn pen_commit(app: &mut PhotocraftApp, closed: bool) {
         }
         app.run("layer.vectorMask.edit", json!({"layer": id, "path": p}))
     } else {
-        // The drawn work path is selected in the Paths panel, as in Photoshop.
+        // While the work path is selected in the Paths panel a new path is added to it as a
+        // subpath; otherwise it replaces it. The drawn work path is selected, as in Photoshop.
+        let mut path = path;
+        if app.ui.selected_path.as_deref() == Some("work")
+            && let Some(existing) = app.session.active().and_then(|st| st.doc.work_path.as_ref())
+        {
+            let mut p = photocraft_engine::vector_cmds::path_json(existing);
+            if let (Some(subs), Some(new)) = (p.get_mut("subpaths").and_then(Value::as_array_mut), path.get("subpaths").and_then(Value::as_array)) {
+                subs.extend(new.iter().cloned());
+            }
+            path = p;
+        }
         app.run("path.set", json!({"name": "work", "path": path})).inspect(|_| app.ui.selected_path = Some("work".into()))
     };
     if let Err(e) = r {
@@ -512,20 +614,21 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
             }
         }
         painter.add(egui::Shape::line(pts, Stroke::new(1.5, accent)));
+        // No rubber band while ⌘ (Direct Selection) is held or a handle is being dragged.
+        let editing = pen.edit.is_some() || painter.ctx().input(|i| i.modifiers.command);
         if let (Some(last), Some(h)) = (pen.knots.last(), app.hover_doc)
             && !pen.dragging
+            && !editing
         {
             painter.add(egui::Shape::dashed_line(&[to_scr(last[0]), to_scr(h)], Stroke::new(1.0, accent), 4.0, 3.0));
         }
+        // Each handle shows unless retracted: the incoming one stays after ⌥ removes the outgoing.
+        for (i, h) in pen_handles(pen) {
+            draw_handle(painter, to_scr(pen.knots[i][0]), to_scr(pen.knots[i][h]), accent);
+        }
+        let focus = pen.focus.filter(|&i| i < pen.knots.len()).or(pen.knots.len().checked_sub(1));
         for (i, k) in pen.knots.iter().enumerate() {
-            let c = to_scr(k[0]);
-            let last = i + 1 == pen.knots.len();
-            if last && k[2] != k[0] {
-                for hnd in [k[1], k[2]] {
-                    draw_handle(painter, c, to_scr(hnd), accent);
-                }
-            }
-            draw_anchor(painter, c, last, accent);
+            draw_anchor(painter, to_scr(k[0]), Some(i) == focus, accent);
         }
     }
 }
@@ -1079,6 +1182,19 @@ pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_pen_shows_each_handle_that_is_not_retracted() {
+        let smooth = [[100.0, 100.0], [60.0, 100.0], [140.0, 100.0]];
+        let mut pen = PenPath { knots: vec![[[30.0, 100.0]; 3], smooth], ..Default::default() };
+        assert_eq!(pen_handles(&pen), vec![(1, 1), (1, 2)]);
+        // ⌥ removed the outgoing handle: the incoming one still shows (it did not before).
+        pen.knots[1][2] = pen.knots[1][0];
+        assert_eq!(pen_handles(&pen), vec![(1, 1)]);
+        // ⌘ on another anchor shows its handles instead.
+        pen.focus = Some(0);
+        assert_eq!(pen_handles(&pen), Vec::new());
+    }
 
     #[test]
     fn all_shape_tools_and_open_pen_use_the_complete_stroke_defaults() {

@@ -8,6 +8,8 @@
 //!   handles collinear; ⌥ breaks them apart), or a segment to bend it (straight segments move).
 //! * Pen + ⌥: click an anchor to make it a corner, drag from it to pull out smooth handles, drag a
 //!   handle to move it alone.
+//! * While the Pen is drawing, ⌘ / ⌥ on the path in progress reshape it instead and drawing goes
+//!   on (`vector_ui::pen_modifier_down`); ⌘ anywhere else ends it.
 //!
 //! A drag previews with `photocraft_vector::edit` and commits once on release through the engine
 //! (`path.moveAnchors`, `path.moveHandle`, `path.bendSegment`, `path.convertPoint`): one history
@@ -151,18 +153,25 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool 
     match ev {
         ToolEvent::Down { x, y, .. } => {
             let pen_idle = app.ui.pen.is_none();
+            // While a path is being drawn, ⌥ / ⌘ on it reshape it and drawing goes on (vector_ui).
+            if tool == Tool::Pen && !pen_idle && (mods.alt || mods.command) && crate::vector_ui::pen_modifier_down(app, x, y, mods) {
+                return true;
+            }
             // Pen + ⌥ is Convert Point only while no path is being drawn.
             let convert = tool == Tool::Pen && mods.alt && !mods.command && pen_idle;
             if !(direct(tool, mods) || convert) {
                 return false;
             }
             if tool == Tool::Pen && !pen_idle {
-                // ⌘-click ends the path being drawn, which becomes editable, as in Photoshop.
+                // ⌘-click off it ends the path being drawn, which becomes editable, as in Photoshop.
                 crate::vector_ui::pen_commit(app, false);
             }
             press(app, [x, y], mods, convert)
         }
         ToolEvent::Move { x, y, .. } => {
+            if crate::vector_ui::pen_edit_move(app, x, y) {
+                return true;
+            }
             let ds = &mut app.ui.direct_selection;
             match &mut ds.drag {
                 Some(Drag::Edit { base, edit, start, end, preview, .. }) => {
@@ -174,6 +183,7 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool 
             }
             true
         }
+        ToolEvent::Up { .. } if crate::vector_ui::pen_edit_up(app) => true,
         ToolEvent::Up { x, y } => match app.ui.direct_selection.drag.take() {
             Some(Drag::Edit { target, edit, start, .. }) => {
                 release(app, target, &edit, start, [x, y]);
