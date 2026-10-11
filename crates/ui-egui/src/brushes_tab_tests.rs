@@ -249,7 +249,7 @@ fn brush_picker_upper_controls_stop_at_their_max_width() {
 fn the_brushes_tab_grid_is_centred_past_its_indent() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.ui.panels.brush_settings = true;
-    app.ui.brush_tab = 1;
+    app.ui.dock_tabs.brush = 1;
     app.ui.brushes_panel.view = BrushesView::Grid;
     let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {

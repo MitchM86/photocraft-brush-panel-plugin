@@ -65,8 +65,7 @@ pub fn open(app: &mut PhotocraftApp, name: &str, bytes: &[u8]) -> Option<Result<
         };
         if what == "brushes" {
             // Show them: Brush Settings › Brushes tab.
-            app.ui.panels.brush_settings = true;
-            app.ui.brush_tab = 1;
+            crate::dock::show_panel(app, crate::dock::Panel::Brushes);
         }
     }))
 }

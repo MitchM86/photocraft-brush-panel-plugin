@@ -191,13 +191,12 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
         return r;
     }
     if id == "window.panel.brushes" {
-        // Window › Brushes opens the Brush Settings window on its presets tab.
-        app.ui.panels.brush_settings = true;
-        app.ui.brush_tab = 1;
+        // Window › Brushes shows the Brushes panel (in the Brush Settings window unless moved).
+        crate::dock::show_panel(app, crate::dock::Panel::Brushes);
         return Ok(Value::Null);
     }
     if id == "window.panel.brushSettings" {
-        app.ui.brush_tab = 0;
+        crate::dock::select_tab(app, crate::dock::Panel::BrushSettings);
     }
     // View/Window/Type shell items, and dialogs/pickers in front of File commands.
     // Edit › Preferences, Keyboard Shortcuts, Color Settings and other Edit dialogs.
@@ -531,9 +530,16 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
             Ok(json!({"document": to}))
         }
         t if t.starts_with("window.toggle.") => {
-            // A shown but collapsed dock group is expanded rather than hidden (#129).
-            if let Some(g) = crate::dock::Group::from_key(&t["window.toggle.".len()..]).filter(|g| g.shown(&app.ui.panels) && app.ui.dock.is_collapsed(*g)) {
-                crate::dock::reveal(app, g);
+            // A panel's toggle (F7 Layers, F5 Brush Settings…) shows or hides the group the panel
+            // is in now, wherever it was dragged.
+            if let Some(panel) = crate::dock::toggle_panel(&t["window.toggle.".len()..]) {
+                let (g, _) = crate::dock::locate(app, panel);
+                if g.shown(&app.ui.panels) && !app.ui.dock.is_collapsed(g) {
+                    *g.shown_mut(&mut app.ui.panels) = false;
+                } else {
+                    // A shown but collapsed group is expanded rather than hidden (#129).
+                    crate::dock::show_panel(app, panel);
+                }
                 return Ok(Value::Null);
             }
             let p = &mut app.ui.panels;
@@ -723,6 +729,9 @@ fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
         "view.snap" => return Some(e.snap),
         "view.lockGuides" => return Some(e.lock_guides),
         _ => {}
+    }
+    if let Some(panel) = id.strip_prefix("window.toggle.").and_then(crate::dock::toggle_panel) {
+        return Some(crate::dock::group_shown(app, panel));
     }
     let p = &app.ui.panels;
     Some(match id {

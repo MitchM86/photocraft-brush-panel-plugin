@@ -387,8 +387,7 @@ fn on_event(app: &mut PhotocraftApp, ctx: &egui::Context, e: JobEvent) {
             let group = v.get("group").and_then(Value::as_str).unwrap_or_default();
             app.ui.status = format!("Imported {n} brushes from {group}");
             app.ui.status_error = false;
-            app.ui.panels.brush_settings = true;
-            app.ui.brush_tab = 1;
+            crate::dock::show_panel(app, crate::dock::Panel::Brushes);
         }
         JobOutcome::Done(_) => {
             app.sync_views();

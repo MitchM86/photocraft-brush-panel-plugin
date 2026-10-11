@@ -448,7 +448,7 @@ fn drop_targets_and_actions_reorder_presets() {
 fn harness(tab: usize, section: usize) -> Harness<'static, PhotocraftApp> {
     let mut app = app();
     app.ui.panels.brush_settings = true;
-    app.ui.brush_tab = tab;
+    app.ui.dock_tabs.brush = tab;
     app.ui.brush_section = section;
     let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_ui_state(
         |ui, app: &mut PhotocraftApp| {
@@ -704,7 +704,7 @@ fn f5_edits_the_default_brush_with_every_section() {
     assert!(!fresh.shape_dynamics.enabled && !fresh.transfer.enabled, "the default round brush has no dynamics yet");
     h.key_press(egui::Key::F5);
     h.run_steps(3);
-    assert!(h.state().ui.panels.brush_settings && h.state().ui.brush_tab == 0, "F5 shows Brush Settings");
+    assert!(h.state().ui.panels.brush_settings && h.state().ui.dock_tabs.brush == 0, "F5 shows Brush Settings");
     // Every section is there for the built-in round brush, not only for sampled or imported ones.
     for (name, _) in SECTIONS {
         assert!(h.query_all_by_label(name).next().is_some(), "{name} listed");
@@ -818,7 +818,7 @@ fn options_bar_reaches_brush_settings_and_the_preset_library() {
     h.run_steps(3);
     h.get_by_label("Brush Settings…").click();
     h.run_steps(3);
-    assert!(h.state().ui.panels.brush_settings && h.state().ui.brush_tab == 0);
+    assert!(h.state().ui.panels.brush_settings && h.state().ui.dock_tabs.brush == 0);
     assert_eq!(h.state().ui.brush_picker, None);
 }
 
@@ -937,7 +937,7 @@ fn a_resized_brush_panel_keeps_its_size_across_tabs() {
         h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() });
         h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() });
         h.run_steps(frames);
-        assert_eq!(h.state().ui.brush_tab, tab, "the click switched tabs");
+        assert_eq!(h.state().ui.dock_tabs.brush, tab, "the click switched tabs");
         let r = panel_rect(&h);
         assert!((r.width() - resized.width()).abs() < 2.0 && (r.height() - resized.height()).abs() < 2.0, "tab {tab}: {resized:?} → {r:?}");
     }

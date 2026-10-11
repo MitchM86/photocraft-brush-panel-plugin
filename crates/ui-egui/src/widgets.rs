@@ -190,11 +190,17 @@ fn pro_panel(ui: &mut Ui, id: &str, tabs: &[&str], selected: &mut usize, collaps
 }
 
 pub fn pill_tab(ui: &mut Ui, label: &str, selected: bool) -> Response {
+    pill_tab_sense(ui, label, selected, Sense::click())
+}
+
+/// [`pill_tab`] that also senses `sense` (a floating panel's tab is clicked to pick it and
+/// dragged to move the panel; a short press still counts as a click).
+pub fn pill_tab_sense(ui: &mut Ui, label: &str, selected: bool, sense: Sense) -> Response {
     let t = Tokens::get(ui.ctx());
     let font = theme::medium(12.5);
     let galley = ui.painter().layout_no_wrap(tl!(label).to_owned(), font, t.text);
     let size = vec2(galley.size().x + 20.0, 24.0);
-    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(size, sense);
     if selected {
         surface(ui, rect, t.hover, true);
         if !t.bevel {

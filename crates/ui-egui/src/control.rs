@@ -592,7 +592,8 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
                     app.ui.brush_section = (i as usize).min(crate::brush_panel::SECTIONS.len() - 1);
                 }
                 if let Some(i) = brush_tab {
-                    app.ui.brush_tab = (i as usize).min(1);
+                    let p = if i == 0 { crate::dock::Panel::BrushSettings } else { crate::dock::Panel::Brushes };
+                    crate::dock::select_tab(app, p);
                 }
                 if let Some(v) = brushes_view {
                     app.ui.brushes_panel.view = v;

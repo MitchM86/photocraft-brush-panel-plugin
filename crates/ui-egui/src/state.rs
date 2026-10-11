@@ -864,6 +864,8 @@ pub struct DockTabs {
     pub history: usize,
     /// Character | Paragraph.
     pub character: usize,
+    /// Brush Settings | Brushes.
+    pub brush: usize,
     /// Groups made by dragging a panel between groups (`dock::Group::Extra`).
     #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub extra: std::collections::BTreeMap<u8, usize>,
@@ -999,11 +1001,10 @@ pub struct UiState {
     /// Which chip the Color panel edits.
     #[serde(default)]
     pub color_panel: ColorPanelState,
-    /// Brush Settings: selected section (0 = Brush Tip Shape) and tab (0 settings, 1 Brushes).
+    /// Brush Settings: selected section (0 = Brush Tip Shape). Its tab is the dock's
+    /// (`dock_tabs.brush`, a `dock::Group::Brush` like the other panel groups).
     #[serde(default)]
     pub brush_section: usize,
-    #[serde(default)]
-    pub brush_tab: usize,
     /// Brushes panel: collapsed groups and the search filter.
     #[serde(default)]
     pub brushes_panel: crate::brush_panel::BrushesPanelState,
@@ -1105,7 +1106,6 @@ impl Default for UiState {
             dock: Default::default(),
             color_panel: Default::default(),
             brush_section: 0,
-            brush_tab: 0,
             brushes_panel: Default::default(),
             selection_mode: 0,
             tool_options: ToolOptions::default(),

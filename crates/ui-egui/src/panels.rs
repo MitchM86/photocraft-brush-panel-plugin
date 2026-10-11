@@ -1512,7 +1512,17 @@ fn dock_panels(app: &mut PhotocraftApp, ui: &mut egui::Ui, p: &crate::state::Pan
         return;
     }
     let margin = if t.pro { 2 } else { 8 };
-    let mut panel = egui::Panel::right("dock").resizable(true).default_size(if t.pro { 290.0 } else { 300.0 }).size_range(DOCK_WIDTH);
+    // A docked panel that needs more room (Brush Settings' two columns) widens the column, as in
+    // Photoshop; it narrows again when that panel leaves.
+    let need = shown
+        .iter()
+        .filter(|g| !app.ui.dock.is_floating(**g))
+        .flat_map(|g| app.ui.dock.visible_panels(*g, t.pro))
+        .map(|(_, p)| p.min_width())
+        .fold(0.0f32, f32::max);
+    let lo = if need > 0.0 { (need + 2.0 * f32::from(margin) + 2.0).max(*DOCK_WIDTH.start()) } else { *DOCK_WIDTH.start() };
+    let range = lo..=DOCK_WIDTH.end().max(lo + 60.0);
+    let mut panel = egui::Panel::right("dock").resizable(true).default_size(if t.pro { 290.0 } else { 300.0 }).size_range(range);
     if let Some(w) = ui.ctx().data_mut(|d| d.remove_temp::<f32>(dock_width_id())) {
         panel = panel.exact_size(w);
     }
@@ -1523,7 +1533,7 @@ fn dock_panels(app: &mut PhotocraftApp, ui: &mut egui::Ui, p: &crate::state::Pan
 }
 
 /// One dock panel's content; `dock` bounds it and scrolls it when it's taller.
-fn dock_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, panel: crate::dock::Panel) {
+pub(crate) fn dock_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, panel: crate::dock::Panel) {
     use crate::dock::Panel;
     let pro = Tokens::get(ui.ctx()).pro;
     match panel {
@@ -1546,6 +1556,8 @@ fn dock_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, panel: crate::dock::Pan
         Panel::Layers => layers(app, ui),
         Panel::Channels => channels(app, ui),
         Panel::Paths => crate::vector_ui::paths_panel(app, ui),
+        Panel::BrushSettings => crate::brush_panel::settings_tab(app, ui),
+        Panel::Brushes => crate::brushes_tab::show(app, ui),
     }
 }
 

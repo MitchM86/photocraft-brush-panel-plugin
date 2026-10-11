@@ -166,8 +166,8 @@ pub fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, picks: Vec<Pick>) {
 
 /// Show the Brush Settings panel on its settings tab (what F5 does when it is hidden).
 pub fn open_settings(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    if app.ui.panels.brush_settings {
-        app.ui.brush_tab = 0;
+    if crate::dock::group_shown(app, crate::dock::Panel::BrushSettings) {
+        crate::dock::select_tab(app, crate::dock::Panel::BrushSettings);
         return;
     }
     if let Err(e) = crate::menus::invoke(app, ctx, "window.panel.brushSettings", json!({})) {
@@ -178,7 +178,7 @@ pub fn open_settings(app: &mut PhotocraftApp, ctx: &egui::Context) {
 /// The options-bar button beside the brush chip that shows and hides the Brush Settings panel
 /// (Photoshop's "Toggle the Brush Settings panel"). It runs Window › Brush Settings (F5).
 pub fn settings_toggle(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let on = app.ui.panels.brush_settings;
+    let on = crate::dock::group_shown(app, crate::dock::Panel::BrushSettings);
     if named(icons::button(ui, "sliders-horizontal", 24.0, on, "Toggle the Brush Settings panel  (F5)"), "Toggle the Brush Settings panel").clicked()
         && let Err(e) = crate::menus::invoke(app, ui.ctx(), "window.panel.brushSettings", json!({}))
     {

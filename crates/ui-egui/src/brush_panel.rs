@@ -14,7 +14,7 @@
 //! The lock beside a section name keeps that section's settings when another preset is picked
 //! (`locks` in the brush, applied by the engine). The Brushes tab lives in [`crate::brushes_tab`].
 
-use egui::{Color32, CornerRadius, RichText, Sense, Stroke, vec2};
+use egui::{Color32, RichText, Sense, Stroke, vec2};
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint;
 use serde::{Deserialize, Serialize};
@@ -50,8 +50,8 @@ pub(crate) const WIDTH: f32 = 540.0;
 const STRIP_H: u32 = 76;
 /// The panel's default content height (the section body's 450 pt scroll area plus the rest) and
 /// its smallest size: resizing the window makes the section body and the strip follow.
-const DEFAULT_H: f32 = 662.0;
-const MIN_SIZE: (f32, f32) = (460.0, 420.0);
+pub(crate) const DEFAULT_H: f32 = 662.0;
+pub(crate) const MIN_SIZE: (f32, f32) = (460.0, 420.0);
 /// The section body's smallest height.
 const MIN_BODY_H: f32 = 150.0;
 
@@ -317,7 +317,7 @@ fn section_list(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSetting
     });
 }
 
-fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub(crate) fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let before = app.session.tools.brush.clone();
     let mut b = before.clone();
@@ -334,7 +334,12 @@ fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     });
     egui::CentralPanel::no_frame().show(ui, |ui| {
         ui.horizontal_top(|ui| {
-            section_list(app, ui, &mut b);
+            // Scrolls when the panel is shorter than the list (docked in a short group).
+            egui::ScrollArea::vertical()
+                .id_salt("brush-section-list")
+                .max_height(ui.available_height().max(MIN_BODY_H))
+                .auto_shrink([true, false])
+                .show(ui, |ui| section_list(app, ui, &mut b));
             widgets::vline(ui, ui.available_height().max(MIN_BODY_H));
             ui.vertical(|ui| {
                 ui.set_width(width - 190.0);
@@ -393,57 +398,12 @@ fn settings_footer(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSett
     });
 }
 
+/// Window › Brush Settings (F5): the Brush Settings | Brushes group, floating unless docked,
+/// drawn with the other floating panel groups (`dock::floating_windows`), which also drop panels
+/// dragged by their tabs.
 pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    if !app.ui.panels.brush_settings {
-        return;
-    }
-    let t = Tokens::get(ctx);
-    let frame = egui::Frame::NONE
-        .fill(t.card)
-        .stroke(Stroke::new(1.0, t.card_border))
-        .corner_radius(CornerRadius::same(t.radius_lg as u8))
-        .shadow(egui::Shadow { offset: [0, 10], blur: 30, spread: 0, color: t.shadow })
-        .inner_margin(egui::Margin::same(10));
-    let canvas = app.last_canvas_rect;
-    let mut open = true;
-    egui::Window::new(tl!("Brush Settings"))
-        .id(egui::Id::new("brush-settings"))
-        .title_bar(false)
-        // Drag an edge or the corner to resize (Photoshop's panels); egui remembers the size
-        // with the window layout.
-        .resizable(true)
-        // The frame's margins and stroke count in the window size.
-        .default_size(vec2(WIDTH + 22.0, DEFAULT_H))
-        .min_size(vec2(MIN_SIZE.0, MIN_SIZE.1))
-        .frame(frame)
-        .default_pos(egui::pos2((canvas.right() - WIDTH - 30.0).max(canvas.left() + 8.0), canvas.top() + 24.0))
-        .show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                let mut tab = app.ui.brush_tab;
-                for (i, name) in [tl!("Brush Settings"), tl!("Brushes")].iter().enumerate() {
-                    if widgets::pill_tab(ui, name, tab == i).clicked() {
-                        tab = i;
-                    }
-                }
-                app.ui.brush_tab = tab;
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icons::button(ui, "x", 20.0, false, tl!("Close")).clicked() {
-                        open = false;
-                    }
-                });
-            });
-            ui.add_space(6.0);
-            widgets::hairline(ui);
-            ui.add_space(6.0);
-            if app.ui.brush_tab == 1 {
-                crate::brushes_tab::show(app, ui);
-            } else {
-                settings_tab(app, ui);
-            }
-        });
-    if !open {
-        app.ui.panels.brush_settings = false;
-    }
+    crate::dock::floating_windows(app, ctx);
+    crate::dock::end_drag(app, ctx);
 }
 
 #[cfg(test)]

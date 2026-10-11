@@ -96,6 +96,8 @@ fn harness(app: PhotocraftApp, size: egui::Vec2, theme: ThemeKind) -> Harness<'s
             }
             crate::panels::right_dock(app, ui);
             egui::CentralPanel::default().show(ui, |_| {});
+            // The floating panel groups, and dropping panels dragged by their tabs (as the app does).
+            crate::brush_panel::window(app, &ctx);
         },
         app,
     );
@@ -824,7 +826,7 @@ fn tab_hides_all_panels_and_shift_tab_only_the_dock() {
 #[test]
 fn every_panel_is_in_exactly_one_group_and_moved_panels_leave_home() {
     let once = |d: &DockLayout, pro: bool| {
-        let all: Vec<Panel> = Group::ALL.iter().flat_map(|g| d.panels(*g, pro)).collect();
+        let all: Vec<Panel> = d.groups().iter().flat_map(|g| d.panels(*g, pro)).collect();
         for p in Panel::ALL {
             assert_eq!(all.iter().filter(|x| **x == p).count(), 1, "{p:?} in {all:?}");
         }
@@ -925,7 +927,7 @@ fn panels_move_between_groups_reorder_and_make_new_groups() {
         d.move_panel(Panel::Channels, PanelDrop::Into(Group::Color, 0), pro).unwrap();
         assert!(!d.order().contains(&Group::Extra(0)) && !d.tabs.contains_key(&Group::Extra(0)));
         // Every panel still in exactly one group, and the layout round-trips.
-        let all: Vec<Panel> = d.order().iter().flat_map(|g| d.panels(*g, pro)).collect();
+        let all: Vec<Panel> = d.groups().iter().flat_map(|g| d.panels(*g, pro)).collect();
         assert!(Panel::ALL.iter().all(|p| all.iter().filter(|x| *x == p).count() == 1), "{all:?}");
         let back: DockLayout = serde_json::from_value(serde_json::to_value(&d).unwrap()).unwrap();
         assert_eq!(back, d);
@@ -1033,5 +1035,100 @@ fn a_panel_drag_shows_where_it_will_land() {
         h.event(egui::Event::PointerButton { pos: from, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
         h.run_steps(2);
         assert_eq!(h.state().ui.dock, DockLayout::default(), "{name}");
+    }
+}
+
+fn floating_frames(h: &Harness<'static, PhotocraftApp>) -> Vec<FloatingFrame> {
+    h.ctx.data(|d| d.get_temp::<Vec<FloatingFrame>>(floating_frames_id())).unwrap_or_default()
+}
+
+#[test]
+fn panels_tear_out_into_floating_windows_and_dock_back() {
+    for theme in [ThemeKind::ProMedium, ThemeKind::Studio] {
+        let pro = is_pro(theme);
+        let (app, _, _) = app_with_layers();
+        let mut h = harness(app, vec2(1400.0, 900.0), theme);
+        let strip = |h: &Harness<'static, PhotocraftApp>, g: Group| last_strips(&h.ctx).into_iter().find(|s| s.group == g).unwrap();
+        // Swatches dragged onto the canvas: a floating window of its own there.
+        let (_, sr) = strip(&h, Group::Color).tabs.into_iter().find(|(i, _)| h.state().ui.dock.panels(Group::Color, pro)[*i] == Panel::Swatches).unwrap();
+        drag_to(&mut h, sr.center(), pos2(400.0, 300.0));
+        let (g, _) = h.state().ui.dock.locate(Panel::Swatches, pro);
+        assert!(matches!(g, Group::Extra(_)) && h.state().ui.dock.is_floating(g), "{theme:?}: {g:?}");
+        h.run_steps(2);
+        let f = floating_frames(&h).into_iter().find(|f| f.group == g).expect("its window is drawn");
+        assert!(f.rect.contains(pos2(400.0, 300.0)), "{theme:?}: it opens at the pointer: {:?}", f.rect);
+        assert!(!h.state().ui.dock.panels(Group::Color, pro).contains(&Panel::Swatches));
+        // Its tab dragged into the gap above Layers: docked again, as a group of its own.
+        let lr = rect_of(&h, Group::Layers);
+        drag_to(&mut h, f.tabs[0].1.center(), pos2(lr.center().x, lr.top() - GAP / 2.0));
+        let (g2, _) = h.state().ui.dock.locate(Panel::Swatches, pro);
+        assert!(!h.state().ui.dock.is_floating(g2) && h.state().ui.dock.order().contains(&g2), "{theme:?}: {g2:?}");
+        assert!(h.state().ui.dock.floating.is_empty(), "{theme:?}: the emptied window is gone");
+        h.run_steps(2);
+        assert!(floating_frames(&h).is_empty() && last_rects(&h.ctx).iter().any(|(x, _)| *x == g2), "{theme:?}");
+    }
+}
+
+#[test]
+fn brush_settings_docks_widens_the_column_and_f5_follows_it() {
+    let (mut app, _, _) = app_with_layers();
+    app.ui.panels.brush_settings = true;
+    let mut h = harness(app, vec2(1500.0, 950.0), ThemeKind::ProMedium);
+    h.run_steps(2);
+    let f = floating_frames(&h).into_iter().find(|f| f.group == Group::Brush).expect("Brush Settings floats by default");
+    let narrow = rect_of(&h, Group::Layers).width();
+    assert!(narrow < 400.0, "{narrow}");
+    // Its Brush Settings tab onto the Layers strip.
+    let ls = last_strips(&h.ctx).into_iter().find(|s| s.group == Group::Layers).unwrap();
+    let to = pos2(ls.tabs.last().unwrap().1.right() + 6.0, ls.tabs[0].1.center().y);
+    drag_to(&mut h, f.tabs[0].1.center(), to);
+    h.run_steps(3);
+    assert_eq!(h.state().ui.dock.locate(Panel::BrushSettings, true).0, Group::Layers);
+    assert!(rect_of(&h, Group::Layers).width() >= Panel::BrushSettings.min_width(), "the column widened: {}", rect_of(&h, Group::Layers).width());
+    // The Brushes tab stays in its floating window.
+    assert!(floating_frames(&h).iter().any(|f| f.group == Group::Brush), "Brushes still floats");
+    // F5 toggles the group Brush Settings is in now (Layers), not its old window.
+    let ctx = h.ctx.clone();
+    crate::menus::invoke(h.state_mut(), &ctx, "window.toggle.brushSettings", json!({})).unwrap();
+    h.run_steps(2);
+    assert!(!h.state().ui.panels.layers && h.state().ui.panels.brush_settings, "F5 hid the Layers group, not the Brushes window");
+    crate::menus::invoke(h.state_mut(), &ctx, "window.toggle.brushSettings", json!({})).unwrap();
+    h.run_steps(2);
+    assert!(h.state().ui.panels.layers && crate::dock::panel_selected(h.state(), Panel::BrushSettings, true));
+    // Dragged back out, the column narrows again.
+    let ls = last_strips(&h.ctx).into_iter().find(|s| s.group == Group::Layers).unwrap();
+    let (_, br) = ls.tabs.iter().copied().find(|(i, _)| h.state().ui.dock.panels(Group::Layers, true)[*i] == Panel::BrushSettings).unwrap();
+    drag_to(&mut h, br.center(), pos2(300.0, 300.0));
+    h.run_steps(4);
+    assert!(rect_of(&h, Group::Layers).width() < 520.0 + 1.0, "{}", rect_of(&h, Group::Layers).width());
+    // A floating window's close button hides it; Window › Brushes brings it back.
+    let fw = floating_frames(&h).into_iter().find(|f| f.group == Group::Brush).unwrap();
+    let close = pos2(fw.header.right() - 8.0, fw.header.center().y);
+    h.event(egui::Event::PointerMoved(close));
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton { pos: close, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
+    h.event(egui::Event::PointerButton { pos: close, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
+    h.run_steps(3);
+    assert!(!h.state().ui.panels.brush_settings, "closed");
+    crate::menus::invoke(h.state_mut(), &ctx, "window.panel.brushes", json!({})).unwrap();
+    h.run_steps(2);
+    assert!(h.state().ui.panels.brush_settings && floating_frames(&h).iter().any(|f| f.group == Group::Brush));
+}
+
+/// `PHOTOCRAFT_UI_SHOT=<dir>`: Brush Settings docked under Layers and Swatches torn out.
+#[test]
+fn a_rearranged_workspace_renders() {
+    let (mut app, _, _) = app_with_layers();
+    app.ui.panels.brush_settings = true;
+    let pro = true;
+    app.ui.dock.move_panel(Panel::BrushSettings, PanelDrop::NewGroup(None), pro).unwrap();
+    app.ui.dock.move_panel(Panel::Swatches, PanelDrop::Float([420.0, 260.0]), pro).unwrap();
+    let mut h = harness(app, vec2(1500.0, 950.0), ThemeKind::ProMedium);
+    h.run_steps(4);
+    assert!(floating_frames(&h).len() == 2, "Brushes and Swatches float");
+    if let Some(dir) = std::env::var_os("PHOTOCRAFT_UI_SHOT")
+        && let Ok(img) = h.render()
+    {
+        let _ = img.save(std::path::Path::new(&dir).join("dock-rearranged.png"));
     }
 }
