@@ -918,6 +918,12 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     Tool::MixerBrush => {
                         brush_preset_chip(ui, b, &mut app.ui);
                         crate::brush_picker::settings_toggle(app, ui);
+                        // The brush load, as in Photoshop: the foreground colour, or what ⌥-click picked up.
+                        let load = crate::retouch_ui::mixer_color(app).map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8);
+                        let (r, resp) = ui.allocate_exact_size(egui::vec2(22.0, 16.0), egui::Sense::hover());
+                        ui.painter().rect_filled(r, 2.0, egui::Color32::from_rgb(load[0], load[1], load[2]));
+                        ui.painter().rect_stroke(r, 2.0, egui::Stroke::new(1.0, t.field_border), egui::StrokeKind::Outside);
+                        resp.on_hover_text(crate::i18n::fmt(tl!("Current brush load ({alt}-click the image to load its colour)"), &[("alt", &crate::shortcuts::pretty("Alt"))]));
                         widgets::vline(ui, 22.0);
                         for (label, value) in [
                             (tl!("Wet"), &mut b.mixer.wet),

@@ -1008,7 +1008,8 @@
 	Dots	ドット
 	Drag a rectangle around the object	オブジェクトを囲む矩形をドラッグ
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	画像上をドラッグして制約を追加。Shift で水平/垂直、右クリックで削除。
-	Drag to move the active shape's path or the Work Path	ドラッグして、アクティブなシェイプのパスまたは作業用パスを移動
+	Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee	クリック: パスコンポーネントを選択 · ドラッグ: 移動 · {shift}+クリック: 追加 · {alt}+ドラッグ: コピー · 何もない所をドラッグ: 範囲選択
+	Select less than the whole path, or delete the layer or its vector mask in the Layers panel.	パス全体より少なく選択するか、レイヤーパネルでレイヤーまたはそのベクトルマスクを削除してください。
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	クリック: アンカーポイントを選択 · ドラッグ: ポイント、ハンドル、セグメントを移動 · {shift}+クリック: 追加 · {alt}+クリック: サブパス全体
 	Draw with the Pen tool (P) or make a work path from a selection.	ペンツール(P)で描くか、選択範囲から作業用パスを作成します。
 	Drop an image or PSD anywhere to open it.	画像や PSD をここにドロップすると開きます。
@@ -2034,6 +2035,7 @@
 	Mixer Brush	混合ブラシ
 	Mixer Brush Tool	混合ブラシツール
 	Wet	ウェット
+	Current brush load ({alt}-click the image to load its colour)	現在のブラシの補充量（{alt}+クリックで画像の色を補充）
 	Mix	混合
 	Wetness Jitter	ウェットのジッター
 	Mix Jitter	混合のジッター

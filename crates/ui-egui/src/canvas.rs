@@ -464,7 +464,7 @@ fn begin_live_stroke(app: &PhotocraftApp) -> Option<LiveStroke> {
     static STROKES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let st = app.session.active()?;
     let d = app.drag.as_ref()?;
-    let stroke = if let Some((cmd, mut p)) = crate::retouch_ui::dab_params(app, d.tool) {
+    let stroke = if let Some((cmd, mut p)) = crate::retouch_ui::dab_params(app, d.tool, d.modifiers) {
         // The params `retouch_ui::finish_stroke` commits; Sample All Layers isn't previewed.
         p["points"] = json!(d.points);
         p["target"] = paint_target(app);
@@ -3801,10 +3801,21 @@ fn draw_drag_preview(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &View
 }
 
 /// Tools on which holding ⌥ (Alt) switches to the Eyedropper: a click or drag sets the
-/// foreground colour, as with the Eyedropper itself (#417).
+/// foreground colour, as with the Eyedropper itself (#417). The Mixer Brush's ⌥-click loads its
+/// reservoir instead (`load_mixer`).
 pub(crate) fn alt_samples(tool: Tool, mods: egui::Modifiers) -> bool {
     // Control+Alt is the brush-resize drag (`brush_resize`), not sampling.
-    mods.alt && !mods.ctrl && matches!(tool, Tool::Brush | Tool::Pencil | Tool::Gradient | Tool::PaintBucket)
+    mods.alt && !mods.ctrl && matches!(tool, Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::Gradient | Tool::PaintBucket)
+}
+
+/// Mixer Brush ⌥-click, as in Photoshop: load the brush with the colour under the pointer (from
+/// the current layer, or every layer with Sample All Layers). The foreground colour stays; a
+/// new foreground colour loads the brush again (`retouch_ui::finish_stroke`).
+fn load_mixer(app: &mut PhotocraftApp, x: f64, y: f64) {
+    let layers = if app.session.tools.brush.mixer.sample_all_layers { "all" } else { "current" };
+    if let Some([r, g, b]) = sample_color(app, x, y, layers) {
+        app.ui.mixer_load = Some([[r, g, b, 1.0], app.session.tools.foreground]);
+    }
 }
 
 /// The sampling cursor: a pipette whose tip is the sampled pixel. Draws it at `p` and returns the
@@ -3825,6 +3836,8 @@ fn alt_eyedropper(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
         return false;
     }
     match ev {
+        ToolEvent::Down { x, y, .. } if app.active_tool() == Tool::MixerBrush => load_mixer(app, x, y),
+        ToolEvent::Move { .. } if app.active_tool() == Tool::MixerBrush => {}
         // Without ⌥: the sample sets the foreground colour, whatever the Eyedropper would do.
         ToolEvent::Down { x, y, .. } | ToolEvent::Move { x, y, .. } => sample_eyedropper(app, x, y, egui::Modifiers::NONE),
         ToolEvent::Up { .. } => app.alt_sampling = false,
@@ -3954,6 +3967,10 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
     }
     // Move tool: ⇧ locks the axis, ⌥ duplicates (move_mods.rs).
     let ev = crate::move_mods::filter_event(app, ev, mods);
+    // Path Selection: whole path components.
+    if crate::path_select::pointer(app, ev, mods) {
+        return;
+    }
     // Direct Selection, and the Pen's ⌘ (Direct Selection) and ⌥ (Convert Point) modes (#790).
     if crate::direct_select::pointer(app, ev, mods) {
         return;
@@ -4420,7 +4437,7 @@ pub(crate) fn finish_gesture(app: &mut PhotocraftApp, d: Drag) {
         app.last_stroke_end = Some((st.doc.id, [end[0], end[1]]));
     }
     // A live Clone Stamp preview ends here; the commit below replaces it.
-    if live_retouch_command(d.tool).is_some() || crate::retouch_ui::dab_params(app, d.tool).is_some() {
+    if live_retouch_command(d.tool).is_some() || crate::retouch_ui::dab_params(app, d.tool, d.modifiers).is_some() {
         app.live_stroke = None;
     }
     if crate::eraser_ui::finish_stroke(app, d.tool, &d.points) || crate::retouch_ui::finish_stroke(app, d.tool, &d.points, d.modifiers) {
@@ -4433,7 +4450,6 @@ pub(crate) fn finish_gesture(app: &mut PhotocraftApp, d: Drag) {
             && crate::shape_dialog::is_click(d.start, &d.points, app.current_zoom())
             && crate::shape_dialog::open(app, t, d.start).is_some() => {}
         t if crate::vector_ui::is_shape_tool(t) => crate::vector_ui::finish_shape(app, t, d.start, [end[0], end[1]], d.live),
-        Tool::PathSelection => crate::vector_ui::path_selection_finish(app, d.start, [end[0], end[1]]),
         Tool::Type | Tool::VerticalType => crate::type_tool::pointer_up(app, d.start, [end[0], end[1]]),
         Tool::Brush | Tool::Pencil | Tool::Eraser => {
             let live = app.live_stroke.take();

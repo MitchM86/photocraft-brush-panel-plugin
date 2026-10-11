@@ -987,7 +987,8 @@
 	Dots	Titik
 	Drag a rectangle around the object	Seret persegi panjang di sekeliling objek
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Seret pada gambar untuk menambah batasan; Shift untuk horizontal/vertikal; klik kanan untuk menghapus.
-	Drag to move the active shape's path or the Work Path	Seret untuk memindah path bentuk aktif atau Work Path
+	Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee	Klik: pilih komponen path · Seret: pindahkan · {shift}-klik: tambah · {alt}-seret: salin · Seret di area kosong: marquee
+	Select less than the whole path, or delete the layer or its vector mask in the Layers panel.	Pilih kurang dari seluruh path, atau hapus layer atau mask vektornya di panel Layer.
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Klik: pilih titik jangkar · Seret: pindahkan titik, gagang, atau segmen · {shift}-klik: tambah · {alt}-klik: seluruh subpath
 	Draw with the Pen tool (P) or make a work path from a selection.	Gambar dengan alat Pen (P) atau buat work path dari seleksi.
 	Drop an image or PSD anywhere to open it.	Jatuhkan gambar atau PSD di mana saja untuk membukanya.
@@ -1991,6 +1992,7 @@
 	Apply the pen's tilt and rotation to the tip shape	Terapkan kemiringan dan rotasi pena ke bentuk ujung
 	Mixer Brush	Kuas Pencampur
 	Wet	Basah
+	Current brush load ({alt}-click the image to load its colour)	Muatan kuas saat ini ({alt}-klik gambar untuk memuat warnanya)
 	Mix	Campur
 	Wetness Jitter	Jitter Kebasahan
 	Mix Jitter	Jitter Campuran

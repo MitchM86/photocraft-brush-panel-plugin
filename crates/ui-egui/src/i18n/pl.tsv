@@ -1007,7 +1007,8 @@
 	Dots	Kropki
 	Drag a rectangle around the object	Przeciągnij prostokąt wokół obiektu
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Przeciągnij po obrazie, aby dodać ograniczenie; Shift — poziomo/pionowo; prawy przycisk usuwa.
-	Drag to move the active shape's path or the Work Path	Przeciągnij, aby przesunąć ścieżkę aktywnego kształtu lub ścieżkę roboczą
+	Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee	Klik: zaznacz składnik ścieżki · Przeciągnięcie: przesuń · {shift}-klik: dodaj · {alt}-przeciągnięcie: kopia · Przeciągnięcie w pustym miejscu: zaznaczenie prostokątne
+	Select less than the whole path, or delete the layer or its vector mask in the Layers panel.	Zaznacz mniej niż całą ścieżkę albo usuń warstwę lub jej maskę wektorową w panelu Warstwy.
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Klik: zaznacz punkt kontrolny · Przeciągnięcie: przesuń punkt, uchwyt lub segment · {shift}-klik: dodaj · {alt}-klik: cała podścieżka
 	Draw with the Pen tool (P) or make a work path from a selection.	Rysuj narzędziem Pióro (P) lub utwórz ścieżkę roboczą z zaznaczenia.
 	Drop an image or PSD anywhere to open it.	Upuść obraz lub plik PSD w dowolnym miejscu, aby go otworzyć.
@@ -2023,6 +2024,7 @@
 	Mixer Brush	Pędzel mieszający
 	Mixer Brush Tool	Narzędzie Pędzel mieszający
 	Wet	Wilgotność
+	Current brush load ({alt}-click the image to load its colour)	Bieżące nasycenie pędzla ({alt}-klik w obrazie pobiera jego kolor)
 	Mix	Mieszanie
 	Wetness Jitter	Rozrzut wilgotności
 	Mix Jitter	Rozrzut mieszania

@@ -1003,7 +1003,8 @@
 	Dots	Puntos
 	Drag a rectangle around the object	Arrastre un rectángulo alrededor del objeto
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Arrastre sobre la imagen para añadir una restricción; Mayús para horizontal/vertical; clic derecho para eliminar.
-	Drag to move the active shape's path or the Work Path	Arrastre para mover el trazado de la forma activa o el Trazado de trabajo
+	Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee	Clic: seleccionar componente de trazado · Arrastrar: mover · {shift}-clic: añadir · {alt}-arrastrar: copiar · Arrastrar en vacío: marco
+	Select less than the whole path, or delete the layer or its vector mask in the Layers panel.	Seleccione menos que el trazado completo, o elimine la capa o su máscara vectorial en el panel Capas.
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Clic: seleccionar punto · Arrastrar: mover punto, manejador o segmento · {shift}-clic: añadir · {alt}-clic: subtrazado completo
 	Draw with the Pen tool (P) or make a work path from a selection.	Dibuja con la herramienta Pluma (P) o crea un trazado de trabajo a partir de una selección.
 	Drop an image or PSD anywhere to open it.	Suelte una imagen o un PSD en cualquier lugar para abrirlo.
@@ -2032,6 +2033,7 @@
 	Mixer Brush	Pincel mezclador
 	Mixer Brush Tool	Herramienta Pincel mezclador
 	Wet	Húmedo
+	Current brush load ({alt}-click the image to load its colour)	Carga actual del pincel ({alt}-clic en la imagen para cargar su color)
 	Mix	Mezcla
 	Wetness Jitter	Variación de humedad
 	Mix Jitter	Variación de mezcla

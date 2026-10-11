@@ -1894,6 +1894,7 @@
 	Mixer Brush	Πινέλο ανάμειξης (Mixer Brush)
 	Mixer Brush Tool	Πινέλο ανάμειξης (Mixer Brush Tool)
 	Wet	Υγρασία
+	Current brush load ({alt}-click the image to load its colour)	Τρέχουσα φόρτωση πινέλου ({alt}-κλικ στην εικόνα φορτώνει το χρώμα της)
 	Load	Φόρτωση
 	Mix	Ανάμειξη
 	8 bit	8 bit ανά κανάλι
@@ -2243,7 +2244,8 @@
 	Drag or click polygon points · hold Alt during lasso for straight segments · {add} add · {sub} before drawing subtracts	Σύρετε ή κάντε κλικ για πολυγωνικά σημεία · κρατήστε Alt κατά το λάσο για ευθείες · {add} προσθήκη · {sub} αφαίρεση πριν από τη σχεδίαση
 	Drag to draw a gradient	Σύρετε για να σχεδιάσετε διαβάθμιση
 	Drag to move the active layer	Σύρετε για μετακίνηση του ενεργού επιπέδου
-	Drag to move the active shape's path or the Work Path	Σύρετε για μετακίνηση της διαδρομής του ενεργού σχήματος ή της διαδρομής εργασίας
+	Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee	Κλικ: επιλογή στοιχείου διαδρομής · Σύρσιμο: μετακίνηση · {shift}-κλικ: προσθήκη · {alt}-σύρσιμο: αντίγραφο · Σύρσιμο στο κενό: πλαίσιο επιλογής
+	Select less than the whole path, or delete the layer or its vector mask in the Layers panel.	Επιλέξτε λιγότερο από ολόκληρη τη διαδρομή ή διαγράψτε το επίπεδο ή τη διανυσματική μάσκα του στο πλαίσιο Επίπεδα.
 	Dual Brush	Διπλό πινέλο
 	Duplicate Path	Διπλασιασμός διαδρομής
 	Duplicate style	Διπλασιασμός στυλ

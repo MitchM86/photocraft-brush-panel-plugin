@@ -8,6 +8,7 @@ use serde_json::json;
 
 use super::{MaskKind, THUMB_VECTOR, recorded, vector_thumb_image};
 use crate::PhotocraftApp;
+use crate::canvas::ToolEvent;
 
 /// A 200×100 document: "Masked" (pixel + vector mask) and a "Badge" shape layer.
 fn session() -> (photocraft_engine::Session, u64, u64) {
@@ -436,7 +437,10 @@ fn clicking_the_vector_mask_targets_it_for_the_path_tools() {
     assert!(near(super::brackets(&h.ctx).unwrap(), r.expand(3.0)), "brackets on the vector mask");
     assert_eq!(crate::canvas::paint_target(h.state()), json!("pixels"));
     // Path Selection moves the vector mask.
-    crate::vector_ui::path_selection_finish(h.state_mut(), [30.0, 30.0], [35.0, 32.0]);
+    h.state_mut().ui.tool = crate::state::Tool::PathSelection;
+    for ev in [ToolEvent::Down { x: 70.0, y: 10.0, pressure: 1.0 }, ToolEvent::Move { x: 75.0, y: 12.0, pressure: 1.0 }, ToolEvent::Up { x: 75.0, y: 12.0 }] {
+        crate::canvas::tool_event(h.state_mut(), ev, Modifiers::NONE);
+    }
     let k = layer(&h, masked).vector_mask.unwrap().path.subpaths[0].knots[0].anchor;
     assert_eq!((k.x, k.y), (25.0, 12.0));
     // The Pen adds a subpath to it.

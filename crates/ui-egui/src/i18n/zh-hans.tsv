@@ -1008,7 +1008,8 @@
 	Dots	点
 	Drag a rectangle around the object	围绕对象拖出矩形
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	在图像上拖动以添加约束；按 Shift 保持水平或垂直；右键单击删除。
-	Drag to move the active shape's path or the Work Path	拖动以移动当前形状的路径或工作路径
+	Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee	单击：选择路径组件 · 拖动：移动 · {shift}-单击：添加 · {alt}-拖动：复制 · 在空白处拖动：框选
+	Select less than the whole path, or delete the layer or its vector mask in the Layers panel.	请选择少于整个路径的部分，或在图层面板中删除图层或其矢量蒙版。
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	单击：选择锚点 · 拖动：移动锚点、手柄或线段 · {shift}-单击：添加 · {alt}-单击：整个子路径
 	Draw with the Pen tool (P) or make a work path from a selection.	使用钢笔工具（P）绘制，或从选区创建工作路径。
 	Drop an image or PSD anywhere to open it.	将图像或 PSD 拖放到任意位置即可打开。
@@ -2091,6 +2092,7 @@ cameraRaw	Blending	混合
 	Apply the pen's tilt and rotation to the tip shape	将笔的倾斜和旋转应用于笔尖形状
 	Mixer Brush	混合器画笔
 	Wet	湿润
+	Current brush load ({alt}-click the image to load its colour)	当前画笔载入（{alt}-单击图像以载入其颜色）
 	Mix	混合
 	Wetness Jitter	湿润度抖动
 	Mix Jitter	混合抖动

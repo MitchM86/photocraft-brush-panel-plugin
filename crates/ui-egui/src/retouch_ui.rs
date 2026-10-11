@@ -44,13 +44,17 @@ pub(crate) fn clone_params(app: &PhotocraftApp) -> Option<Value> {
 }
 
 /// The command and options-bar params (without `points` and `target`) of a sequential-dab tool:
-/// Blur, Sharpen, Smudge, Dodge, Burn, Sponge. Shared by the live preview and the commit.
-pub(crate) fn dab_params(app: &PhotocraftApp, tool: Tool) -> Option<(&'static str, Value)> {
+/// Blur, Sharpen, Smudge, Dodge, Burn, Sponge. Shared by the live preview and the commit. `mods`
+/// are the stroke's: ⌥ turns on Smudge's Finger Painting, as in Photoshop (Dodge/Burn and
+/// Blur/Sharpen swap through `alt_flipped` instead).
+pub(crate) fn dab_params(app: &PhotocraftApp, tool: Tool, mods: egui::Modifiers) -> Option<(&'static str, Value)> {
     let o = &app.ui.tool_options;
     Some(match tool {
         Tool::Blur => ("paint.blur", json!({"strength": o.strength, "sampleAllLayers": o.sample_all_layers})),
         Tool::Sharpen => ("paint.sharpen", json!({"strength": o.strength, "protectDetail": o.protect_detail, "sampleAllLayers": o.sample_all_layers})),
-        Tool::Smudge => ("paint.smudge", json!({"strength": o.strength, "fingerPainting": o.finger_painting, "sampleAllLayers": o.sample_all_layers})),
+        Tool::Smudge => {
+            ("paint.smudge", json!({"strength": o.strength, "fingerPainting": o.finger_painting || mods.alt, "sampleAllLayers": o.sample_all_layers}))
+        }
         Tool::Dodge | Tool::Burn => (
             if tool == Tool::Dodge { "paint.dodge" } else { "paint.burn" },
             json!({"range": o.tone_range, "exposure": o.exposure, "protectTones": o.protect_tones}),
@@ -60,6 +64,13 @@ pub(crate) fn dab_params(app: &PhotocraftApp, tool: Tool) -> Option<(&'static st
     })
 }
 
+/// The colour the Mixer Brush loads: the last ⌥-click's while the foreground colour is unchanged
+/// since, else the foreground colour.
+pub(crate) fn mixer_color(app: &PhotocraftApp) -> [f32; 4] {
+    let fg = app.session.tools.foreground;
+    app.ui.mixer_load.filter(|[_, then]| *then == fg).map_or(fg, |[c, _]| c)
+}
+
 /// Finish a stroke with a retouching tool. Returns false if `tool` isn't one.
 pub fn finish_stroke(app: &mut PhotocraftApp, tool: Tool, points: &[[f64; 3]], mods: egui::Modifiers) -> bool {
     let o = app.ui.tool_options.clone();
@@ -67,7 +78,7 @@ pub fn finish_stroke(app: &mut PhotocraftApp, tool: Tool, points: &[[f64; 3]], m
     let (cmd, mut p): (&str, Value) = match tool {
         Tool::SpotHealing => ("paint.spotHealing", json!({"type": o.spot_type, "sampleAllLayers": o.sample_all_layers})),
         Tool::Remove => ("paint.remove", json!({"sampleAllLayers": o.sample_all_layers})),
-        Tool::MixerBrush => ("paint.mixerBrush", json!({})),
+        Tool::MixerBrush => ("paint.mixerBrush", json!({"color": mixer_color(app)})),
         Tool::PatternStamp => {
             let mut p = json!({
                 "aligned": o.pattern_stamp_aligned,
@@ -100,7 +111,7 @@ pub fn finish_stroke(app: &mut PhotocraftApp, tool: Tool, points: &[[f64; 3]], m
             (if tool == Tool::Healing { "paint.healingBrush" } else { "paint.cloneStamp" }, p)
         }
         Tool::HistoryBrush => ("paint.historyBrush", json!({})),
-        Tool::Blur | Tool::Sharpen | Tool::Smudge | Tool::Dodge | Tool::Burn | Tool::Sponge => match dab_params(app, tool) {
+        Tool::Blur | Tool::Sharpen | Tool::Smudge | Tool::Dodge | Tool::Burn | Tool::Sponge => match dab_params(app, tool, mods) {
             Some(cp) => cp,
             None => return false,
         },
@@ -482,6 +493,44 @@ mod tests {
         tool_event(app, ToolEvent::Move { x: 50.0, y: 30.0, pressure: 1.0 }, m);
         tool_event(app, ToolEvent::Up { x: 50.0, y: 30.0 }, m);
         assert!(!app.ui.status_error, "{tool:?}: {}", app.ui.status);
+    }
+
+    #[test]
+    fn smudge_alt_drag_turns_on_finger_painting() {
+        let mut app = app();
+        let alt = egui::Modifiers::ALT;
+        app.ui.tool = Tool::Smudge;
+        tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 30.0, pressure: 1.0 }, alt);
+        tool_event(&mut app, ToolEvent::Move { x: 50.0, y: 30.0, pressure: 1.0 }, alt);
+        tool_event(&mut app, ToolEvent::Up { x: 50.0, y: 30.0 }, alt);
+        let (id, p) = app.session.journal.last().cloned().unwrap();
+        assert_eq!((id.as_str(), &p["fingerPainting"]), ("paint.smudge", &json!(true)));
+    }
+
+    #[test]
+    fn mixer_brush_alt_click_loads_the_colour_under_it_until_the_foreground_changes() {
+        let mut app = app();
+        app.run("paint.pencil", json!({"points": [[30, 30]], "size": 20, "color": "#204080"})).unwrap();
+        app.run("tools.setColors", json!({"foreground": "#f02010"})).unwrap();
+        app.ui.tool = Tool::MixerBrush;
+        crate::paint_mouse::sync_tool_brush(&mut app);
+        let steps = app.session.active().unwrap().history.past_len();
+        let alt = egui::Modifiers::ALT;
+        tool_event(&mut app, ToolEvent::Down { x: 30.0, y: 30.0, pressure: 1.0 }, alt);
+        tool_event(&mut app, ToolEvent::Up { x: 30.0, y: 30.0 }, alt);
+        assert_eq!(app.session.active().unwrap().history.past_len(), steps, "⌥-click paints nothing");
+        let hex = |c: [f32; 4]| c.map(|v| (v * 255.0).round() as u8);
+        assert_eq!(hex(mixer_color(&app)), [0x20, 0x40, 0x80, 255], "it loads the colour under it");
+        assert_eq!(hex(app.session.tools.foreground), [0xf0, 0x20, 0x10, 255], "the foreground colour stays");
+        // A stroke loads it.
+        tool_event(&mut app, ToolEvent::Down { x: 70.0, y: 30.0, pressure: 1.0 }, egui::Modifiers::NONE);
+        tool_event(&mut app, ToolEvent::Up { x: 70.0, y: 30.0 }, egui::Modifiers::NONE);
+        let (id, p) = app.session.journal.last().cloned().unwrap();
+        assert_eq!(id, "paint.mixerBrush");
+        assert_eq!(hex(serde_json::from_value::<[f32; 4]>(p["color"].clone()).unwrap()), [0x20, 0x40, 0x80, 255]);
+        // Picking a new foreground colour loads that instead.
+        app.run("tools.setColors", json!({"foreground": "#00ff00"})).unwrap();
+        assert_eq!(hex(mixer_color(&app)), [0, 255, 0, 255]);
     }
 
     fn active(app: &PhotocraftApp) -> &photocraft_doc::Layer {

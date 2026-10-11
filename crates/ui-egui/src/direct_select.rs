@@ -37,7 +37,7 @@ pub enum PathRef {
 
 impl PathRef {
     /// The engine's target params for this path.
-    fn params(self) -> Value {
+    pub(crate) fn params(self) -> Value {
         match self {
             PathRef::Work => json!({"name": "work"}),
             PathRef::Layer(id) => json!({"name": "layer", "layer": id}),
@@ -118,7 +118,7 @@ pub fn shows(app: &PhotocraftApp, mods: Modifiers) -> bool {
 
 /// The paths Direct Selection edits, front first: the targeted vector mask or the active shape
 /// layer's path, then the work path.
-fn candidates(app: &PhotocraftApp) -> Vec<(PathRef, Path)> {
+pub(crate) fn candidates(app: &PhotocraftApp) -> Vec<(PathRef, Path)> {
     let layer = crate::vector_ui::targeted_vector_mask(app).or_else(|| crate::vector_ui::active_shape_path(app));
     let work = app.session.active().and_then(|st| st.doc.work_path.clone());
     layer.map(|(id, p)| (PathRef::Layer(id), p)).into_iter().chain(work.map(|p| (PathRef::Work, p))).collect()

@@ -109,6 +109,32 @@ fn convert_point(s: &mut Session, p: &Value) -> Result<Value> {
     edit_path(s, CMD, p, "Convert Point", |path| edit::convert_point(path, k, out))
 }
 
+fn subpaths(cmd: &str, p: &Value) -> Result<Vec<usize>> {
+    p.get("subpaths")
+        .and_then(Value::as_array)
+        .filter(|a| !a.is_empty())
+        .and_then(|a| a.iter().map(|v| v.as_u64().and_then(|i| usize::try_from(i).ok())).collect::<Option<Vec<_>>>())
+        .ok_or_else(|| bad(cmd, "`subpaths` must list subpath indices"))
+}
+
+fn move_subpaths(s: &mut Session, p: &Value) -> Result<Value> {
+    const CMD: &str = "path.moveSubpaths";
+    let subs = subpaths(CMD, p)?;
+    let d = offset(CMD, p)?;
+    let duplicate = p.get("duplicate").and_then(Value::as_bool).unwrap_or(false);
+    let mut moved = Vec::new();
+    let label = if duplicate { "Duplicate Path" } else { "Drag Path" };
+    let mut r = edit_path(s, CMD, p, label, |path| edit::move_subpaths(path, &subs, d, duplicate).map(|m| moved = m))?;
+    r["subpaths"] = json!(moved);
+    Ok(r)
+}
+
+fn delete_subpaths(s: &mut Session, p: &Value) -> Result<Value> {
+    const CMD: &str = "path.deleteSubpaths";
+    let subs = subpaths(CMD, p)?;
+    edit_path(s, CMD, p, "Delete Path", |path| edit::delete_subpaths(path, &subs))
+}
+
 pub fn specs() -> Vec<CommandSpec> {
     const TARGET: &str = r#""name":str|"work"|"layer"="work","layer":id? (with "layer": a shape layer's path or a vector mask)"#;
     let spec = |id: &'static str, label: &'static str, params: String, run: fn(&mut Session, &Value) -> Result<Value>| CommandSpec {
@@ -141,6 +167,18 @@ pub fn specs() -> Vec<CommandSpec> {
             r#""subpath":i,"knot":j,"out":[x,y]? (none: corner with retracted handles; given: smooth with this out handle and its mirror)"#.into(),
             convert_point,
         ),
+        spec(
+            "path.moveSubpaths",
+            "Drag Path",
+            r#""subpaths":[i,…],"move":[dx,dy],"duplicate":bool=false (Path Selection drag; duplicate = ⌥, moved copies are added after the last subpath) → also "subpaths": the indices that moved"#.into(),
+            move_subpaths,
+        ),
+        spec(
+            "path.deleteSubpaths",
+            "Delete Path",
+            r#""subpaths":[i,…] (Path Selection ⌫; not every subpath: delete the path instead)"#.into(),
+            delete_subpaths,
+        ),
     ]
 }
 
@@ -167,6 +205,26 @@ mod tests {
 
     fn work(s: &Session) -> photocraft_doc::Path {
         s.active().unwrap().doc.work_path.clone().unwrap()
+    }
+
+    #[test]
+    fn subpaths_move_duplicate_and_delete_in_one_undoable_step_each() {
+        let mut s = session();
+        let sq = |x: f64| json!({"closed": true, "knots": [[x, 10], [x + 20.0, 10], [x + 20.0, 30], [x, 30]]});
+        s.execute("path.set", json!({"path": {"subpaths": [sq(10.0), sq(60.0)]}})).unwrap();
+        let steps = s.active().unwrap().history.past_len();
+        let r = s.execute("path.moveSubpaths", json!({"subpaths": [1], "move": [0, 40]})).unwrap();
+        assert_eq!((r["subpaths"].clone(), work(&s).subpaths[0].knots[0].anchor.y, work(&s).subpaths[1].knots[0].anchor.y), (json!([1]), 10.0, 50.0));
+        let r = s.execute("path.moveSubpaths", json!({"subpaths": [0], "move": [5, 0], "duplicate": true})).unwrap();
+        assert_eq!((r["subpaths"].clone(), work(&s).subpaths.len(), work(&s).subpaths[2].knots[0].anchor.x), (json!([2]), 3, 15.0));
+        s.execute("path.deleteSubpaths", json!({"subpaths": [0, 1]})).unwrap();
+        assert_eq!((work(&s).subpaths.len(), work(&s).subpaths[0].knots[0].anchor.x), (1, 15.0));
+        assert_eq!(s.active().unwrap().history.past_len(), steps + 3);
+        assert!(s.execute("path.deleteSubpaths", json!({"subpaths": [0]})).is_err(), "not the last one");
+        assert!(s.execute("path.moveSubpaths", json!({"subpaths": [], "move": [1, 1]})).is_err());
+        assert!(s.execute("path.moveSubpaths", json!({"subpaths": [4], "move": [1, 1]})).is_err());
+        s.execute("edit.undo", json!({})).unwrap();
+        assert_eq!(work(&s).subpaths.len(), 3);
     }
 
     #[test]

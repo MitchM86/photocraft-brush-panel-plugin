@@ -398,6 +398,15 @@ pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context) {
             return;
         }
     }
+    // Path Selection: ⌫/Delete removes the selected path components, not pixels (Edit › Clear).
+    if app.ui.tool == Tool::PathSelection {
+        let mods = ctx.input(|i| i.modifiers);
+        let pressed = |ctx: &egui::Context| ctx.input(|i| i.key_pressed(Key::Backspace) || i.key_pressed(Key::Delete));
+        if !mods.any() && pressed(ctx) && crate::path_select::delete_selected(app) {
+            ctx.input_mut(|i| i.consume_key(mods, Key::Backspace) || i.consume_key(mods, Key::Delete));
+            return;
+        }
+    }
     // Inline type editing eats text and navigation keys; ⌘-shortcuts still reach the menus.
     let editing = crate::type_tool::handle_keys(app, ctx);
     // Registry, UI and menu-catalogue shortcuts (see [`crate::shortcut_dispatch::bindings`]).

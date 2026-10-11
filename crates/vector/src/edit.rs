@@ -186,6 +186,120 @@ pub fn anchors_in(path: &Path, [x0, y0, x1, y1]: [f64; 4]) -> Vec<[usize; 2]> {
     out
 }
 
+// ---------------------------------------------------------------------------------------------
+// Whole subpaths: Photoshop's Path Selection tool works on path components, one subpath each.
+
+/// `subs` sorted without repeats, or an error naming one that doesn't exist.
+fn subpath_list(path: &Path, subs: &[usize]) -> Result<Vec<usize>, String> {
+    let mut v = subs.to_vec();
+    v.sort_unstable();
+    v.dedup();
+    match v.iter().find(|&&s| s >= path.subpaths.len()) {
+        Some(s) => Err(format!("no subpath {s}")),
+        None if v.is_empty() => Err("no subpaths given".into()),
+        None => Ok(v),
+    }
+}
+
+/// Moves subpaths `subs` by `d`. With `duplicate` they stay and moved copies are added after the
+/// last subpath (⌥-drag). Returns the indices of the subpaths that moved: `subs`, or the copies.
+pub fn move_subpaths(path: &mut Path, subs: &[usize], d: [f64; 2], duplicate: bool) -> Result<Vec<usize>, String> {
+    let subs = subpath_list(path, subs)?;
+    let moved = if duplicate {
+        let n = path.subpaths.len();
+        let copies: Vec<_> = subs.iter().map(|&s| path.subpaths[s].clone()).collect();
+        path.subpaths.extend(copies);
+        (n..path.subpaths.len()).collect()
+    } else {
+        subs
+    };
+    for &s in &moved {
+        for k in &mut path.subpaths[s].knots {
+            k.anchor = add(k.anchor, d);
+            k.in_ctrl = add(k.in_ctrl, d);
+            k.out_ctrl = add(k.out_ctrl, d);
+        }
+    }
+    Ok(moved)
+}
+
+/// Removes subpaths `subs`. Removing every one is an error: delete the path itself instead.
+pub fn delete_subpaths(path: &mut Path, subs: &[usize]) -> Result<(), String> {
+    let subs = subpath_list(path, subs)?;
+    if subs.len() == path.subpaths.len() {
+        return Err("that is every subpath: delete the path instead".into());
+    }
+    for &s in subs.iter().rev() {
+        path.subpaths.remove(s);
+    }
+    Ok(())
+}
+
+/// Even-odd point-in-polygon.
+fn inside(pts: &[(f64, f64)], p: Point) -> bool {
+    let mut c = false;
+    for (i, &(x1, y1)) in pts.iter().enumerate() {
+        let (x0, y0) = pts[(i + pts.len() - 1) % pts.len()];
+        if (y1 > p.y) != (y0 > p.y) && p.x < x0 + (p.y - y0) / (y1 - y0) * (x1 - x0) {
+            c = !c;
+        }
+    }
+    c
+}
+
+/// The subpath a Path Selection click at `p` picks: one whose outline or anchor is within `tol`
+/// (the nearest), else the frontmost (last) closed subpath around `p`.
+pub fn subpath_at(path: &Path, p: Point, tol: f64) -> Option<usize> {
+    let on = hit(path, p, tol, &[]).map(|h| match h {
+        Hit::Anchor([s, _]) | Hit::Handle([s, _], _) | Hit::Segment([s, _], _) => s,
+    });
+    on.or_else(|| {
+        path.subpaths.iter().enumerate().rev().find_map(|(s, sp)| {
+            let line = crate::flatten::flatten_subpath(sp, 0.25);
+            (sp.closed && line.pts.len() > 2 && inside(&line.pts, p)).then_some(s)
+        })
+    })
+}
+
+/// Does the segment `a`–`b` cross the box (Liang–Barsky)?
+fn segment_meets_box(a: (f64, f64), b: (f64, f64), [x0, y0, x1, y1]: [f64; 4]) -> bool {
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    let (mut t0, mut t1) = (0.0_f64, 1.0_f64);
+    for (q, r) in [(-dx, a.0 - x0), (dx, x1 - a.0), (-dy, a.1 - y0), (dy, y1 - a.1)] {
+        if q == 0.0 {
+            if r < 0.0 {
+                return false;
+            }
+        } else {
+            let t = r / q;
+            if q < 0.0 {
+                t0 = t0.max(t);
+            } else {
+                t1 = t1.min(t);
+            }
+            if t0 > t1 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// Subpaths a Path Selection marquee `[x0, y0, x1, y1]` touches: any part of the outline inside
+/// the box, or the box inside a closed subpath. In path order.
+pub fn subpaths_touching(path: &Path, [x0, y0, x1, y1]: [f64; 4]) -> Vec<usize> {
+    let b = [x0.min(x1), y0.min(y1), x0.max(x1), y0.max(y1)];
+    let touches = |sp: &photocraft_doc::Subpath| {
+        let line = crate::flatten::flatten_subpath(sp, 0.25);
+        let pts = &line.pts;
+        let n = pts.len();
+        let edges = if sp.closed { n } else { n.saturating_sub(1) };
+        let crosses = (n == 1 && segment_meets_box(pts[0], pts[0], b)) || (0..edges).any(|i| segment_meets_box(pts[i], pts[(i + 1) % n], b));
+        crosses || (sp.closed && n > 2 && inside(pts, Point::new(b[0], b[1])))
+    };
+    path.subpaths.iter().enumerate().filter(|(_, sp)| touches(sp)).map(|(s, _)| s).collect()
+}
+
 fn eval(seg: &[Point; 4], t: f64) -> Point {
     let u = 1.0 - t;
     let (a, b, c, d) = (u * u * u, 3.0 * u * u * t, 3.0 * u * t * t, t * t * t);
@@ -243,6 +357,37 @@ mod tests {
 
     fn at(path: &Path, s: usize, k: usize) -> Knot {
         path.subpaths[s].knots[k]
+    }
+
+    /// Two squares: 0 at (0,0)–(40,40), 1 at (100,100)–(140,140).
+    fn two() -> Path {
+        let sq = |x: f64, y: f64| Subpath::polygon(&[(x, y), (x + 40.0, y), (x + 40.0, y + 40.0), (x, y + 40.0)]);
+        Path::new(vec![sq(0.0, 0.0), sq(100.0, 100.0)])
+    }
+
+    #[test]
+    fn subpaths_move_alone_or_as_copies_and_delete() {
+        let mut p = two();
+        assert_eq!(move_subpaths(&mut p, &[1, 1], [5.0, -5.0], false), Ok(vec![1]));
+        assert_eq!((at(&p, 0, 0).anchor, at(&p, 1, 0).anchor), (Point::new(0.0, 0.0), Point::new(105.0, 95.0)), "only subpath 1 moved");
+        assert_eq!(move_subpaths(&mut p, &[0], [10.0, 0.0], true), Ok(vec![2]));
+        assert_eq!((p.subpaths.len(), at(&p, 0, 0).anchor, at(&p, 2, 0).anchor), (3, Point::new(0.0, 0.0), Point::new(10.0, 0.0)), "⌥: a moved copy");
+        assert!(move_subpaths(&mut p, &[7], [1.0, 1.0], false).is_err());
+        delete_subpaths(&mut p, &[0, 2]).unwrap();
+        assert_eq!((p.subpaths.len(), at(&p, 0, 0).anchor), (1, Point::new(105.0, 95.0)));
+        assert!(delete_subpaths(&mut p, &[0]).is_err(), "not every subpath");
+    }
+
+    #[test]
+    fn path_selection_picks_subpaths_by_outline_inside_or_marquee() {
+        let p = two();
+        assert_eq!(subpath_at(&p, Point::new(120.0, 101.0), 3.0), Some(1), "on the outline");
+        assert_eq!(subpath_at(&p, Point::new(20.0, 20.0), 3.0), Some(0), "inside a closed subpath");
+        assert_eq!(subpath_at(&p, Point::new(70.0, 70.0), 3.0), None);
+        assert_eq!(subpaths_touching(&p, [30.0, 30.0, 110.0, 110.0]), vec![0, 1]);
+        assert_eq!(subpaths_touching(&p, [50.0, 50.0, 90.0, 90.0]), Vec::<usize>::new());
+        assert_eq!(subpaths_touching(&p, [10.0, 10.0, 20.0, 20.0]), vec![0], "a box inside a subpath");
+        assert_eq!(subpaths_touching(&p, [130.0, 0.0, 120.0, 200.0]), vec![1], "any corner order");
     }
 
     #[test]

@@ -992,7 +992,8 @@
 	Dots	Pontos
 	Drag a rectangle around the object	Arraste um retângulo ao redor do objeto
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Arraste sobre a imagem para adicionar uma restrição; Shift para horizontal/vertical; clique direito para excluir.
-	Drag to move the active shape's path or the Work Path	Arraste para mover o demarcador da forma ativa ou o demarcador de trabalho
+	Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee	Clique: selecionar componente do demarcador · Arrastar: mover · {shift}-clique: adicionar · {alt}-arrastar: copiar · Arrastar no vazio: letreiro
+	Select less than the whole path, or delete the layer or its vector mask in the Layers panel.	Selecione menos que o demarcador inteiro, ou exclua a camada ou sua máscara vetorial no painel Camadas.
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Clique: selecionar ponto · Arrastar: mover ponto, alça ou segmento · {shift}-clique: adicionar · {alt}-clique: subdemarcador inteiro
 	Draw with the Pen tool (P) or make a work path from a selection.	Desenhe com a ferramenta Caneta (P) ou crie um demarcador de trabalho a partir de uma seleção.
 	Drop an image or PSD anywhere to open it.	Solte uma imagem ou um PSD em qualquer lugar para abri-lo.
@@ -1996,6 +1997,7 @@
 	Apply the pen's tilt and rotation to the tip shape	Aplicar a inclinação e a rotação da caneta à forma da ponta
 	Mixer Brush	Pincel misturador
 	Wet	Molhado
+	Current brush load ({alt}-click the image to load its colour)	Carga atual do pincel ({alt}-clique na imagem para carregar sua cor)
 	Mix	Mistura
 	Wetness Jitter	Variação da umidade
 	Mix Jitter	Variação da mistura

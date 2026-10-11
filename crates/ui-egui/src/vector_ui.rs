@@ -490,25 +490,6 @@ pub(crate) fn free_transform_path(app: &PhotocraftApp) -> Option<(Value, Path)> 
     Some((params, path))
 }
 
-pub fn path_selection_finish(app: &mut PhotocraftApp, start: [f64; 2], end: [f64; 2]) {
-    let (dx, dy) = (end[0] - start[0], end[1] - start[1]);
-    if dx.abs() + dy.abs() < 0.5 {
-        return;
-    }
-    let Some((target, path)) = target_path(app) else { return };
-    let _ = match target {
-        PathTarget::Shape(id) => app.run("shape.edit", json!({"layer": id, "move": [dx.round(), dy.round()]})),
-        PathTarget::VectorMask(id) => {
-            let moved = path.transform(&Affine::translate(dx.round(), dy.round()));
-            app.run("layer.vectorMask.edit", json!({"layer": id, "path": photocraft_engine::vector_cmds::path_json(&moved)}))
-        }
-        PathTarget::Work => {
-            let moved = path.transform(&Affine::translate(dx.round(), dy.round()));
-            app.run("path.set", json!({"name": "work", "path": photocraft_engine::vector_cmds::path_json(&moved)}))
-        }
-    };
-}
-
 // ---------------------------------------------------------------------------------------------
 // Drawing
 
@@ -571,38 +552,34 @@ pub(crate) fn draw_handle(painter: &egui::Painter, anchor: Pos2, handle: Pos2, a
 /// Work path / active shape path outlines, anchors, and the pen path in progress.
 pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, doc: &Document) {
     let tool = app.ui.tool;
-    let vector_tool = matches!(tool, Tool::Pen | Tool::PathSelection) || is_shape_tool(tool);
+    let vector_tool = tool == Tool::Pen || is_shape_tool(tool);
     let accent = Tokens::get(painter.ctx()).accent;
     let to_scr = |q: [f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
-    let draw_path = |p: &Path, anchors: bool| {
-        draw_outline(painter, p, &to_scr, accent);
-        if anchors {
-            for k in p.subpaths.iter().flat_map(|s| &s.knots) {
-                draw_anchor(painter, to_scr([k.anchor.x, k.anchor.y]), false, accent);
-            }
-        }
-    };
+    let draw_path = |p: &Path| draw_outline(painter, p, &to_scr, accent);
     // View › Show › Target Path (under Extras) hides the paths; the Pen's path in progress stays.
     // Free Transform Path draws the path through its box instead (transform_tool).
     let paths = app.ui.view.shows(app.ui.view.show.target_path) && !app.ui.transform.as_ref().is_some_and(|t| t.path.is_some());
     if crate::direct_select::shows(app, painter.ctx().input(|i| i.modifiers)) {
         // Direct Selection (or the Pen with ⌘/Ctrl held) draws the paths it edits (#790).
         crate::direct_select::draw_overlay(app, painter, &to_scr, accent, paths);
+    } else if tool == Tool::PathSelection {
+        // Path Selection shows its selected components' anchors.
+        crate::path_select::draw_overlay(app, painter, &to_scr, accent, paths);
     } else if paths {
         if vector_tool {
             if let Some(wp) = &doc.work_path {
-                draw_path(wp, tool == Tool::PathSelection);
+                draw_path(wp);
             }
             let st = app.session.active();
             if let Some(l) = st.and_then(|s| s.active_layer.and_then(|id| s.doc.layer(id)))
                 && let LayerContent::Shape(sh) = &l.content
             {
-                draw_path(&sh.path, tool == Tool::PathSelection);
+                draw_path(&sh.path);
             }
         }
         // A targeted vector mask shows its path with any tool (#196).
         if let Some((_, p)) = targeted_vector_mask(app) {
-            draw_path(&p, tool == Tool::PathSelection);
+            draw_path(&p);
         }
     }
     // Pen path in progress, with handles of the last knot and a rubber band to the pointer.
@@ -647,7 +624,14 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
     };
     let o = &mut app.ui.tool_options;
     if tool == Tool::PathSelection {
-        lbl(ui, if app.ui.vector_mask_target { "Drag to move the targeted vector mask" } else { tl!("Drag to move the active shape's path or the Work Path") });
+        let (shift, alt) = (crate::shortcuts::pretty("Shift"), crate::shortcuts::pretty("Alt"));
+        lbl(
+            ui,
+            &crate::i18n::fmt(
+                tl!("Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee"),
+                &[("shift", &shift), ("alt", &alt)],
+            ),
+        );
         return true;
     }
     if tool == Tool::DirectSelection {
@@ -1403,7 +1387,11 @@ mod tests {
         assert!(wp.subpaths[0].closed && wp.subpaths[0].knots.len() == 3);
         assert!(wp.subpaths[0].knots[2].smooth);
         // Path Selection moves it.
-        path_selection_finish(&mut app, [50.0, 50.0], [60.0, 55.0]);
+        app.ui.tool = Tool::PathSelection;
+        let none = egui::Modifiers::NONE;
+        crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Down { x: 100.0, y: 30.0, pressure: 1.0 }, none);
+        crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Move { x: 110.0, y: 35.0, pressure: 1.0 }, none);
+        crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Up { x: 110.0, y: 35.0 }, none);
         let wp = app.session.active().unwrap().doc.work_path.clone().unwrap();
         assert_eq!((wp.subpaths[0].knots[0].anchor.x, wp.subpaths[0].knots[0].anchor.y), (30.0, 25.0));
     }

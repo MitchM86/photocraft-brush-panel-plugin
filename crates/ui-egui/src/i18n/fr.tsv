@@ -993,7 +993,8 @@
 	Dots	Points
 	Drag a rectangle around the object	Tracez un rectangle autour de l'objet
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Faites glisser sur l'image pour ajouter une contrainte ; Maj pour horizontal/vertical ; clic droit pour supprimer.
-	Drag to move the active shape's path or the Work Path	Faites glisser pour déplacer le tracé de la forme active ou le tracé de travail
+	Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee	Clic : sélectionner le composant de tracé · Glisser : déplacer · {shift}-clic : ajouter · {alt}-glisser : copier · Glisser dans le vide : rectangle de sélection
+	Select less than the whole path, or delete the layer or its vector mask in the Layers panel.	Sélectionnez moins que le tracé entier, ou supprimez le calque ou son masque vectoriel dans le panneau Calques.
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Clic : sélectionner le point · Glisser : déplacer point, poignée ou segment · {shift}-clic : ajouter · {alt}-clic : sous-tracé entier
 	Draw with the Pen tool (P) or make a work path from a selection.	Dessinez avec l'outil Plume (P) ou créez un tracé de travail à partir d'une sélection.
 	Drop an image or PSD anywhere to open it.	Déposez une image ou un PSD n'importe où pour l'ouvrir.
@@ -1997,6 +1998,7 @@
 	Apply the pen's tilt and rotation to the tip shape	Appliquer l'inclinaison et la rotation du stylet à la forme de la pointe
 	Mixer Brush	Pinceau mélangeur
 	Wet	Humidité
+	Current brush load ({alt}-click the image to load its colour)	Charge actuelle de la forme ({alt}-clic dans l'image pour charger sa couleur)
 	Mix	Mélange
 	Wetness Jitter	Variation de l'humidité
 	Mix Jitter	Variation du mélange

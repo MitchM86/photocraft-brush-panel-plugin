@@ -998,7 +998,8 @@
 	Dots	Punkte
 	Drag a rectangle around the object	Ziehe ein Rechteck um das Objekt
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Ziehe auf dem Bild, um eine Zwangsbedingung hinzuzufügen; Shift für horizontal/vertikal; Rechtsklick löscht.
-	Drag to move the active shape's path or the Work Path	Ziehen, um den Pfad der aktiven Form oder den Arbeitspfad zu verschieben
+	Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee	Klick: Pfadkomponente auswählen · Ziehen: verschieben · {shift}-Klick: hinzufügen · {alt}-Ziehen: kopieren · Ziehen ins Leere: Auswahlrahmen
+	Select less than the whole path, or delete the layer or its vector mask in the Layers panel.	Weniger als den ganzen Pfad auswählen oder die Ebene bzw. ihre Vektormaske im Ebenen-Bedienfeld löschen.
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Klick: Ankerpunkt auswählen · Ziehen: Ankerpunkt, Griff oder Segment verschieben · {shift}-Klick: hinzufügen · {alt}-Klick: ganzer Teilpfad
 	Draw with the Pen tool (P) or make a work path from a selection.	Zeichne mit dem Stift-Werkzeug (P) oder erzeuge einen Arbeitspfad aus einer Auswahl.
 	Drop an image or PSD anywhere to open it.	Ziehe ein Bild oder PSD an eine beliebige Stelle, um es zu öffnen.
@@ -2016,6 +2017,7 @@
 	Mixer Brush	Mischer-Pinsel
 	Mixer Brush Tool	Mischer-Pinsel-Werkzeug
 	Wet	Feucht
+	Current brush load ({alt}-click the image to load its colour)	Aktuelle Pinselladung ({alt}-Klick ins Bild nimmt dessen Farbe auf)
 	Mix	Mischen
 	Wetness Jitter	Feuchtigkeitsschwankung
 	Mix Jitter	Mischschwankung

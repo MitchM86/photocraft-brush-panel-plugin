@@ -729,6 +729,8 @@ mod tests {
                 | "path.moveHandle"
                 | "path.bendSegment"
                 | "path.convertPoint"
+                | "path.moveSubpaths"
+                | "path.deleteSubpaths"
                 | "path.clippingPath.set"
                 | "path.rename"
                 | "select.toWorkPath"

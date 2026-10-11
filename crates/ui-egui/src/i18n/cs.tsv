@@ -1018,7 +1018,8 @@
 	Dots	Tečky
 	Drag a rectangle around the object	Táhněte obdélník kolem objektu
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Tažením v obraze přidáte omezení; Shift pro vodorovné/svislé; pravým kliknutím odstraníte.
-	Drag to move the active shape's path or the Work Path	Tažením přesunete cestu aktivního tvaru nebo pracovní cestu
+	Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee	Klik: vybrat součást cesty · Tažení: přesunout · {shift}+klik: přidat · {alt}+tažení: kopie · Tažení mimo: výběr obdélníkem
+	Select less than the whole path, or delete the layer or its vector mask in the Layers panel.	Vyberte méně než celou cestu, nebo odstraňte vrstvu či její vektorovou masku v panelu Vrstvy.
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Klik: vybrat bod · Tažení: přesunout bod, úchyt nebo segment · {shift}+klik: přidat · {alt}+klik: celá podcesta
 	Draw with the Pen tool (P) or make a work path from a selection.	Kreslete nástrojem pero (P) nebo vytvořte pracovní cestu z výběru.
 	Drop an image or PSD anywhere to open it.	Přetáhněte sem obrázek nebo PSD a otevře se.
@@ -2049,6 +2050,7 @@
 	Mixer Brush	Míchací štětec
 	Mixer Brush Tool	Nástroj Míchací štětec
 	Wet	Vlhkost
+	Current brush load ({alt}-click the image to load its colour)	Aktuální náplň štětce ({alt}+klik do obrazu nabere jeho barvu)
 	Mix	Míchání
 	Wetness Jitter	Kolísání vlhkosti
 	Mix Jitter	Kolísání míchání

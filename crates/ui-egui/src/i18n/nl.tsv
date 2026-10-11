@@ -992,7 +992,8 @@
 	Dots	Stippen
 	Drag a rectangle around the object	Sleep een rechthoek rond het object
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Sleep over de afbeelding om een beperking toe te voegen; Shift voor horizontaal/verticaal; rechtsklik om te verwijderen.
-	Drag to move the active shape's path or the Work Path	Sleep om het pad van de actieve vorm of het werkpad te verplaatsen
+	Click: select path component · Drag: move · {shift}-click: add · {alt}-drag: copy · Drag empty: marquee	Klik: padcomponent selecteren · Slepen: verplaatsen · {shift}-klik: toevoegen · {alt}-slepen: kopiëren · Slepen in leeg gebied: selectiekader
+	Select less than the whole path, or delete the layer or its vector mask in the Layers panel.	Selecteer minder dan het hele pad, of verwijder de laag of het vectormasker in het deelvenster Lagen.
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Klik: ankerpunt selecteren · Slepen: ankerpunt, greep of segment verplaatsen · {shift}-klik: toevoegen · {alt}-klik: heel subpad
 	Draw with the Pen tool (P) or make a work path from a selection.	Teken met het pengereedschap (P) of maak een werkpad van een selectie.
 	Drop an image or PSD anywhere to open it.	Sleep een afbeelding of PSD ergens naartoe om deze te openen.
@@ -2003,6 +2004,7 @@
 	Mixer Brush	Mengpenseel
 	Mixer Brush Tool	Mengpenseelgereedschap
 	Wet	Nat
+	Current brush load ({alt}-click the image to load its colour)	Huidige penseellading ({alt}-klik in de afbeelding om de kleur te laden)
 	Mix	Mengen
 	Wetness Jitter	Nattigheidsvariatie
 	Mix Jitter	Mengvariatie

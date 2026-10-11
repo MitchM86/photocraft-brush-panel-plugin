@@ -29,7 +29,8 @@ pub struct SliceUi {
 /// A gesture in progress.
 #[derive(Clone, Debug, PartialEq)]
 pub enum SliceDrag {
-    New { start: [f64; 2], cur: [f64; 2] },
+    /// Drawing a new slice; `mods` are the keys held now (⇧ square, ⌥ from the centre).
+    New { start: [f64; 2], cur: [f64; 2], mods: egui::Modifiers },
     Move { id: u32, start: [f64; 2], cur: [f64; 2], rect: photocraft_geom::Rect },
 }
 
@@ -51,8 +52,20 @@ fn rect_from(a: [f64; 2], b: [f64; 2]) -> photocraft_geom::Rect {
     photocraft_geom::Rect::new(x0, y0, x1, y1)
 }
 
+/// The slice a Slice tool drag from `start` to `cur` draws: ⇧ makes it square and ⌥ draws it from
+/// its centre, as with the Rectangular Marquee in Photoshop.
+fn new_rect(start: [f64; 2], cur: [f64; 2], mods: egui::Modifiers) -> photocraft_geom::Rect {
+    let mut d = [cur[0] - start[0], cur[1] - start[1]];
+    if mods.shift {
+        let side = d[0].abs().max(d[1].abs());
+        d = [side.copysign(d[0]), side.copysign(d[1])];
+    }
+    let end = [start[0] + d[0], start[1] + d[1]];
+    if mods.alt { rect_from([start[0] - d[0], start[1] - d[1]], end) } else { rect_from(start, end) }
+}
+
 /// Pointer input for the two slice tools. Returns true when the event was theirs.
-pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, _mods: egui::Modifiers) -> bool {
+pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) -> bool {
     let tool = app.ui.tool;
     if !is_slice_tool(tool) {
         return false;
@@ -63,7 +76,7 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, _mods: egui::Modifiers) -
         ToolEvent::Down { x, y, .. } => {
             if tool == Tool::Slice {
                 if !locked {
-                    app.ui.slices.drag = Some(SliceDrag::New { start: [x, y], cur: [x, y] });
+                    app.ui.slices.drag = Some(SliceDrag::New { start: [x, y], cur: [x, y], mods });
                 }
             } else {
                 let hit = slice_at(&doc, x, y);
@@ -76,12 +89,16 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, _mods: egui::Modifiers) -
             }
         }
         ToolEvent::Move { x, y, .. } => match &mut app.ui.slices.drag {
-            Some(SliceDrag::New { cur, .. }) | Some(SliceDrag::Move { cur, .. }) => *cur = [x, y],
+            Some(SliceDrag::New { cur, mods: m, .. }) => {
+                *cur = [x, y];
+                *m = mods;
+            }
+            Some(SliceDrag::Move { cur, .. }) => *cur = [x, y],
             None => {}
         },
         ToolEvent::Up { x, y } => match app.ui.slices.drag.take() {
             Some(SliceDrag::New { start, .. }) => {
-                let r = rect_from(start, [x, y]);
+                let r = new_rect(start, [x, y], mods);
                 if r.width() >= 1 && r.height() >= 1 && (r.width() > 2 || r.height() > 2) {
                     if let Ok(v) = app.run("slice.new", json!({"rect": [r.x0, r.y0, r.width(), r.height()]})) {
                         app.ui.slices.selected = v.get("number").and_then(Value::as_u64).map(|n| n as usize);
@@ -180,8 +197,8 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
         }
     }
     match &app.ui.slices.drag {
-        Some(SliceDrag::New { start, cur }) => {
-            let sr = to_screen(rect_from(*start, *cur));
+        Some(SliceDrag::New { start, cur, mods }) => {
+            let sr = to_screen(new_rect(*start, *cur, *mods));
             painter.rect_stroke(sr, 0.0, Stroke::new(1.0, Color32::WHITE), egui::StrokeKind::Middle);
             let pts = [sr.left_top(), sr.right_top(), sr.right_bottom(), sr.left_bottom(), sr.left_top()];
             painter.add(egui::Shape::dashed_line(&pts, Stroke::new(1.0, color), 4.0, 4.0));
@@ -291,6 +308,23 @@ mod tests {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
         app.run("file.new", json!({"width": 100, "height": 80})).unwrap();
         app
+    }
+
+    #[test]
+    fn shift_draws_square_slices_and_alt_from_the_centre() {
+        let new = |mods: egui::Modifiers| {
+            let mut app = app();
+            app.ui.tool = Tool::Slice;
+            pointer(&mut app, ToolEvent::Down { x: 50.0, y: 40.0, pressure: 1.0 }, mods);
+            pointer(&mut app, ToolEvent::Move { x: 70.0, y: 50.0, pressure: 1.0 }, mods);
+            pointer(&mut app, ToolEvent::Up { x: 70.0, y: 50.0 }, mods);
+            app.session.active().unwrap().doc.slices.list[0].rect
+        };
+        let r = photocraft_geom::Rect::new;
+        assert_eq!(new(egui::Modifiers::NONE), r(50, 40, 70, 50));
+        assert_eq!(new(egui::Modifiers::SHIFT), r(50, 40, 70, 60), "square");
+        assert_eq!(new(egui::Modifiers::ALT), r(30, 30, 70, 50), "from the centre");
+        assert_eq!(new(egui::Modifiers::SHIFT | egui::Modifiers::ALT), r(30, 20, 70, 60), "both");
     }
 
     #[test]

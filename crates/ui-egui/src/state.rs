@@ -952,6 +952,13 @@ pub struct UiState {
     /// Direct Selection tool: selected anchors and the drag in progress (#790).
     #[serde(default)]
     pub direct_selection: crate::direct_select::DirectSelection,
+    /// Path Selection tool: selected path components and the drag in progress.
+    #[serde(default)]
+    pub path_selection: crate::path_select::PathSelection,
+    /// The Mixer Brush's ⌥-click load and the foreground colour when it was taken: it loads the
+    /// brush until the foreground colour changes.
+    #[serde(skip)]
+    pub mixer_load: Option<[[f32; 4]; 2]>,
     /// Selected row in the Paths panel ("work" or a saved path name).
     #[serde(default)]
     pub selected_path: Option<String>,
@@ -1106,6 +1113,8 @@ impl Default for UiState {
             pen: None,
             stroke_editor: None,
             direct_selection: Default::default(),
+            path_selection: Default::default(),
+            mixer_load: None,
             selected_path: None,
             panels: Panels::default(),
             views: Vec::new(),
