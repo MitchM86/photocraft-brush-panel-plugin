@@ -3563,3 +3563,26 @@ cameraRaw	Masking	Маскування
 	Bit Depth	Бітова глибина
 	Compression	Стиснення
 	Preserve Editing Capabilities	Зберегти можливості редагування
+	32 bit	32 біт
+	Byte Order	Порядок байтів
+	Dimensions	Розміри
+	Encoding	Кодування
+	File size:	Розмір файлу:
+	Guess	Підібрати
+	Header	Заголовок
+	IBM PC	IBM PC
+	Image Interpolation	Інтерполяція зображення
+	Interleaved	З чергуванням
+	Macintosh	Macintosh
+	Swap	Поміняти
+	TIFF (8 bits/pixel)	TIFF (8 біт/піксель)
+	The file is too small for this size.	Файл замалий для цього розміру.
+	The size matches the file.	Розмір відповідає файлу.
+	{n} bytes past the image are ignored.	Пропущено байтів після зображення: {n}.
+	ASCII	ASCII
+	ASCII85	ASCII85
+	Binary	Двійкове
+	JPEG (low quality)	JPEG (низька якість)
+	JPEG (medium quality)	JPEG (середня якість)
+	JPEG (high quality)	JPEG (висока якість)
+	JPEG (maximum quality)	JPEG (максимальна якість)

@@ -18,8 +18,8 @@ type Inbox = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
 /// Photoshop brushes (.abr), gradients (.grd) and swatches (.aco, .ase), which go to the preset libraries.
 const OPEN_EXTS: &[&str] = &[
     "pcraft", "pdn", "ora", "psd", "psb", "psdt", "png", "jpg", "jpeg", "tif", "tiff", "webp", "gif", "bmp", "tga", "ico", "qoi", "exr", "hdr", "pbm", "pgm",
-    "ppm", "pam", "pfm", "heic", "heif", "hif", "dng", "cr2", "cr3", "nef", "nrw", "arw", "pef", "orf", "rw2", "raf", "abr", "grd", "svg", "svgz", "aco",
-    "ase", "af", "afdesign", "afphoto", "afpub",
+    "ppm", "pam", "pfm", "heic", "heif", "hif", "jp2", "jpf", "jpx", "j2k", "j2c", "jpc", "pdf", "ai", "eps", "epsf", "raw", "dng", "cr2", "cr3", "nef", "nrw",
+    "arw", "pef", "orf", "rw2", "raf", "abr", "grd", "svg", "svgz", "aco", "ase", "af", "afdesign", "afphoto", "afpub",
 ];
 const SVG_EXTS: &[&str] = &["svg", "svgz"];
 const CANVAS_ID: &str = "photocraft_canvas";
@@ -340,17 +340,7 @@ fn services(inbox: Inbox) -> Services {
             photocraft_io::import_with_svg_group_depth(name, bytes, max_svg_group_depth).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string())
         })),
         export: Some(Box::new(|doc: &Document, path: &str, settings: &photocraft_ui_egui::ExportSettings| {
-            let mut opts = photocraft_io::ExportOptions::default();
-            if let Some(q) = settings.jpeg_quality {
-                opts.encode.jpeg_quality = q;
-            }
-            opts.encode.webp_lossless = settings.webp_lossless;
-            if let Some(q) = settings.webp_quality {
-                opts.encode.webp_quality = q;
-            }
-            opts.tiff_layers = settings.tiff_layers;
-            opts.xmp = if settings.xmp_all { photocraft_io::XmpEmbed::All } else { photocraft_io::XmpEmbed::None };
-            photocraft_io::export(doc, path, &opts).map(|r| (r.bytes, r.warnings)).map_err(|e| e.to_string())
+            photocraft_io::export(doc, path, &settings.export_options()).map(|r| (r.bytes, r.warnings)).map_err(|e| e.to_string())
         })),
         file_dialog: Some(Box::new(|request, _parent, reply| match request {
             // The browser's file picker hands over the file's contents, not a path.

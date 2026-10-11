@@ -554,7 +554,7 @@ fn map_bands(img: &Image, layout: ChannelLayout, sample: CSample, f: impl Fn(Vec
 }
 
 /// Straight-alpha pixels composited over white (no ink for CMYK), without the alpha channel.
-fn matte_over_white(img: &Image) -> Result<Image, IoError> {
+pub(crate) fn matte_over_white(img: &Image) -> Result<Image, IoError> {
     let layout = img.layout();
     let white = if layout.is_cmyk() { 0.0 } else { 1.0 };
     map_bands(img, layout.without_alpha(), img.sample_type(), |vals| {

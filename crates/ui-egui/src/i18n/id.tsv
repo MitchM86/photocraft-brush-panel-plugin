@@ -2862,3 +2862,26 @@ fontWeight	Italic	Miring
 	Bit Depth	Kedalaman Bit
 	Compression	Kompresi
 	Preserve Editing Capabilities	Pertahankan Kemampuan Penyuntingan
+	32 bit	32 bit
+	Byte Order	Urutan byte
+	Dimensions	Dimensi
+	Encoding	Pengodean
+	File size:	Ukuran file:
+	Guess	Tebak
+	Header	Header
+	IBM PC	IBM PC
+	Image Interpolation	Interpolasi gambar
+	Interleaved	Berselang-seling
+	Macintosh	Macintosh
+	Swap	Tukar
+	TIFF (8 bits/pixel)	TIFF (8 bit/piksel)
+	The file is too small for this size.	File terlalu kecil untuk ukuran ini.
+	The size matches the file.	Ukuran cocok dengan file.
+	{n} bytes past the image are ignored.	{n} byte setelah gambar diabaikan.
+	ASCII	ASCII
+	ASCII85	ASCII85
+	Binary	Biner
+	JPEG (low quality)	JPEG (kualitas rendah)
+	JPEG (medium quality)	JPEG (kualitas sedang)
+	JPEG (high quality)	JPEG (kualitas tinggi)
+	JPEG (maximum quality)	JPEG (kualitas maksimum)

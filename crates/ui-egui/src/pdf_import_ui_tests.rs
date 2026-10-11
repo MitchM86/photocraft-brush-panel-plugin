@@ -90,6 +90,19 @@ fn a_plain_pdf_asks_then_opens_the_chosen_pages() {
 }
 
 #[test]
+fn ok_without_pages_keeps_the_dialog() {
+    let (mut app, _) = app();
+    app.open_bytes("two.pdf", &plain_pdf(2)).unwrap();
+    let id = pdf_dialog(&app);
+    app.ui.dialog_mut(id).unwrap().fields.insert("pages".into(), json!([]));
+    assert!(crate::dialogs::confirm(&mut app, id).is_err());
+    let again = pdf_dialog(&app);
+    assert_eq!(app.pdf_imports.keys().copied().collect::<Vec<_>>(), [again]);
+    crate::dialogs::cancel(&mut app, again).unwrap();
+    assert!(app.pdf_imports.is_empty());
+}
+
+#[test]
 fn cancel_forgets_the_pdf() {
     let (mut app, _) = app();
     app.open_bytes("one.pdf", &plain_pdf(1)).unwrap();

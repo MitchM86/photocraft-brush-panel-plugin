@@ -2465,3 +2465,26 @@ fontWeight	Italic	斜体
 	Bit Depth	位深度
 	Compression	压缩
 	Preserve Editing Capabilities	保留编辑功能
+	32 bit	32 位
+	Byte Order	字节顺序
+	Dimensions	尺寸
+	Encoding	编码
+	File size:	文件大小：
+	Guess	推测
+	Header	文件头
+	IBM PC	IBM PC
+	Image Interpolation	图像插值
+	Interleaved	交错
+	Macintosh	Macintosh
+	Swap	互换
+	TIFF (8 bits/pixel)	TIFF（8 位/像素）
+	The file is too small for this size.	文件对于此尺寸来说太小。
+	The size matches the file.	尺寸与文件相符。
+	{n} bytes past the image are ignored.	图像之后的 {n} 字节将被忽略。
+	ASCII	ASCII
+	ASCII85	ASCII85
+	Binary	二进制
+	JPEG (low quality)	JPEG（低品质）
+	JPEG (medium quality)	JPEG（中等品质）
+	JPEG (high quality)	JPEG（高品质）
+	JPEG (maximum quality)	JPEG（最佳品质）

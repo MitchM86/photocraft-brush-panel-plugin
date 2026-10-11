@@ -117,6 +117,7 @@ pub mod panels;
 pub mod parity;
 pub mod patch_preview;
 pub mod pdf_import_ui;
+pub mod raw_open_ui;
 pub mod doc_float;
 pub mod doc_panes;
 pub mod pen_trace;
@@ -210,6 +211,12 @@ pub struct ExportSettings {
     /// PDF: keep the layered document inside so it reopens with its layers (Photoshop's
     /// "Preserve Photoshop Editing Capabilities"; on for Save As, off for Export As).
     pub pdf_editable: bool,
+    /// JPEG 2000: lossy at this quality 0–100 (None = lossless).
+    pub jpeg2000_quality: Option<u8>,
+    /// EPS: preview, encoding and interpolation (Photoshop's EPS Options).
+    pub eps: photocraft_io::EpsOptions,
+    /// Photoshop Raw: header, channel order and byte order (Photoshop Raw Options).
+    pub photoshop_raw: photocraft_io::RawSaveOptions,
     /// TIFF: keep the layers (Photoshop layer data); `false` is "Discard Layers and Save a Copy".
     pub tiff_layers: bool,
     /// Embed the document's whole XMP packet. `true` by default (Save As keeps the metadata);
@@ -226,9 +233,37 @@ impl Default for ExportSettings {
             webp_quality: None,
             pdf_jpeg_quality: None,
             pdf_editable: true,
+            jpeg2000_quality: None,
+            eps: photocraft_io::EpsOptions::default(),
+            photoshop_raw: photocraft_io::RawSaveOptions::default(),
             tiff_layers: true,
             xmp_all: true,
         }
+    }
+}
+
+impl ExportSettings {
+    /// The `photocraft_io` options these settings ask for (the desktop and web exporters share it).
+    pub fn export_options(&self) -> photocraft_io::ExportOptions {
+        let mut opts = photocraft_io::ExportOptions::default();
+        if let Some(q) = self.jpeg_quality {
+            opts.encode.jpeg_quality = q;
+        }
+        opts.encode.webp_lossless = self.webp_lossless;
+        if let Some(q) = self.webp_quality {
+            opts.encode.webp_quality = q;
+        }
+        opts.encode.jpeg2000_lossless = self.jpeg2000_quality.is_none();
+        if let Some(q) = self.jpeg2000_quality {
+            opts.encode.jpeg2000_quality = q;
+        }
+        opts.tiff_layers = self.tiff_layers;
+        opts.pdf_editable = self.pdf_editable;
+        opts.pdf = self.pdf_jpeg_quality.map_or(photocraft_io::PdfCompression::Zip, photocraft_io::PdfCompression::Jpeg);
+        opts.eps = self.eps;
+        opts.photoshop_raw = self.photoshop_raw;
+        opts.xmp = if self.xmp_all { photocraft_io::XmpEmbed::All } else { photocraft_io::XmpEmbed::None };
+        opts
     }
 }
 
@@ -614,6 +649,8 @@ pub struct PhotocraftApp {
     pub(crate) tiff_options: Option<tiff_options_ui::Prompt>,
     /// PDFs waiting in Import PDF, by dialog id (see `pdf_import_ui`).
     pub(crate) pdf_imports: HashMap<u64, pdf_import_ui::Source>,
+    /// Photoshop Raw files waiting in Photoshop Raw Options, by dialog id (see `raw_open_ui`).
+    pub(crate) raw_opens: HashMap<u64, raw_open_ui::Source>,
     /// Where each document was last saved or exported to through a dialog (#1826): its next Save
     /// As or export dialog starts there rather than beside the document. Session-only.
     pub(crate) save_dirs: HashMap<photocraft_doc::DocId, std::path::PathBuf>,
@@ -730,6 +767,7 @@ impl PhotocraftApp {
             file_dialog: None,
             tiff_options: None,
             pdf_imports: HashMap::new(),
+            raw_opens: HashMap::new(),
             save_dirs: HashMap::new(),
             allow_close: false,
             stylus: Default::default(),
@@ -1013,6 +1051,10 @@ impl PhotocraftApp {
         }
         // A PDF asks which pages, at what resolution, first (Import PDF).
         if let Some(r) = pdf_import_ui::intercept(self, name, None, bytes) {
+            return r.map(|()| Vec::new());
+        }
+        // Photoshop Raw asks for its size first (Photoshop Raw Options).
+        if let Some(r) = raw_open_ui::intercept(self, name, None, bytes) {
             return r.map(|()| Vec::new());
         }
         let name = &self.open_name(name);

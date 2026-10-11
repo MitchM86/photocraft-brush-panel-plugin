@@ -140,6 +140,9 @@ mod exr {
 mod hdr {
     cases!(Format::Hdr);
 }
+mod jpeg2000 {
+    cases!(Format::Jpeg2000);
+}
 
 // ---------------------------------------------------------------------------
 // Targeted round-trips beyond the matrix

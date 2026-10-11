@@ -58,6 +58,7 @@ fn default_build_formats_all_symmetric() {
         Format::Qoi,
         Format::OpenExr,
         Format::Hdr,
+        Format::Jpeg2000,
     ];
     for f in expected {
         assert!(caps(f).read && caps(f).write, "{f:?}");

@@ -45,7 +45,9 @@ pub mod linked;
 mod multichannel_map;
 mod ora;
 pub mod pattern_map;
+mod eps;
 mod pdf;
+pub mod photoshop_raw;
 pub mod pdf_import;
 mod pdn;
 pub mod pixels;
@@ -66,7 +68,9 @@ use photocraft_psd::{PsdError, PsdFile};
 
 pub use adjust_map::ADJUSTMENT_KEYS;
 pub use flat::{document_to_image, import_tiff_page, tga_alpha_channel_to_transparency};
+pub use eps::{EpsEncoding, EpsJpegQuality, EpsOptions, EpsPreview};
 pub use pdf::PdfCompression;
+pub use photoshop_raw::{RawLayout, RawSaveOptions};
 pub use psd_export::{PsdExportOptions, document_to_psd, document_to_psd_with};
 pub use psd_import::{psd_to_document, psd_to_document_with};
 
@@ -171,6 +175,10 @@ pub struct ExportOptions {
     /// Capabilities"), so it reopens with its layers. On by default, as Save As does; Export As
     /// writes a plain PDF.
     pub pdf_editable: bool,
+    /// EPS: preview, encoding and interpolation (Photoshop's EPS Options).
+    pub eps: EpsOptions,
+    /// Photoshop Raw: header, channel order and byte order (Photoshop Raw Options).
+    pub photoshop_raw: RawSaveOptions,
 }
 
 impl Default for ExportOptions {
@@ -182,6 +190,8 @@ impl Default for ExportOptions {
             xmp: XmpEmbed::All,
             pdf: PdfCompression::Zip,
             pdf_editable: true,
+            eps: EpsOptions::default(),
+            photoshop_raw: RawSaveOptions::default(),
         }
     }
 }
@@ -232,6 +242,9 @@ fn import_stages(name: &str, bytes: &[u8], ctl: &photocraft_raster::Interrupt, m
     if !is_psd(bytes) && (has_extension(name, "pdf") || ((has_extension(name, "ai") || !has_extension(name, "svg")) && pdf_import::is_pdf(bytes))) {
         return pdf_import::import(name, bytes);
     }
+    if eps::is_eps(bytes) || ["eps", "epsf", "epsi"].iter().any(|e| has_extension(name, e)) {
+        return eps::import(name, bytes);
+    }
     if is_psd(bytes) {
         let file = PsdFile::from_bytes(bytes)?;
         // Nesting past the document model's cap could never be saved (.pcraft refuses it) and
@@ -257,6 +270,12 @@ fn import_stages(name: &str, bytes: &[u8], ctl: &photocraft_raster::Interrupt, m
     }
     if raw::is_raw(bytes) {
         return raw::import_raw(name, bytes);
+    }
+    // Not a camera raw: Photoshop Raw, whose size only the person opening it knows.
+    if has_extension(name, "raw") && photocraft_codecs::detect(bytes).is_none() {
+        return Err(IoError::Unsupported(
+            "this .raw file is Photoshop Raw (bare pixels): open it with its width, height and channels (photoshop_raw::import)".into(),
+        ));
     }
     if is_svg_input(name, bytes) {
         return svg::import_svg_with_group_depth(name, bytes, max_group_depth);
@@ -300,6 +319,12 @@ pub fn export(doc: &Document, name_or_ext: &str, opts: &ExportOptions) -> Result
     if ext == "pdf" {
         return pdf::export(doc, opts);
     }
+    if ext == "eps" {
+        return eps::export(doc, opts);
+    }
+    if ext == "raw" {
+        return photoshop_raw::export(doc, opts);
+    }
     if ext == photocraft_format::EXTENSION {
         let previews = photocraft_format::SaveOptions {
             thumbnail: Some(photocraft_compose::thumbnail(doc, 256)),
@@ -322,6 +347,12 @@ pub fn export(doc: &Document, name_or_ext: &str, opts: &ExportOptions) -> Result
     let format = photocraft_codecs::from_extension(&ext).ok_or_else(|| IoError::UnknownFormat(name_or_ext.to_string()))?;
     if format == photocraft_codecs::Format::Tiff && opts.tiff_layers && tiff_layers::would_write_layers(doc) {
         return tiff_layers::export_layered(doc, opts);
+    }
+    // `.j2k`, `.j2c` and `.jpc` name a bare JPEG 2000 codestream; the other extensions the JP2 file.
+    if format == photocraft_codecs::Format::Jpeg2000 && matches!(ext.as_str(), "j2k" | "j2c" | "jpc") && !opts.encode.jpeg2000_codestream {
+        let mut o = opts.clone();
+        o.encode.jpeg2000_codestream = true;
+        return flat::export_flat(doc, format, &o);
     }
     flat::export_flat(doc, format, opts)
 }

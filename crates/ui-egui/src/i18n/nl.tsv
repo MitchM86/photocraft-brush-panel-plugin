@@ -3634,3 +3634,26 @@ cameraRaw	Whites	Witten
 	Art Box	Illustratiekader
 	Bit Depth	Bitdiepte
 	Preserve Editing Capabilities	Bewerkingsmogelijkheden behouden
+	32 bit	32-bits
+	Byte Order	Bytevolgorde
+	Dimensions	Afmetingen
+	Encoding	Codering
+	File size:	Bestandsgrootte:
+	Guess	Schatten
+	Header	Header
+	IBM PC	IBM PC
+	Image Interpolation	Beeldinterpolatie
+	Interleaved	Verweven
+	Macintosh	Macintosh
+	Swap	Omwisselen
+	TIFF (8 bits/pixel)	TIFF (8 bits/pixel)
+	The file is too small for this size.	Het bestand is te klein voor dit formaat.
+	The size matches the file.	Het formaat komt overeen met het bestand.
+	{n} bytes past the image are ignored.	{n} bytes na de afbeelding worden genegeerd.
+	ASCII	ASCII
+	ASCII85	ASCII85
+	Binary	Binair
+	JPEG (low quality)	JPEG (lage kwaliteit)
+	JPEG (medium quality)	JPEG (gemiddelde kwaliteit)
+	JPEG (high quality)	JPEG (hoge kwaliteit)
+	JPEG (maximum quality)	JPEG (maximale kwaliteit)

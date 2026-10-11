@@ -3035,3 +3035,26 @@ fontWeight	Italic	기울임
 	Bit Depth	비트 심도
 	Compression	압축
 	Preserve Editing Capabilities	편집 기능 유지
+	32 bit	32비트
+	Byte Order	바이트 순서
+	Dimensions	치수
+	Encoding	인코딩
+	File size:	파일 크기:
+	Guess	추측
+	Header	헤더
+	IBM PC	IBM PC
+	Image Interpolation	이미지 보간
+	Interleaved	인터리브
+	Macintosh	Macintosh
+	Swap	바꾸기
+	TIFF (8 bits/pixel)	TIFF(8비트/픽셀)
+	The file is too small for this size.	이 크기에 비해 파일이 너무 작습니다.
+	The size matches the file.	크기가 파일과 일치합니다.
+	{n} bytes past the image are ignored.	이미지 뒤의 {n}바이트는 무시됩니다.
+	ASCII	ASCII
+	ASCII85	ASCII85
+	Binary	바이너리
+	JPEG (low quality)	JPEG(낮은 품질)
+	JPEG (medium quality)	JPEG(중간 품질)
+	JPEG (high quality)	JPEG(높은 품질)
+	JPEG (maximum quality)	JPEG(최고 품질)

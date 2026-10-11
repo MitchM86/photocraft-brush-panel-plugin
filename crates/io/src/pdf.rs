@@ -83,7 +83,7 @@ fn embedded_profile(img: &Image) -> Vec<u8> {
 }
 
 /// Now as a PDF date (`D:YYYYMMDDHHmmSSZ`, UTC); the epoch where there is no clock (the web).
-fn pdf_date() -> String {
+pub(crate) fn pdf_date() -> String {
     #[cfg(not(target_arch = "wasm32"))]
     let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
     #[cfg(target_arch = "wasm32")]

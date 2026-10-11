@@ -121,6 +121,14 @@ pub struct EncodeOptions {
     pub webp_lossless: bool,
     /// Lossy WebP quality 0..=100 (the source application's scale; 75–85 is typical for photos).
     pub webp_quality: u8,
+    /// JPEG 2000: lossless (the reversible 5/3 wavelet) or lossy (9/7) at
+    /// [`Self::jpeg2000_quality`].
+    pub jpeg2000_lossless: bool,
+    /// Lossy JPEG 2000 quality 0..=100 (Photoshop's scale; it sets the compression ratio).
+    pub jpeg2000_quality: u8,
+    /// JPEG 2000: write a bare codestream (`.j2k`/`.j2c`) instead of the JP2 container. A
+    /// codestream has no room for a colour profile, resolution or XMP.
+    pub jpeg2000_codestream: bool,
     pub tiff_compression: TiffCompression,
     /// Always write TIFF as BigTIFF (8-byte offsets). Without it a TIFF is written as BigTIFF
     /// only when it could pass the 4 GiB a classic TIFF can address.
@@ -141,6 +149,9 @@ impl Default for EncodeOptions {
             png_interlaced: false,
             webp_lossless: true,
             webp_quality: 80,
+            jpeg2000_lossless: true,
+            jpeg2000_quality: 50,
+            jpeg2000_codestream: false,
             tiff_compression: TiffCompression::Deflate,
             tiff_bigtiff: false,
             exr_compression: ExrCompression::Zip16,

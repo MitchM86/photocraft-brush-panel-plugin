@@ -3476,3 +3476,26 @@ cameraRaw	Roughness	Chropowatość
 	Bit Depth	Głębia bitowa
 	Compression	Kompresja
 	Preserve Editing Capabilities	Zachowaj możliwość edycji
+	32 bit	32 bity
+	Byte Order	Kolejność bajtów
+	Dimensions	Wymiary
+	Encoding	Kodowanie
+	File size:	Rozmiar pliku:
+	Guess	Zgadnij
+	Header	Nagłówek
+	IBM PC	IBM PC
+	Image Interpolation	Interpolacja obrazu
+	Interleaved	Przeplatany
+	Macintosh	Macintosh
+	Swap	Zamień
+	TIFF (8 bits/pixel)	TIFF (8 bitów/piksel)
+	The file is too small for this size.	Plik jest za mały dla tego rozmiaru.
+	The size matches the file.	Rozmiar pasuje do pliku.
+	{n} bytes past the image are ignored.	Pominięte bajty za obrazem: {n}.
+	ASCII	ASCII
+	ASCII85	ASCII85
+	Binary	Binarne
+	JPEG (low quality)	JPEG (niska jakość)
+	JPEG (medium quality)	JPEG (średnia jakość)
+	JPEG (high quality)	JPEG (wysoka jakość)
+	JPEG (maximum quality)	JPEG (maksymalna jakość)

@@ -31,6 +31,10 @@ image-webp = "0.2"
 zune-jpeg = "0.5"
 zune-core = "0.5"
 jpeg-encoder = "0.6"
+# JPEG 2000: hayro-jpeg2000 decodes (pure Rust, already in the tree through the PDF renderer);
+# openjpeg2-pure-rs encodes (OpenJPEG's encoder translated to Rust, used through its safe API).
+hayro-jpeg2000 = { version = "0.4.1", default-features = false, features = ["simd"] }
+openjpeg2-pure-rs = "0.1.1"
 photocraft-heif = { path = "../heif", optional = true }
 
 # Orientation is applied a band of rows per task on native; wasm stays single-threaded.

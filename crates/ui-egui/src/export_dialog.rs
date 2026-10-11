@@ -13,13 +13,15 @@ use crate::{ExportSettings, PhotocraftApp};
 
 /// The formats Export As writes (extension, name), in Photoshop's order and naming where it has
 /// them. These are the flat ones; PSD, PSB, .pcraft and OpenRaster keep layers and are in Save As.
-const FORMATS: [(&str, &str); 14] = [
+const FORMATS: [(&str, &str); 17] = [
     ("png", "PNG"),
     ("jpg", "JPEG"),
     ("gif", "GIF"),
     ("webp", "WebP"),
     ("avif", "AVIF"),
     ("pdf", "Photoshop PDF"),
+    ("eps", "Photoshop EPS"),
+    ("jp2", "JPEG 2000"),
     ("tif", "TIFF"),
     ("bmp", "BMP"),
     ("tga", "Targa"),
@@ -28,6 +30,7 @@ const FORMATS: [(&str, &str); 14] = [
     ("pnm", "Portable Bit Map"),
     ("ico", "ICO"),
     ("qoi", "QOI"),
+    ("raw", "Photoshop Raw"),
 ];
 
 /// The Export As formats this build can write (AVIF needs the `avif` feature).
@@ -144,6 +147,20 @@ fn set_format_defaults(f: &mut Map<String, Value>, fmt: &str, prefs: &photocraft
             f.insert("quality".into(), json!(prefs.jpeg_quality));
             f.entry("pdfCompression").or_insert(json!("zip"));
         }
+        // Photoshop's JPEG 2000 starts lossless; its quality slider at 50.
+        "jp2" => {
+            f.insert("quality".into(), json!(50));
+            f.insert("lossless".into(), json!(true));
+        }
+        "eps" => {
+            f.entry("epsPreview").or_insert(json!("tiff"));
+            f.entry("epsEncoding").or_insert(json!("binary"));
+        }
+        "raw" => {
+            f.entry("rawHeader").or_insert(json!(0));
+            f.entry("rawInterleaved").or_insert(json!(true));
+            f.entry("rawByteOrder").or_insert(json!(if cfg!(target_os = "macos") { "mac" } else { "pc" }));
+        }
         _ => {}
     }
 }
@@ -162,6 +179,48 @@ fn lossless(f: &Map<String, Value>) -> bool {
     f.get("lossless").and_then(Value::as_bool).unwrap_or(false)
 }
 
+/// EPS Options › Encoding: (field value, label), in Photoshop's order.
+const EPS_ENCODINGS: [(&str, &str); 7] = [
+    ("ascii", "ASCII"),
+    ("ascii85", "ASCII85"),
+    ("binary", "Binary"),
+    ("jpegLow", "JPEG (low quality)"),
+    ("jpegMedium", "JPEG (medium quality)"),
+    ("jpegHigh", "JPEG (high quality)"),
+    ("jpegMaximum", "JPEG (maximum quality)"),
+];
+
+fn eps_options(f: &Map<String, Value>) -> photocraft_io::EpsOptions {
+    use photocraft_io::{EpsEncoding as E, EpsJpegQuality as Q};
+    let encoding = match s(f, "epsEncoding").as_str() {
+        "ascii" => E::Ascii,
+        "ascii85" => E::Ascii85,
+        "jpegLow" => E::Jpeg(Q::Low),
+        "jpegMedium" => E::Jpeg(Q::Medium),
+        "jpegHigh" => E::Jpeg(Q::High),
+        "jpegMaximum" => E::Jpeg(Q::Maximum),
+        _ => E::Binary,
+    };
+    let preview = if s(f, "epsPreview") == "none" { photocraft_io::EpsPreview::None } else { photocraft_io::EpsPreview::Tiff };
+    photocraft_io::EpsOptions { encoding, preview, interpolate: f.get("epsInterpolate").and_then(Value::as_bool).unwrap_or(false) }
+}
+
+fn raw_options(f: &Map<String, Value>) -> photocraft_io::RawSaveOptions {
+    let d = photocraft_io::RawSaveOptions::default();
+    photocraft_io::RawSaveOptions {
+        header: n(f, "rawHeader", 0.0).clamp(0.0, f64::from(MAX_RAW_HEADER)) as u32,
+        interleaved: f.get("rawInterleaved").and_then(Value::as_bool).unwrap_or(d.interleaved),
+        little_endian: match s(f, "rawByteOrder").as_str() {
+            "mac" => false,
+            "pc" => true,
+            _ => d.little_endian,
+        },
+    }
+}
+
+/// The largest Photoshop Raw header Photoshop accepts.
+const MAX_RAW_HEADER: u32 = 1_919_999;
+
 pub(crate) fn settings(f: &Map<String, Value>) -> ExportSettings {
     let fmt = s_fmt(f);
     let quality = n(f, "quality", 85.0).clamp(1.0, 100.0) as u8;
@@ -170,6 +229,9 @@ pub(crate) fn settings(f: &Map<String, Value>) -> ExportSettings {
         webp_lossless: fmt != "webp" || lossless(f),
         webp_quality: (fmt == "webp" && !lossless(f)).then_some(quality),
         pdf_jpeg_quality: pdf_jpeg(f).then_some(quality),
+        jpeg2000_quality: (fmt == "jp2" && !lossless(f)).then(|| n(f, "quality", 50.0).clamp(0.0, 100.0) as u8),
+        eps: eps_options(f),
+        photoshop_raw: raw_options(f),
         // Export As writes a plain PDF unless asked to keep the layers inside.
         pdf_editable: s_fmt(f) == "pdf" && f.get("pdfEditable").and_then(Value::as_bool).unwrap_or(false),
         xmp_all: s(f, "metadata") == "all",
@@ -205,7 +267,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                 }
             });
             let fmt = s_fmt(f);
-            if fmt == "webp" {
+            if fmt == "webp" || fmt == "jp2" {
                 let mut ll = lossless(f);
                 crate::widgets::checkbox(ui, &mut ll, tl!("Lossless"));
                 f.insert("lossless".into(), json!(ll));
@@ -229,6 +291,57 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                 let mut q = n(f, "quality", 85.0) as f32;
                 crate::widgets::slider_row(ui, tl!("Quality"), &mut q, 1.0..=100.0, "%", None);
                 f.insert("quality".into(), json!(q.round()));
+            }
+            if fmt == "jp2" && !lossless(f) {
+                let mut q = n(f, "quality", 50.0) as f32;
+                crate::widgets::slider_row(ui, tl!("Quality"), &mut q, 0.0..=100.0, "", None);
+                f.insert("quality".into(), json!(q.round()));
+            }
+            if fmt == "eps" {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(tl!("Preview")).color(t.text_dim));
+                    let mut p = if s(f, "epsPreview") == "none" { "none".to_string() } else { "tiff".to_string() };
+                    let opts: Vec<(String, &str)> = vec![("none".into(), tl!("None")), ("tiff".into(), tl!("TIFF (8 bits/pixel)"))];
+                    if crate::widgets::dropdown(ui, "export-eps-preview", &mut p, &opts, 150.0) {
+                        f.insert("epsPreview".into(), json!(p));
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(tl!("Encoding")).color(t.text_dim));
+                    let mut e = s(f, "epsEncoding");
+                    if !EPS_ENCODINGS.iter().any(|(k, _)| *k == e) {
+                        e = "binary".into();
+                    }
+                    let opts: Vec<(String, &str)> = EPS_ENCODINGS.iter().map(|(k, l)| (k.to_string(), tl!(l))).collect();
+                    if crate::widgets::dropdown(ui, "export-eps-encoding", &mut e, &opts, 150.0) {
+                        f.insert("epsEncoding".into(), json!(e));
+                    }
+                });
+                let mut interp = f.get("epsInterpolate").and_then(Value::as_bool).unwrap_or(false);
+                crate::widgets::checkbox(ui, &mut interp, tl!("Image Interpolation"));
+                f.insert("epsInterpolate".into(), json!(interp));
+            }
+            if fmt == "raw" {
+                let mut header = n(f, "rawHeader", 0.0) as f32;
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(tl!("Header")).color(t.text_dim));
+                    crate::widgets::value_field(ui, &mut header, 0.0..=MAX_RAW_HEADER as f32, " bytes", 90.0);
+                });
+                f.insert("rawHeader".into(), json!(header.round()));
+                let mut inter = raw_options(f).interleaved;
+                crate::widgets::checkbox(ui, &mut inter, tl!("Interleaved"));
+                f.insert("rawInterleaved".into(), json!(inter));
+                // The byte order only matters for 16- and 32-bit samples.
+                if doc.depth != photocraft_doc::SampleType::U8 {
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new(tl!("Byte Order")).color(t.text_dim));
+                        let mut b = if raw_options(f).little_endian { "pc".to_string() } else { "mac".to_string() };
+                        let opts: Vec<(String, &str)> = vec![("pc".into(), tl!("IBM PC")), ("mac".into(), tl!("Macintosh"))];
+                        if crate::widgets::dropdown(ui, "export-raw-byte-order", &mut b, &opts, 120.0) {
+                            f.insert("rawByteOrder".into(), json!(b));
+                        }
+                    });
+                }
             }
             if keeps_alpha(&fmt) {
                 let mut tr = f.get("transparency").and_then(Value::as_bool).unwrap_or(true);
@@ -261,9 +374,12 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             let layer = f.get("__layer").and_then(Value::as_u64);
             let key = egui::Id::new(("export-preview", doc.id.0, app.session.active().map_or(0, |s| s.revision), layer));
             let sig = format!(
-                "{}{}{}{}{}{}{}",
+                "{}{}{}{}{}{}{}{}{}{}",
                 s_fmt(f),
                 s(f, "pdfCompression"),
+                s(f, "epsEncoding"),
+                s(f, "epsPreview"),
+                n(f, "rawHeader", 0.0),
                 n(f, "quality", 85.0),
                 lossless(f),
                 f.get("transparency").map(|v| v.to_string()).unwrap_or_default(),

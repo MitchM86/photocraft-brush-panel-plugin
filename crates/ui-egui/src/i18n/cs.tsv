@@ -2457,3 +2457,26 @@ fontWeight	Italic	Kurzíva
 	Bit Depth	Bitová hloubka
 	Compression	Komprese
 	Preserve Editing Capabilities	Zachovat možnosti úprav
+	32 bit	32 bitů
+	Byte Order	Pořadí bajtů
+	Dimensions	Rozměry
+	Encoding	Kódování
+	File size:	Velikost souboru:
+	Guess	Odhadnout
+	Header	Záhlaví
+	IBM PC	IBM PC
+	Image Interpolation	Interpolace obrazu
+	Interleaved	Prokládané
+	Macintosh	Macintosh
+	Swap	Prohodit
+	TIFF (8 bits/pixel)	TIFF (8 bitů/pixel)
+	The file is too small for this size.	Soubor je pro tuto velikost příliš malý.
+	The size matches the file.	Velikost odpovídá souboru.
+	{n} bytes past the image are ignored.	Ignorované bajty za obrazem: {n}.
+	ASCII	ASCII
+	ASCII85	ASCII85
+	Binary	Binární
+	JPEG (low quality)	JPEG (nízká kvalita)
+	JPEG (medium quality)	JPEG (střední kvalita)
+	JPEG (high quality)	JPEG (vysoká kvalita)
+	JPEG (maximum quality)	JPEG (maximální kvalita)

@@ -2536,3 +2536,26 @@ fontWeight	Italic	Cursiva
 	Bit Depth	Profundidad de bits
 	Compression	Compresión
 	Preserve Editing Capabilities	Conservar las funciones de edición
+	32 bit	32 bits
+	Byte Order	Orden de bytes
+	Dimensions	Dimensiones
+	Encoding	Codificación
+	File size:	Tamaño de archivo:
+	Guess	Estimar
+	Header	Encabezado
+	IBM PC	IBM PC
+	Image Interpolation	Interpolación de imagen
+	Interleaved	Entrelazado
+	Macintosh	Macintosh
+	Swap	Intercambiar
+	TIFF (8 bits/pixel)	TIFF (8 bits/píxel)
+	The file is too small for this size.	El archivo es demasiado pequeño para este tamaño.
+	The size matches the file.	El tamaño coincide con el archivo.
+	{n} bytes past the image are ignored.	Se ignoran {n} bytes después de la imagen.
+	ASCII	ASCII
+	ASCII85	ASCII85
+	Binary	Binario
+	JPEG (low quality)	JPEG (calidad baja)
+	JPEG (medium quality)	JPEG (calidad media)
+	JPEG (high quality)	JPEG (calidad alta)
+	JPEG (maximum quality)	JPEG (calidad máxima)

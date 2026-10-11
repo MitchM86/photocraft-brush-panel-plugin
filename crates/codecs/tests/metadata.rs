@@ -106,6 +106,10 @@ fn exr_metadata() {
     check_format(Format::OpenExr);
 }
 #[test]
+fn jpeg2000_metadata() {
+    check_format(Format::Jpeg2000);
+}
+#[test]
 fn hdr_metadata() {
     check_format(Format::Hdr);
 }

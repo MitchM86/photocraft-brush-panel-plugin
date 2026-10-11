@@ -50,6 +50,27 @@ codec_rt!(tiff_rgb16, "tif", ColorMode::Rgb, SampleType::U16, false, 0.0);
 codec_rt!(tiff_cmyk8, "tiff", ColorMode::Cmyk, SampleType::U8, false, 0.0);
 codec_rt!(tiff_cmyka16, "tiff", ColorMode::Cmyk, SampleType::U16, true, 0.0);
 codec_rt!(tiff_gray8, "tiff", ColorMode::Grayscale, SampleType::U8, false, 0.0);
+codec_rt!(jp2_rgba8, "jp2", ColorMode::Rgb, SampleType::U8, true, 0.0);
+codec_rt!(jp2_rgb16, "jp2", ColorMode::Rgb, SampleType::U16, false, 0.0);
+codec_rt!(jp2_cmyk8, "jp2", ColorMode::Cmyk, SampleType::U8, false, 0.0);
+codec_rt!(jp2_cmyka16, "jpf", ColorMode::Cmyk, SampleType::U16, true, 0.0);
+codec_rt!(jp2_graya16, "jp2", ColorMode::Grayscale, SampleType::U16, true, 0.0);
+codec_rt!(j2k_codestream_rgb8, "j2k", ColorMode::Rgb, SampleType::U8, false, 0.0);
+
+/// JPEG 2000 keeps the profile and resolution; `.j2k` is a bare codestream, which holds neither.
+#[test]
+fn jp2_profile_and_resolution() {
+    let mut d = single(ColorMode::Rgb, SampleType::U8, false);
+    d.icc_profile = Some(photocraft_cms::Builtin::AdobeRgbCompat.profile().to_bytes());
+    d.resolution_dpi = 300.0;
+    let r = export(&d, "a.jp2", &ExportOptions::default()).expect("export");
+    assert!(r.bytes.starts_with(b"\0\0\0\x0CjP  "));
+    let back = import("a.jp2", &r.bytes).expect("import").document;
+    assert_eq!(back.icc_profile, d.icc_profile);
+    assert!((back.resolution_dpi - 300.0).abs() < 0.01, "{}", back.resolution_dpi);
+    let r = export(&d, "a.j2k", &ExportOptions::default()).expect("export");
+    assert!(r.bytes.starts_with(&[0xFF, 0x4F, 0xFF, 0x51]));
+}
 
 /// EXR stores linear light: a linear document round-trips exactly; an sRGB (untagged) one is
 /// linearised on export and comes back tagged linear sRGB with the same colours.

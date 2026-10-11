@@ -56,6 +56,10 @@ impl PhotocraftApp {
         if let Some(r) = crate::pdf_import_ui::intercept(self, &display_name(path), Some(path), bytes) {
             return r.map(|()| Vec::new());
         }
+        // Photoshop Raw asks for its size first (Photoshop Raw Options).
+        if let Some(r) = crate::raw_open_ui::intercept(self, &display_name(path), Some(path), bytes) {
+            return r.map(|()| Vec::new());
+        }
         if self.background_jobs {
             // The path and Open Recent are recorded when the background open finishes.
             crate::jobs_ui::start_open(self, &display_name(path), Some(path.to_string()), crate::jobs_ui::bytes(bytes))?;
@@ -93,8 +97,9 @@ impl PhotocraftApp {
         // Documents opening in the background are read on the worker too (a 2 GB PSB read
         // would block the window). Preset files (brushes, gradients) go the usual way.
         let ext = std::path::Path::new(path).extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
-        // PDFs are read here: Import PDF needs the pages before anything opens.
-        if self.background_jobs && !crate::preset_files_ui::PRESET_EXTS.contains(&ext.as_str()) && !matches!(ext.as_str(), "pdf" | "ai") {
+        // PDFs are read here: Import PDF needs the pages before anything opens. So are `.raw`
+        // files: a Photoshop Raw one asks for its size (a camera raw then opens in the background).
+        if self.background_jobs && !crate::preset_files_ui::PRESET_EXTS.contains(&ext.as_str()) && !matches!(ext.as_str(), "pdf" | "ai" | "raw") {
             crate::jobs_ui::start_open(self, &display_name(path), Some(path.to_string()), photocraft_engine::jobs::OpenSource::Path(path.to_string()))?;
             return Ok(Vec::new());
         }

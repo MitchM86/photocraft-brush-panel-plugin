@@ -2741,3 +2741,26 @@ fontWeight	Italic	Курсив
 	Bit Depth	Битовая глубина
 	Compression	Сжатие
 	Preserve Editing Capabilities	Сохранить возможности редактирования
+	32 bit	32 бит
+	Byte Order	Порядок байтов
+	Dimensions	Размеры
+	Encoding	Кодирование
+	File size:	Размер файла:
+	Guess	Подобрать
+	Header	Заголовок
+	IBM PC	IBM PC
+	Image Interpolation	Интерполяция изображения
+	Interleaved	С чередованием
+	Macintosh	Macintosh
+	Swap	Поменять
+	TIFF (8 bits/pixel)	TIFF (8 бит/пиксель)
+	The file is too small for this size.	Файл слишком мал для этого размера.
+	The size matches the file.	Размер соответствует файлу.
+	{n} bytes past the image are ignored.	Пропущено байтов после изображения: {n}.
+	ASCII	ASCII
+	ASCII85	ASCII85
+	Binary	Двоичная
+	JPEG (low quality)	JPEG (низкое качество)
+	JPEG (medium quality)	JPEG (среднее качество)
+	JPEG (high quality)	JPEG (высокое качество)
+	JPEG (maximum quality)	JPEG (наилучшее качество)

@@ -3564,3 +3564,26 @@ fontWeight	Thin	Πολύ λεπτά
 	Art Box	Πλαίσιο γραφικού
 	Bit Depth	Βάθος bit
 	Preserve Editing Capabilities	Διατήρηση δυνατοτήτων επεξεργασίας
+	32 bit	32 bit ανά κανάλι
+	Byte Order	Σειρά byte
+	Dimensions	Διαστάσεις
+	Encoding	Κωδικοποίηση
+	File size:	Μέγεθος αρχείου:
+	Guess	Εκτίμηση
+	Header	Κεφαλίδα
+	IBM PC	IBM PC
+	Image Interpolation	Παρεμβολή εικόνας
+	Interleaved	Εναλλάξ
+	Macintosh	Macintosh
+	Swap	Εναλλαγή
+	TIFF (8 bits/pixel)	TIFF (8 bit/pixel)
+	The file is too small for this size.	Το αρχείο είναι πολύ μικρό για αυτό το μέγεθος.
+	The size matches the file.	Το μέγεθος ταιριάζει με το αρχείο.
+	{n} bytes past the image are ignored.	Αγνοούνται {n} byte μετά την εικόνα.
+	ASCII	ASCII
+	ASCII85	ASCII85
+	Binary	Δυαδική
+	JPEG (low quality)	JPEG (χαμηλή ποιότητα)
+	JPEG (medium quality)	JPEG (μέτρια ποιότητα)
+	JPEG (high quality)	JPEG (υψηλή ποιότητα)
+	JPEG (maximum quality)	JPEG (μέγιστη ποιότητα)

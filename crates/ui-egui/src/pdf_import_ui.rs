@@ -242,7 +242,12 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
     let src = app.pdf_imports.remove(&id).ok_or("the PDF is no longer open in Import PDF")?;
     let pages = selected(f, src.info.pages.len());
     if pages.is_empty() {
-        app.pdf_imports.insert(id, src);
+        // OK closed the dialog: bring it back with the PDF, so a page can be chosen.
+        let again = app.ui.open_dialog(DialogKind::Command, f.clone());
+        if let Some(d) = app.ui.dialog_mut(again) {
+            d.fields.insert("__id".into(), json!(again));
+        }
+        app.pdf_imports.insert(again, src);
         return Err("choose at least one page".into());
     }
     let opts = PdfRaster { ppi: ppi(f), crop: crop(f) };

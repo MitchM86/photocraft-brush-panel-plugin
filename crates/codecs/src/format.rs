@@ -23,6 +23,9 @@ pub enum Format {
     Avif,
     /// HEIF/HEIC (HEVC-coded): read-only; see [`ASYMMETRIC_EXCEPTIONS`].
     Heif,
+    /// JPEG 2000: the JP2 container (`.jp2`, also `.jpf`/`.jpx`) or a bare codestream
+    /// (`.j2k`/`.j2c`).
+    Jpeg2000,
 }
 
 /// What a format can hold **and** what this crate reads/writes for it.
@@ -76,7 +79,7 @@ const ALL_LAYOUTS: &[ChannelLayout] = &[L::Gray, L::GrayA, L::Rgb, L::Rgba, L::C
 
 impl Format {
     /// Every format known to the crate (enabled or not).
-    pub const ALL: [Format; 14] = [
+    pub const ALL: [Format; 15] = [
         Format::Png,
         Format::Jpeg,
         Format::Tiff,
@@ -91,6 +94,7 @@ impl Format {
         Format::Hdr,
         Format::Avif,
         Format::Heif,
+        Format::Jpeg2000,
     ];
 
     pub fn caps(self) -> FormatCaps {
@@ -119,6 +123,7 @@ impl Format {
             Format::Hdr => "Radiance HDR",
             Format::Avif => "AVIF",
             Format::Heif => "HEIF",
+            Format::Jpeg2000 => "JPEG 2000",
         }
     }
 
@@ -140,6 +145,7 @@ impl Format {
             Format::Hdr => &["hdr"],
             Format::Avif => &["avif"],
             Format::Heif => &["heic", "heif", "hif"],
+            Format::Jpeg2000 => &["jp2", "jpf", "jpx", "j2k", "j2c", "jpc"],
         }
     }
 
@@ -159,6 +165,7 @@ impl Format {
             Format::Hdr => "image/vnd.radiance",
             Format::Avif => "image/avif",
             Format::Heif => "image/heif",
+            Format::Jpeg2000 => "image/jp2",
         }
     }
 
@@ -208,6 +215,7 @@ pub fn caps(format: Format) -> FormatCaps {
         Format::Heif => {
             FormatCaps { read: cfg!(feature = "heif"), write: false, depths: &[S::U8, S::U16], icc: true, exif: true, xmp: true, lossy: true, ..base }
         }
+        Format::Jpeg2000 => FormatCaps { depths: &[S::U8, S::U16], layouts: ALL_LAYOUTS, icc: true, xmp: true, dpi: true, ..base },
     }
 }
 
@@ -235,6 +243,9 @@ pub fn detect(bytes: &[u8]) -> Option<Format> {
     }
     if b.starts_with(&[0x76, 0x2F, 0x31, 0x01]) {
         return Some(Format::OpenExr);
+    }
+    if b.starts_with(b"\0\0\0\x0CjP  \r\n\x87\n") || b.starts_with(&[0xFF, 0x4F, 0xFF, 0x51]) {
+        return Some(Format::Jpeg2000);
     }
     if b.starts_with(b"#?RADIANCE") || b.starts_with(b"#?RGBE") {
         return Some(Format::Hdr);

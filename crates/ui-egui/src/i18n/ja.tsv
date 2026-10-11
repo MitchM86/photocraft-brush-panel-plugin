@@ -3476,3 +3476,26 @@ fontWeight	Italic	斜体
 	Bit Depth	ビット数
 	Compression	圧縮
 	Preserve Editing Capabilities	編集機能を保持
+	32 bit	32 ビット
+	Byte Order	バイト順序
+	Dimensions	寸法
+	Encoding	エンコーディング
+	File size:	ファイルサイズ：
+	Guess	推測
+	Header	ヘッダー
+	IBM PC	IBM PC
+	Image Interpolation	画像補間
+	Interleaved	インターリーブ
+	Macintosh	Macintosh
+	Swap	入れ替え
+	TIFF (8 bits/pixel)	TIFF（8 ビット/ピクセル）
+	The file is too small for this size.	このサイズにはファイルが小さすぎます。
+	The size matches the file.	サイズはファイルと一致します。
+	{n} bytes past the image are ignored.	画像の後の {n} バイトは無視されます。
+	ASCII	ASCII
+	ASCII85	ASCII85
+	Binary	バイナリ
+	JPEG (low quality)	JPEG（低画質）
+	JPEG (medium quality)	JPEG（中画質）
+	JPEG (high quality)	JPEG（高画質）
+	JPEG (maximum quality)	JPEG（最高画質）
