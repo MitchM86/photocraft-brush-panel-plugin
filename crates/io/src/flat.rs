@@ -242,8 +242,15 @@ pub(crate) fn csample(s: SampleType) -> CSample {
     }
 }
 
-/// Renders the document to a flat codec image (native pixels when possible).
+/// Renders the document to a flat codec image in its own colour model (native pixels when
+/// possible; a layered CMYK document's composite in CMYK through its profile).
 pub fn document_to_image(doc: &Document, warnings: &mut Vec<String>) -> Result<Image, IoError> {
+    document_image(doc, true, warnings)
+}
+
+/// [`document_to_image`]; with `keep_cmyk` off a layered CMYK document is written in sRGB
+/// straight from the compositor (for formats that can't hold CMYK).
+pub(crate) fn document_image(doc: &Document, keep_cmyk: bool, warnings: &mut Vec<String>) -> Result<Image, IoError> {
     let (w, h) = (doc.size.width, doc.size.height);
     let canvas = doc.bounds();
     let fmt = doc.pixel_format();
@@ -275,6 +282,10 @@ pub fn document_to_image(doc: &Document, warnings: &mut Vec<String>) -> Result<I
             y = y1;
         }
         Image::from_raw(w, h, layout, csample(fmt.sample), data)?
+    } else if keep_cmyk && fmt.mode == ColorMode::Cmyk {
+        warnings.push(format!("{} layer(s) flattened; layers, masks and blend modes are not kept", doc.layer_count()));
+        icc = Some(icc.unwrap_or_else(|| photocraft_cms::Builtin::CoatedCmyk.profile().to_bytes().to_vec()));
+        cmyk_composite(doc)?
     } else {
         let count = doc.layer_count();
         warnings.push(format!("{count} layer(s) flattened; layers, masks and blend modes are not kept"));
@@ -337,6 +348,43 @@ pub fn document_to_image(doc: &Document, warnings: &mut Vec<String>) -> Result<I
     Ok(img.with_icc(icc).with_meta(meta))
 }
 
+/// A layered CMYK document's composite in CMYK (1 = full ink), at 8 bits or else 16: the
+/// compositor works in sRGB through the document's CMYK profile, so each pixel goes back through
+/// the same profile (as the PSD merged image does). Untagged; the caller tags it.
+fn cmyk_composite(doc: &Document) -> Result<Image, IoError> {
+    let sample = if doc.pixel_format().sample == SampleType::U8 { CSample::U8 } else { CSample::U16 };
+    let (w, h) = (doc.size.width, doc.size.height);
+    let space = photocraft_compose::cmyk_space(doc);
+    let mut data = try_buffer(doc.size.area() as usize, ChannelLayout::CmykA.channels() * sample.bytes())?;
+    let mut opaque = true;
+    let mut failed = None;
+    let _ = photocraft_compose::render_bands(doc, doc.bounds(), 0, |band| -> Result<(), ()> {
+        opaque &= band.px.iter().all(|p| p[3] >= 1.0);
+        let parts = crate::pixels::par_map(crate::pixels::bands(band.px.len()), |range| {
+            photocraft_color::convert::with_cmyk_space(space.as_ref(), || {
+                let mut out = Vec::with_capacity(range.len() * 5);
+                for p in &band.px[range] {
+                    out.extend_from_slice(&photocraft_color::convert::rgb_to_cmyk([p[0], p[1], p[2]]));
+                    out.push(p[3]);
+                }
+                out
+            })
+        });
+        let vals: Vec<f32> = parts.concat();
+        let rows = u32::try_from(band.px.len() / (w.max(1) as usize)).unwrap_or(0);
+        match Image::from_normalized(w, rows, ChannelLayout::CmykA, sample, &vals) {
+            Ok(img) => data.extend_from_slice(img.data()),
+            Err(e) => failed = Some(e),
+        }
+        Ok(())
+    });
+    if let Some(e) = failed {
+        return Err(e.into());
+    }
+    let img = Image::from_raw(w, h, ChannelLayout::CmykA, sample, data)?;
+    Ok(if opaque { img.converted(ChannelLayout::Cmyk, sample).into_owned() } else { img })
+}
+
 /// An empty buffer with room for `pixels × bytes_per_pixel` bytes, or an error (not an abort)
 /// when that much memory can't be had.
 pub(crate) fn try_buffer(pixels: usize, bytes_per_pixel: usize) -> Result<Vec<u8>, IoError> {
@@ -384,7 +432,8 @@ pub fn export_flat(doc: &Document, format: Format, opts: &ExportOptions) -> Resu
         return Ok(r);
     }
     let mut warnings = Vec::new();
-    let mut img = document_to_image(doc, &mut warnings)?;
+    let keep_cmyk = format.caps().layouts.iter().any(|l| l.is_cmyk());
+    let mut img = document_image(doc, keep_cmyk, &mut warnings)?;
     if opts.xmp == XmpEmbed::None {
         // Export As's Metadata: None: the packet lists the text of every type layer and one id
         // per placed document (#647).
@@ -618,6 +667,18 @@ fn cmyk_image_to_srgb(img: &Image) -> Result<Image, IoError> {
     Ok(Image::from_normalized(w, h, layout, sample, &out)?.with_icc(Some(dst.to_bytes().to_vec())).with_meta(img.meta.clone()))
 }
 
+/// A Duotone document as RGB: its inks rendered by an adjustment layer on top (`None` without
+/// duotone data).
+pub(crate) fn duotone_as_rgb(doc: &Document) -> Option<Document> {
+    let d = doc.duotone.as_ref()?;
+    let mut shown = doc.clone();
+    shown.layers.push(photocraft_doc::Layer::new("Duotone", photocraft_doc::LayerContent::Adjustment(d.display_adjustment())));
+    shown.mode = ColorMode::Rgb;
+    shown.icc_profile = None;
+    shown.duotone = None;
+    Some(shown)
+}
+
 /// Indexed Color → PNG-8 with its colour table; Duotone → the inks rendered as RGB.
 fn export_mode_specific(doc: &Document, format: Format, opts: &ExportOptions) -> Result<Option<ExportResult>, IoError> {
     match doc.mode {
@@ -639,12 +700,7 @@ fn export_mode_specific(doc: &Document, format: Format, opts: &ExportOptions) ->
             Ok(Some(ExportResult { bytes, warnings }))
         }
         ColorMode::Duotone => {
-            let Some(d) = doc.duotone.as_ref() else { return Ok(None) };
-            let mut shown = doc.clone();
-            shown.layers.push(photocraft_doc::Layer::new("Duotone", photocraft_doc::LayerContent::Adjustment(d.display_adjustment())));
-            shown.mode = ColorMode::Rgb;
-            shown.icc_profile = None;
-            shown.duotone = None;
+            let (Some(d), Some(shown)) = (doc.duotone.as_ref(), duotone_as_rgb(doc)) else { return Ok(None) };
             let mut r = export_flat(&shown, format, opts)?;
             r.warnings.retain(|w| !w.contains("flattened"));
             r.warnings.push(format!("Duotone ({} inks) written as RGB", d.inks.len()));

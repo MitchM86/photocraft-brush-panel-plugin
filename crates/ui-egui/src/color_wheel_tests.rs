@@ -144,3 +144,40 @@ fn the_panel_renders_in_both_shapes() {
         }
     }
 }
+
+#[test]
+fn the_cmyk_wheel_shows_and_picks_printable_colours() {
+    use crate::color_picker_ui::out_of_gamut;
+    // Saturated RGB blue and green don't print; the CMYK wheel shows (and picks) what does.
+    for rgb in [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 1.0]] {
+        assert!(out_of_gamut(rgb).is_some(), "{rgb:?} is outside CMYK");
+        let p = shown(WheelKind::Cmyk, rgb);
+        assert!(out_of_gamut(p).is_none(), "{rgb:?} shown as {p:?}");
+        assert_eq!(shown(WheelKind::Rgb, rgb), rgb, "the RGB wheel shows it as it is");
+    }
+    // Printable colours stay (nearly) as they are.
+    let tan = [0.7, 0.55, 0.4];
+    assert!(shown(WheelKind::Cmyk, tan).iter().zip(tan).all(|(a, b)| (a - b).abs() < 0.03));
+    // The hue ring is the RGB one: cyan opposite red.
+    assert_eq!(wheel_to_hue(WheelKind::Cmyk, 180.0), 180.0);
+    assert_eq!(serde_json::to_value(WheelKind::Cmyk).unwrap(), "cmyk");
+
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    app.session.tools.foreground = [0.8, 0.2, 0.2, 1.0];
+    app.ui.color_wheel.kind = WheelKind::Cmyk;
+    let mut h = harness(app);
+    let r = last_rects(&h.ctx).expect("drawn");
+    // Blue on the ring: the foreground becomes the printable blue.
+    click(&mut h, ring_point(r.center, (r.inner + r.outer) / 2.0, 240.0));
+    let fg = h.state().session.tools.foreground;
+    assert!(out_of_gamut([fg[0], fg[1], fg[2]]).is_none(), "{fg:?}");
+    assert!(fg[2] > fg[0] && fg[2] > fg[1], "still blue: {fg:?}");
+    // An unprintable colour set elsewhere shows ⚠; the panel still draws.
+    h.state_mut().session.tools.foreground = [0.0, 1.0, 0.0, 1.0];
+    h.run_steps(2);
+    if let Some(dir) = std::env::var_os("PHOTOCRAFT_UI_SHOT")
+        && let Ok(img) = h.render()
+    {
+        let _ = img.save(std::path::Path::new(&dir).join("color-wheel-cmyk.png"));
+    }
+}

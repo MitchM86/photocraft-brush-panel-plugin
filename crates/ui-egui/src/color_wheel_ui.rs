@@ -1,7 +1,12 @@
 //! The Color Wheel panel (Color group, between Color and Swatches): a hue ring around a
-//! saturation / brightness square or triangle, colour harmonies, recent colours, and an RGB or
-//! painter's RYB wheel. It edits the foreground or background colour, the chip the Color panel
-//! edits (`color_panel.background`), so both panels stay in step.
+//! saturation / brightness square or triangle, colour harmonies, recent colours, and an RGB,
+//! painter's RYB or CMYK wheel. It edits the foreground or background colour, the chip the Color
+//! panel edits (`color_panel.background`), so both panels stay in step.
+//!
+//! The CMYK wheel is for print: everything on it is shown as it prints (each colour through the
+//! CMYK profile and back: the active CMYK document's, else the working CMYK), a colour picked
+//! on it is the printable one, its ink percentages can be typed, and a colour that won't print
+//! shows Photoshop's ⚠ (a click takes the nearest printable colour).
 //!
 //! The geometry and colour maths are plain functions, tested on their own; the panel draws them
 //! with egui meshes.
@@ -33,6 +38,9 @@ pub enum WheelKind {
     Rgb,
     /// The painter's wheel: red opposite green, yellow opposite violet.
     Ryb,
+    /// The ink wheel: cyan, magenta and yellow opposite red, green and blue, every colour shown
+    /// and picked as it prints.
+    Cmyk,
 }
 
 /// Colours chosen to go with the current one, at fixed angles on the ring.
@@ -109,7 +117,13 @@ fn piecewise(x: f32, table: &[(f32, f32)], inverse: bool) -> f32 {
 /// The RGB hue (degrees) shown at `angle` (degrees) on a `kind` wheel.
 pub fn wheel_to_hue(kind: WheelKind, angle: f32) -> f32 {
     match kind {
-        WheelKind::Rgb => if angle.is_finite() { angle.rem_euclid(360.0) } else { 0.0 },
+        WheelKind::Rgb | WheelKind::Cmyk => {
+            if angle.is_finite() {
+                angle.rem_euclid(360.0)
+            } else {
+                0.0
+            }
+        }
         WheelKind::Ryb => piecewise(angle, &RYB_RGB, false),
     }
 }
@@ -117,7 +131,13 @@ pub fn wheel_to_hue(kind: WheelKind, angle: f32) -> f32 {
 /// Where RGB hue `hue` (degrees) sits on a `kind` wheel (degrees).
 pub fn hue_to_wheel(kind: WheelKind, hue: f32) -> f32 {
     match kind {
-        WheelKind::Rgb => if hue.is_finite() { hue.rem_euclid(360.0) } else { 0.0 },
+        WheelKind::Rgb | WheelKind::Cmyk => {
+            if hue.is_finite() {
+                hue.rem_euclid(360.0)
+            } else {
+                0.0
+            }
+        }
         WheelKind::Ryb => piecewise(hue, &RYB_RGB, true),
     }
 }
@@ -167,6 +187,20 @@ pub fn triangle_point(tri: [Pos2; 3], s: f32, v: f32) -> Pos2 {
     pos2(a * tri[0].x + b * tri[1].x + c * tri[2].x, a * tri[0].y + b * tri[1].y + c * tri[2].y)
 }
 
+/// `rgb` as the wheel shows and picks it: as it prints on a CMYK wheel (through the CMYK profile
+/// in effect, see [`photocraft_color::convert::with_cmyk_space`]), else as it is.
+pub fn shown(kind: WheelKind, rgb: [f32; 3]) -> [f32; 3] {
+    use photocraft_color::convert::{cmyk_to_rgb, rgb_to_cmyk};
+    let proof = |c: [f32; 3]| cmyk_to_rgb(rgb_to_cmyk(c)).map(|v| v.clamp(0.0, 1.0));
+    match kind {
+        // Twice: at the edge of the gamut (full cyan and magenta) one trip through the profile
+        // still lands ~3 ΔE from where the next would, enough for the ⚠ to flag a colour the
+        // wheel itself offered; the second trip settles it.
+        WheelKind::Cmyk => proof(proof(rgb)),
+        _ => rgb,
+    }
+}
+
 fn srgb32(rgb: [f32; 3]) -> Color32 {
     let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
     Color32::from_rgb(q(rgb[0]), q(rgb[1]), q(rgb[2]))
@@ -214,6 +248,19 @@ pub fn last_rects(ctx: &egui::Context) -> Option<WheelRects> {
 }
 
 pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    // The CMYK wheel proofs through the active CMYK document's profile (the working CMYK
+    // otherwise).
+    let space = app.session.active().and_then(|st| photocraft_compose::cmyk_space(&st.doc));
+    photocraft_color::convert::with_cmyk_space(space.as_ref(), || panel_in(app, ui));
+}
+
+/// The ink key for the CMYK fields: the values typed, kept while they still make the colour (a
+/// round trip through the profile would otherwise move them as you type).
+fn ink_key() -> egui::Id {
+    egui::Id::new("color-wheel-inks")
+}
+
+fn panel_in(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let bg = app.ui.color_panel.background;
     let current = if bg { app.session.tools.background } else { app.session.tools.foreground };
@@ -231,7 +278,12 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let bg_r = Rect::from_min_size(r.min + vec2(12.0, 6.0), vec2(20.0, 20.0));
         let chip = |rect: Rect, c: [f32; 4], active: bool| {
             ui.painter().rect_filled(rect, 3.0, srgb32([c[0], c[1], c[2]]));
-            ui.painter().rect_stroke(rect, 3.0, Stroke::new(if active { 2.0 } else { 1.0 }, if active { t.accent } else { t.field_border }), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(
+                rect,
+                3.0,
+                Stroke::new(if active { 2.0 } else { 1.0 }, if active { t.accent } else { t.field_border }),
+                egui::StrokeKind::Inside,
+            );
         };
         // The edited one on top.
         if bg {
@@ -252,15 +304,18 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             next.shape = WheelShape::Triangle;
         }
         ui.add_space(4.0);
-        let kinds = [(WheelKind::Rgb, "RGB"), (WheelKind::Ryb, "RYB")];
-        widgets::dropdown(ui, "color-wheel-kind", &mut next.kind, &kinds, 62.0);
+        let kinds = [(WheelKind::Rgb, "RGB"), (WheelKind::Ryb, "RYB"), (WheelKind::Cmyk, "CMYK")];
+        widgets::dropdown(ui, "color-wheel-kind", &mut next.kind, &kinds, 70.0);
         let harmonies: Vec<(Harmony, &str)> = Harmony::ALL.iter().map(|h| (*h, tl!(h.label()))).collect();
         widgets::dropdown(ui, "color-wheel-harmony", &mut next.harmony, &harmonies, (ui.available_width() - 4.0).clamp(90.0, 170.0));
     });
     ui.add_space(6.0);
 
     // The wheel: as large as the panel allows above the harmony and recent rows.
-    let rows = 32.0 + if st.harmony == Harmony::None { 0.0 } else { 30.0 } + if st.recent.is_empty() { 0.0 } else { 30.0 };
+    let rows = 32.0
+        + if st.harmony == Harmony::None { 0.0 } else { 30.0 }
+        + if st.recent.is_empty() { 0.0 } else { 30.0 }
+        + if st.kind == WheelKind::Cmyk { 30.0 } else { 0.0 };
     let side = ui.available_width().min((ui.available_height() - rows).max(120.0)).max(120.0);
     let (area, resp) = ui.allocate_exact_size(vec2(ui.available_width(), side), Sense::click_and_drag());
     let c = area.center();
@@ -272,7 +327,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut ring = Mesh::default();
     for k in 0..=n {
         let a = k as f32 / n as f32 * 360.0;
-        let col = srgb32(hsv_to_rgb(wheel_to_hue(st.kind, a), 1.0, 1.0));
+        let col = srgb32(shown(st.kind, hsv_to_rgb(wheel_to_hue(st.kind, a), 1.0, 1.0)));
         ring.colored_vertex(ring_point(c, inner, a), col);
         ring.colored_vertex(ring_point(c, outer, a), col);
     }
@@ -294,7 +349,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             for y in 0..=g {
                 for x in 0..=g {
                     let (s, v) = (x as f32 / g as f32, 1.0 - y as f32 / g as f32);
-                    m.colored_vertex(pos2(sq.left() + s * sq.width(), sq.top() + (1.0 - v) * sq.height()), srgb32(hsv_to_rgb(hue, s, v)));
+                    m.colored_vertex(pos2(sq.left() + s * sq.width(), sq.top() + (1.0 - v) * sq.height()), srgb32(shown(st.kind, hsv_to_rgb(hue, s, v))));
                 }
             }
             for y in 0..g as u32 {
@@ -320,7 +375,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     let v = a + b;
                     let s = if v > 1e-6 { a / v } else { 0.0 };
                     let p = pos2(a * tri[0].x + b * tri[1].x + (1.0 - a - b) * tri[2].x, a * tri[0].y + b * tri[1].y + (1.0 - a - b) * tri[2].y);
-                    m.colored_vertex(p, srgb32(hsv_to_rgb(hue, s, v.min(1.0))));
+                    m.colored_vertex(p, srgb32(shown(st.kind, hsv_to_rgb(hue, s, v.min(1.0)))));
                 }
             }
             for i in 0..g {
@@ -363,7 +418,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             s = ((p.x - square.left()) / square.width()).clamp(0.0, 1.0);
             v = 1.0 - ((p.y - square.top()) / square.height()).clamp(0.0, 1.0);
         }
-        let rgb = hsv_to_rgb(h, s, v);
+        let rgb = shown(st.kind, hsv_to_rgb(h, s, v));
         let col = [rgb[0], rgb[1], rgb[2], 1.0];
         set_color(app, col);
         ui.data_mut(|d| d.insert_temp(hue_key(), h));
@@ -411,7 +466,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             let offsets = std::iter::once(0.0).chain(st.harmony.offsets().iter().copied());
             for (k, off) in offsets.enumerate().take(4) {
                 let h = wheel_to_hue(st.kind, a + off);
-                let rgb = hsv_to_rgb(h, cur_s, cur_v);
+                let rgb = shown(st.kind, hsv_to_rgb(h, cur_s, cur_v));
                 let (r, sr) = ui.allocate_exact_size(vec2(36.0, 22.0), Sense::click());
                 ui.painter().rect_filled(r, t.radius_sm, srgb32(rgb));
                 ui.painter().rect_stroke(r, t.radius_sm, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
@@ -422,6 +477,46 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     let col = [rgb[0], rgb[1], rgb[2], 1.0];
                     set_color(app, col);
                     ui.data_mut(|d| d.insert_temp(hue_key(), h));
+                    remember(&mut next.recent, col);
+                }
+            }
+        });
+    }
+    // CMYK: the ink percentages (typed values set the colour), and ⚠ when it won't print.
+    if st.kind == WheelKind::Cmyk {
+        ui.add_space(6.0);
+        let now = if app.ui.color_panel.background { app.session.tools.background } else { app.session.tools.foreground };
+        let rgb = [now[0], now[1], now[2]];
+        let kept: Option<([f32; 4], String)> = ui.data(|d| d.get_temp(ink_key()));
+        let mut inks = kept.filter(|(_, hex)| *hex == crate::color_picker_ui::hex(rgb)).map_or_else(|| photocraft_color::convert::rgb_to_cmyk(rgb), |(k, _)| k);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            let mut typed = false;
+            for (i, name) in ["C", "M", "Y", "K"].into_iter().enumerate() {
+                ui.add_space(if i == 0 { 0.0 } else { 3.0 });
+                ui.label(egui::RichText::new(name).color(t.text_dim));
+                let mut pct = (inks[i] * 100.0).round();
+                if widgets::value_field(ui, &mut pct, 0.0..=100.0, "%", 52.0).changed() {
+                    inks[i] = (pct / 100.0).clamp(0.0, 1.0);
+                    typed = true;
+                }
+            }
+            if typed {
+                let rgb = photocraft_color::convert::cmyk_to_rgb(inks).map(|c| c.clamp(0.0, 1.0));
+                set_color(app, [rgb[0], rgb[1], rgb[2], 1.0]);
+                ui.data_mut(|d| d.insert_temp(ink_key(), (inks, crate::color_picker_ui::hex(rgb))));
+            }
+            if let Some(near) = crate::color_picker_ui::out_of_gamut(rgb) {
+                let (r, resp) = ui.allocate_exact_size(vec2(30.0, 18.0), Sense::click());
+                let icon = Rect::from_min_size(r.min + vec2(0.0, 2.0), vec2(13.0, 13.0));
+                let chip = Rect::from_min_size(pos2(icon.right() + 4.0, r.top() + 4.0), vec2(10.0, 10.0));
+                crate::color_picker_ui::warning_triangle(ui.painter(), icon, t.text, t.chrome);
+                ui.painter().rect_filled(chip, 0.0, srgb32(near));
+                ui.painter().rect_stroke(chip, 0.0, Stroke::new(1.0, t.text_dim), egui::StrokeKind::Outside);
+                let tip = tl!("Out of gamut for printing: click for the nearest printable colour");
+                if resp.on_hover_text(tip).clicked() {
+                    let col = [near[0], near[1], near[2], 1.0];
+                    set_color(app, col);
                     remember(&mut next.recent, col);
                 }
             }

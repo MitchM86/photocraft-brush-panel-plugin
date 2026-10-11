@@ -156,10 +156,11 @@ pub fn saves_in_place(path: &str) -> bool {
 }
 
 /// Whether the lower-case extension `ext` names a layered document format (PSD, PSB, OpenRaster,
-/// .pcraft). A save to one becomes the document's file; any other format is a copy for automation
-/// saves, desktop and headless alike (#1547, #2579).
+/// .pcraft, and Photoshop PDF, which keeps the layered document inside). A save to one becomes the
+/// document's file; any other format is a copy for automation saves, desktop and headless alike
+/// (#1547, #2579).
 pub fn layered_extension(ext: &str) -> bool {
-    matches!(ext, "psd" | "psb" | "pcraft" | "ora")
+    matches!(ext, "psd" | "psb" | "pcraft" | "ora" | "pdf")
 }
 
 /// Whether `path` names a document template (.psdt). A template opens as a new untitled document

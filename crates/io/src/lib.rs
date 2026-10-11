@@ -45,6 +45,8 @@ pub mod linked;
 mod multichannel_map;
 mod ora;
 pub mod pattern_map;
+mod pdf;
+pub mod pdf_import;
 mod pdn;
 pub mod pixels;
 mod psd_export;
@@ -64,6 +66,7 @@ use photocraft_psd::{PsdError, PsdFile};
 
 pub use adjust_map::ADJUSTMENT_KEYS;
 pub use flat::{document_to_image, import_tiff_page, tga_alpha_channel_to_transparency};
+pub use pdf::PdfCompression;
 pub use psd_export::{PsdExportOptions, document_to_psd, document_to_psd_with};
 pub use psd_import::{psd_to_document, psd_to_document_with};
 
@@ -162,11 +165,24 @@ pub struct ExportOptions {
     /// PSD/PSB always keep XMP; `.pcraft` keeps both. Everything by default, as Save As does;
     /// Export As offers None.
     pub xmp: XmpEmbed,
+    /// PDF: how the image is compressed (ZIP, or JPEG at a quality).
+    pub pdf: PdfCompression,
+    /// PDF: keep the layered document inside (Photoshop's "Preserve Photoshop Editing
+    /// Capabilities"), so it reopens with its layers. On by default, as Save As does; Export As
+    /// writes a plain PDF.
+    pub pdf_editable: bool,
 }
 
 impl Default for ExportOptions {
     fn default() -> Self {
-        ExportOptions { encode: EncodeOptions::default(), force_psb: false, tiff_layers: false, xmp: XmpEmbed::All }
+        ExportOptions {
+            encode: EncodeOptions::default(),
+            force_psb: false,
+            tiff_layers: false,
+            xmp: XmpEmbed::All,
+            pdf: PdfCompression::Zip,
+            pdf_editable: true,
+        }
     }
 }
 
@@ -211,6 +227,10 @@ fn import_stages(name: &str, bytes: &[u8], ctl: &photocraft_raster::Interrupt, m
     // A declared native extension must reach its loader so malformed bundles retain format errors.
     if has_extension(name, photocraft_format::EXTENSION) || photocraft_format::is_pcraft(bytes) {
         return Ok(ImportResult { document: photocraft_format::load_from_bytes(bytes)?, warnings: Vec::new(), source_read_only: false, preview_only: false });
+    }
+    // Illustrator files are PDFs too, and open the same way (as in Photoshop).
+    if !is_psd(bytes) && (has_extension(name, "pdf") || ((has_extension(name, "ai") || !has_extension(name, "svg")) && pdf_import::is_pdf(bytes))) {
+        return pdf_import::import(name, bytes);
     }
     if is_psd(bytes) {
         let file = PsdFile::from_bytes(bytes)?;
@@ -276,6 +296,9 @@ pub fn export(doc: &Document, name_or_ext: &str, opts: &ExportOptions) -> Result
     }
     if ext == "ora" {
         return ora::export(doc);
+    }
+    if ext == "pdf" {
+        return pdf::export(doc, opts);
     }
     if ext == photocraft_format::EXTENSION {
         let previews = photocraft_format::SaveOptions {

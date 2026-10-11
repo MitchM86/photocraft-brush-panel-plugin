@@ -42,8 +42,8 @@ pub mod chrome_ui;
 pub mod cjk_fonts;
 pub mod clip_line_ui;
 pub mod color_picker_ui;
-pub mod color_wheel_ui;
 pub mod color_range_ui;
+pub mod color_wheel_ui;
 pub mod comps_ui;
 pub mod control;
 pub mod credits;
@@ -116,6 +116,7 @@ pub mod palette;
 pub mod panels;
 pub mod parity;
 pub mod patch_preview;
+pub mod pdf_import_ui;
 pub mod pen_trace;
 pub mod perspective_ui;
 pub mod pixel_grid;
@@ -202,6 +203,11 @@ pub struct ExportSettings {
     pub webp_lossless: bool,
     /// Lossy WebP quality 1–100 (None = codec default).
     pub webp_quality: Option<u8>,
+    /// PDF: JPEG compression at this quality 1–100 (None = ZIP).
+    pub pdf_jpeg_quality: Option<u8>,
+    /// PDF: keep the layered document inside so it reopens with its layers (Photoshop's
+    /// "Preserve Photoshop Editing Capabilities"; on for Save As, off for Export As).
+    pub pdf_editable: bool,
     /// TIFF: keep the layers (Photoshop layer data); `false` is "Discard Layers and Save a Copy".
     pub tiff_layers: bool,
     /// Embed the document's whole XMP packet. `true` by default (Save As keeps the metadata);
@@ -212,7 +218,15 @@ pub struct ExportSettings {
 
 impl Default for ExportSettings {
     fn default() -> Self {
-        ExportSettings { jpeg_quality: None, webp_lossless: true, webp_quality: None, tiff_layers: true, xmp_all: true }
+        ExportSettings {
+            jpeg_quality: None,
+            webp_lossless: true,
+            webp_quality: None,
+            pdf_jpeg_quality: None,
+            pdf_editable: true,
+            tiff_layers: true,
+            xmp_all: true,
+        }
     }
 }
 
@@ -596,6 +610,8 @@ pub struct PhotocraftApp {
     pub(crate) file_dialog: Option<file_dialog::Pending>,
     /// A Save As to a layered TIFF parked behind the TIFF Options prompt (see `tiff_options_ui`).
     pub(crate) tiff_options: Option<tiff_options_ui::Prompt>,
+    /// PDFs waiting in Import PDF, by dialog id (see `pdf_import_ui`).
+    pub(crate) pdf_imports: HashMap<u64, pdf_import_ui::Source>,
     /// Where each document was last saved or exported to through a dialog (#1826): its next Save
     /// As or export dialog starts there rather than beside the document. Session-only.
     pub(crate) save_dirs: HashMap<photocraft_doc::DocId, std::path::PathBuf>,
@@ -711,6 +727,7 @@ impl PhotocraftApp {
             discard: None,
             file_dialog: None,
             tiff_options: None,
+            pdf_imports: HashMap::new(),
             save_dirs: HashMap::new(),
             allow_close: false,
             stylus: Default::default(),
@@ -990,6 +1007,10 @@ impl PhotocraftApp {
     /// remembers the path. Brush and gradient files go to the preset libraries instead.
     pub fn open_bytes(&mut self, name: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
         if let Some(r) = preset_files_ui::open(self, name, bytes) {
+            return r.map(|()| Vec::new());
+        }
+        // A PDF asks which pages, at what resolution, first (Import PDF).
+        if let Some(r) = pdf_import_ui::intercept(self, name, None, bytes) {
             return r.map(|()| Vec::new());
         }
         let name = &self.open_name(name);

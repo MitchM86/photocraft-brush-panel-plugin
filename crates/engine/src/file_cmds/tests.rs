@@ -565,7 +565,8 @@ fn guide_layouts() {
 
 #[test]
 fn only_layered_files_save_in_place() {
-    for path in ["a.psd", "dir/a.PSB", r"C:\w\a.pcraft", "my.dir/a.psd", "a.ora", "dir/A.ORA"] {
+    // Photoshop PDF keeps the layered document inside, so it saves in place too.
+    for path in ["a.psd", "dir/a.PSB", r"C:\w\a.pcraft", "my.dir/a.psd", "a.ora", "dir/A.ORA", "a.pdf", "Brochure.PDF"] {
         assert!(saves_in_place(path), "{path}");
     }
     // Flat formats, no extension, a dotted folder with an extensionless file, a dot file.

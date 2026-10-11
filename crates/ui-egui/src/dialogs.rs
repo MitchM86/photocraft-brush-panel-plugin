@@ -154,7 +154,11 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 800.0
             } else if about_tabs {
                 700.0
-            } else if d.kind == DialogKind::LayerStyle || d.fields.contains_key("__export") || crate::color_picker_ui::owns(&d.fields) {
+            } else if d.kind == DialogKind::LayerStyle
+                || d.fields.contains_key("__export")
+                || crate::pdf_import_ui::owns(&d.fields)
+                || crate::color_picker_ui::owns(&d.fields)
+            {
                 600.0
             } else {
                 440.0
@@ -224,6 +228,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 DialogKind::Command if crate::color_range_ui::owns(&fields) => crate::color_range_ui::body(app, ui, &mut fields),
                 DialogKind::Command if crate::prefs_ui::owns(&fields) => crate::prefs_ui::body(app, ui, &mut fields),
                 DialogKind::Command if fields.contains_key("__export") => crate::export_dialog::body(app, ui, &mut fields),
+                DialogKind::Command if crate::pdf_import_ui::owns(&fields) => crate::pdf_import_ui::body(app, ui, &mut fields),
                 // Image Size and Canvas Size open on Width, selected (#2329).
                 DialogKind::Command if fields.contains_key("__sizing") => first_field_focused(ui, id, |ui| crate::sizing::body(ui, &mut fields)),
                 DialogKind::Command if crate::adjust_dialog::owns(&fields) => crate::adjust_dialog::body(app, ui, &mut fields),
@@ -436,6 +441,7 @@ pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
         DialogKind::Command if crate::color_range_ui::owns(&d.fields) => crate::color_range_ui::confirm(app, &d.fields),
         DialogKind::Command if crate::prefs_ui::owns(&d.fields) => crate::prefs_ui::confirm(app, &d.fields),
         DialogKind::Command if d.fields.contains_key("__export") => crate::export_dialog::confirm(app, &d.fields),
+        DialogKind::Command if crate::pdf_import_ui::owns(&d.fields) => crate::pdf_import_ui::confirm(app, &d.fields),
         DialogKind::Command => {
             let Some(cmd) = d.fields.get("__command").and_then(Value::as_str).map(str::to_string) else {
                 app.filter_preview = None;
@@ -469,6 +475,7 @@ pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
 /// Cancel a dialog and its dependent Layer Style picker, without applying edits.
 pub fn cancel(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
     app.ui.close_dialog(id).ok_or_else(|| format!("no dialog {id}"))?;
+    crate::pdf_import_ui::closed(app, id);
     app.ui.dialogs.retain(|d| !crate::layer_style::color_picker::child_of(&d.fields, id));
     app.filter_preview = None;
     app.color_range = None;

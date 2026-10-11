@@ -3462,3 +3462,17 @@ fontWeight	Italic	斜体
 	Tetrad	テトラード
 	Recent Colors	最近使用した色
 	Click to edit the foreground or the background color	クリックして描画色または背景色を編集
+	Import PDF	PDF の読み込み
+	Pages	ページ
+	Pages in file:	ファイル内のページ数:
+	Page Options	ページオプション
+	Crop To	トリミング
+	Bounding Box	バウンディングボックス
+	Media Box	メディアボックス
+	Crop Box	トリミングボックス
+	Bleed Box	裁ち落としボックス
+	Trim Box	仕上がりボックス
+	Art Box	アートボックス
+	Bit Depth	ビット数
+	Compression	圧縮
+	Preserve Editing Capabilities	編集機能を保持

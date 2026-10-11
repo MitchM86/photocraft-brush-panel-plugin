@@ -11,7 +11,34 @@ use crate::state::DialogKind;
 use crate::theme::Tokens;
 use crate::{ExportSettings, PhotocraftApp};
 
-const FORMATS: [(&str, &str); 5] = [("png", "PNG"), ("jpg", "JPG"), ("webp", "WebP"), ("tif", "TIFF"), ("tga", "TGA")];
+/// The formats Export As writes (extension, name), in Photoshop's order and naming where it has
+/// them. These are the flat ones; PSD, PSB, .pcraft and OpenRaster keep layers and are in Save As.
+const FORMATS: [(&str, &str); 14] = [
+    ("png", "PNG"),
+    ("jpg", "JPEG"),
+    ("gif", "GIF"),
+    ("webp", "WebP"),
+    ("avif", "AVIF"),
+    ("pdf", "Photoshop PDF"),
+    ("tif", "TIFF"),
+    ("bmp", "BMP"),
+    ("tga", "Targa"),
+    ("exr", "OpenEXR"),
+    ("hdr", "Radiance HDR"),
+    ("pnm", "Portable Bit Map"),
+    ("ico", "ICO"),
+    ("qoi", "QOI"),
+];
+
+/// The Export As formats this build can write (AVIF needs the `avif` feature).
+fn formats() -> impl Iterator<Item = (&'static str, &'static str)> {
+    FORMATS.into_iter().filter(|(ext, _)| photocraft_codecs::from_extension(ext).is_none_or(|f| f.caps().write))
+}
+
+/// Whether `fmt` keeps transparency (PDF as a soft mask); the others are flattened over white.
+fn keeps_alpha(fmt: &str) -> bool {
+    fmt == "pdf" || photocraft_codecs::from_extension(fmt).is_some_and(|f| f.caps().alpha)
+}
 
 pub fn open(app: &mut PhotocraftApp) -> Result<u64, String> {
     let st = app.session.active().ok_or("no document")?;
@@ -89,7 +116,7 @@ fn export_document(doc: &Document, f: &Map<String, Value>, max_side: Option<u32>
             .map_err(|e| e.to_string())?;
     }
     let fmt = s_fmt(f);
-    if !f.get("transparency").and_then(Value::as_bool).unwrap_or(true) || fmt == "jpg" {
+    if !f.get("transparency").and_then(Value::as_bool).unwrap_or(true) || !keeps_alpha(&fmt) {
         s.execute("layer.flattenImage", json!({})).map_err(|e| e.to_string())?;
     }
     s.active().map(|d| (*d.doc).clone()).ok_or_else(|| "export failed".into())
@@ -113,6 +140,10 @@ fn set_format_defaults(f: &mut Map<String, Value>, fmt: &str, prefs: &photocraft
             f.insert("quality".into(), json!(prefs.webp_quality));
             f.insert("lossless".into(), json!(prefs.webp_lossless));
         }
+        "pdf" => {
+            f.insert("quality".into(), json!(prefs.jpeg_quality));
+            f.entry("pdfCompression").or_insert(json!("zip"));
+        }
         _ => {}
     }
 }
@@ -122,17 +153,25 @@ fn s_fmt(f: &Map<String, Value>) -> String {
     if v.is_empty() { "png".into() } else { v }
 }
 
+/// PDF with JPEG compression (else ZIP).
+fn pdf_jpeg(f: &Map<String, Value>) -> bool {
+    s_fmt(f) == "pdf" && s(f, "pdfCompression") == "jpeg"
+}
+
 fn lossless(f: &Map<String, Value>) -> bool {
     f.get("lossless").and_then(Value::as_bool).unwrap_or(false)
 }
 
-fn settings(f: &Map<String, Value>) -> ExportSettings {
+pub(crate) fn settings(f: &Map<String, Value>) -> ExportSettings {
     let fmt = s_fmt(f);
     let quality = n(f, "quality", 85.0).clamp(1.0, 100.0) as u8;
     ExportSettings {
         jpeg_quality: (fmt == "jpg").then_some(quality),
         webp_lossless: fmt != "webp" || lossless(f),
         webp_quality: (fmt == "webp" && !lossless(f)).then_some(quality),
+        pdf_jpeg_quality: pdf_jpeg(f).then_some(quality),
+        // Export As writes a plain PDF unless asked to keep the layers inside.
+        pdf_editable: s_fmt(f) == "pdf" && f.get("pdfEditable").and_then(Value::as_bool).unwrap_or(false),
         xmp_all: s(f, "metadata") == "all",
         ..Default::default()
     }
@@ -160,8 +199,8 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new(tl!("Format")).color(t.text_dim));
                 let mut fmt = s_fmt(f);
-                let opts: Vec<(String, &str)> = FORMATS.iter().map(|(k, l)| (k.to_string(), *l)).collect();
-                if crate::widgets::dropdown(ui, "export-format", &mut fmt, &opts, 130.0) {
+                let opts: Vec<(String, &str)> = formats().map(|(k, l)| (k.to_string(), l)).collect();
+                if crate::widgets::dropdown(ui, "export-format", &mut fmt, &opts, 150.0) {
                     set_format_defaults(f, &fmt, &app.session.prefs().export);
                 }
             });
@@ -171,12 +210,27 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
                 crate::widgets::checkbox(ui, &mut ll, tl!("Lossless"));
                 f.insert("lossless".into(), json!(ll));
             }
-            if fmt == "jpg" || (fmt == "webp" && !lossless(f)) {
+            if fmt == "pdf" {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(tl!("Compression")).color(t.text_dim));
+                    let mut c = if pdf_jpeg(f) { "jpeg".to_string() } else { "zip".to_string() };
+                    let opts: Vec<(String, &str)> = vec![("zip".into(), "ZIP"), ("jpeg".into(), "JPEG")];
+                    if crate::widgets::dropdown(ui, "export-pdf-compression", &mut c, &opts, 110.0) {
+                        f.insert("pdfCompression".into(), json!(c));
+                    }
+                });
+            }
+            if fmt == "pdf" {
+                let mut keep = f.get("pdfEditable").and_then(Value::as_bool).unwrap_or(false);
+                crate::widgets::checkbox(ui, &mut keep, tl!("Preserve Editing Capabilities"));
+                f.insert("pdfEditable".into(), json!(keep));
+            }
+            if fmt == "jpg" || (fmt == "webp" && !lossless(f)) || pdf_jpeg(f) {
                 let mut q = n(f, "quality", 85.0) as f32;
                 crate::widgets::slider_row(ui, tl!("Quality"), &mut q, 1.0..=100.0, "%", None);
                 f.insert("quality".into(), json!(q.round()));
             }
-            if fmt != "jpg" {
+            if keeps_alpha(&fmt) {
                 let mut tr = f.get("transparency").and_then(Value::as_bool).unwrap_or(true);
                 crate::widgets::checkbox(ui, &mut tr, tl!("Transparency"));
                 f.insert("transparency".into(), json!(tr));
@@ -207,8 +261,9 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             let layer = f.get("__layer").and_then(Value::as_u64);
             let key = egui::Id::new(("export-preview", doc.id.0, app.session.active().map_or(0, |s| s.revision), layer));
             let sig = format!(
-                "{}{}{}{}{}{}",
+                "{}{}{}{}{}{}{}",
                 s_fmt(f),
+                s(f, "pdfCompression"),
                 n(f, "quality", 85.0),
                 lossless(f),
                 f.get("transparency").map(|v| v.to_string()).unwrap_or_default(),

@@ -540,7 +540,7 @@ fn swatches(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
 }
 
 /// ⚠: a filled triangle with an exclamation mark cut out of it.
-fn warning_triangle(p: &egui::Painter, r: Rect, ink: Color32, cut: Color32) {
+pub(crate) fn warning_triangle(p: &egui::Painter, r: Rect, ink: Color32, cut: Color32) {
     let tri = vec![pos2(r.center().x, r.top()), pos2(r.right(), r.bottom()), pos2(r.left(), r.bottom())];
     p.add(egui::Shape::convex_polygon(tri, ink, Stroke::NONE));
     let x = r.center().x;

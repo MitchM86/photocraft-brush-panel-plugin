@@ -60,6 +60,9 @@ const SAVE_FILTERS: &[(&str, &[&str])] = &[
     ("TIFF", &["tif"]),
     ("Targa", &["tga"]),
     ("OpenEXR", &["exr"]),
+    ("Photoshop PDF", &["pdf"]),
+    ("GIF", &["gif"]),
+    ("BMP", &["bmp"]),
 ];
 
 /// Non-document files the shell saves (Swatches panel exports): offered alone, so the dialog
@@ -196,6 +199,8 @@ fn export_options(settings: &photocraft_ui_egui::ExportSettings) -> photocraft_i
         opts.encode.webp_quality = q;
     }
     opts.tiff_layers = settings.tiff_layers;
+    opts.pdf_editable = settings.pdf_editable;
+    opts.pdf = settings.pdf_jpeg_quality.map_or(photocraft_io::PdfCompression::Zip, photocraft_io::PdfCompression::Jpeg);
     opts.xmp = if settings.xmp_all { photocraft_io::XmpEmbed::All } else { photocraft_io::XmpEmbed::None };
     opts
 }
