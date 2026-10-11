@@ -2051,6 +2051,8 @@
 	Mixer Brush Tool	Nástroj Míchací štětec
 	Wet	Vlhkost
 	Current brush load ({alt}-click the image to load its colour)	Aktuální náplň štětce ({alt}+klik do obrazu nabere jeho barvu)
+	Erase to History	Mazat do historie
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Místo mazání vrátit zdrojový stav štětce historie ({alt}+tažení: jeden tah)
 	Mix	Míchání
 	Wetness Jitter	Kolísání vlhkosti
 	Mix Jitter	Kolísání míchání

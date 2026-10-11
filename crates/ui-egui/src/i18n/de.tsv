@@ -2018,6 +2018,8 @@
 	Mixer Brush Tool	Mischer-Pinsel-Werkzeug
 	Wet	Feucht
 	Current brush load ({alt}-click the image to load its colour)	Aktuelle Pinselladung ({alt}-Klick ins Bild nimmt dessen Farbe auf)
+	Erase to History	Basierend auf Protokoll löschen
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Statt zu löschen den Quellzustand des Protokollpinsels zurückmalen ({alt}-Ziehen: ein Strich)
 	Mix	Mischen
 	Wetness Jitter	Feuchtigkeitsschwankung
 	Mix Jitter	Mischschwankung

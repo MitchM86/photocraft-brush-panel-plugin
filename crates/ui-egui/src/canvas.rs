@@ -471,7 +471,7 @@ fn begin_live_stroke(app: &PhotocraftApp) -> Option<LiveStroke> {
         EngineStroke::Dab(photocraft_engine::retouch_cmds::LiveDab::begin(&app.session, cmd, &p).ok()?)
     } else if let Some(cmd) = live_retouch_command(d.tool) {
         // The params `retouch_ui::finish_stroke` commits.
-        let mut p = if d.tool == Tool::HistoryBrush { json!({}) } else { crate::retouch_ui::clone_params(app)? };
+        let mut p = if d.tool == Tool::HistoryBrush { crate::eraser_ui::history_params(app) } else { crate::retouch_ui::clone_params(app)? };
         p["points"] = json!(d.points);
         p["target"] = paint_target(app);
         EngineStroke::Retouch(photocraft_engine::retouch_cmds::LiveRetouch::begin(&app.session, cmd, &p).ok()?)
@@ -4188,6 +4188,8 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
                 _ => {}
             }
             crate::paint_mouse::sync_tool_brush(app);
+            // Erase to History (or ⌥) turns an Eraser stroke into a History Brush stroke.
+            let tool = crate::eraser_ui::stroke_tool(app, tool, mods.alt);
             let erase = tool == Tool::Eraser || std::mem::take(&mut app.secondary_erase);
             // ⇧-click after a stroke: a straight line from where it ended (stroke_constraint.rs).
             let active = app.session.active().map(|st| st.doc.id);

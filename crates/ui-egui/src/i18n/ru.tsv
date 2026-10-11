@@ -969,6 +969,8 @@
 	Auto Clean Brush	Автоочистка кисти
 	Wet	Влага
 	Current brush load ({alt}-click the image to load its colour)	Текущая загрузка кисти ({alt}-щелчок по изображению загружает его цвет)
+	Erase to History	Стирать до исторического состояния
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Вместо стирания возвращать исходное состояние архивной кисти ({alt}-перетаскивание: один мазок)
 	Rate	Скорость
 	Airbrush: keeps depositing paint while the pointer rests.	Аэрограф: продолжает наносить краску, пока курсор неподвижен.
 	Pulled String Mode	Режим натянутой нити

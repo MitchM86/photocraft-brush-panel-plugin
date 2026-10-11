@@ -1992,6 +1992,8 @@
 	Mixer Brush	혼합 브러시
 	Wet	젖음
 	Current brush load ({alt}-click the image to load its colour)	현재 브러시 불러오기({alt}-클릭하면 이미지의 색상을 불러옴)
+	Erase to History	작업 내역으로 지우기
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	지우는 대신 작업 내역 브러시의 소스 상태로 다시 칠하기({alt}-드래그: 한 획)
 	Mix	혼합
 	Wetness Jitter	젖음 지터
 	Mix Jitter	혼합 지터

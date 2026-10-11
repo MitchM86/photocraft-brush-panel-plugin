@@ -2036,6 +2036,8 @@
 	Mixer Brush Tool	混合ブラシツール
 	Wet	ウェット
 	Current brush load ({alt}-click the image to load its colour)	現在のブラシの補充量（{alt}+クリックで画像の色を補充）
+	Erase to History	ヒストリーで消去
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	消去せずにヒストリーブラシのソースの状態を描き戻す（{alt}+ドラッグ: 1 ストローク）
 	Mix	混合
 	Wetness Jitter	ウェットのジッター
 	Mix Jitter	混合のジッター

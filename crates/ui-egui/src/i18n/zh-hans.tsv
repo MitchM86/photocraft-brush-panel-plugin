@@ -2093,6 +2093,8 @@ cameraRaw	Blending	混合
 	Mixer Brush	混合器画笔
 	Wet	湿润
 	Current brush load ({alt}-click the image to load its colour)	当前画笔载入（{alt}-单击图像以载入其颜色）
+	Erase to History	抹到历史记录
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	不擦除，而是绘回历史记录画笔的源状态（{alt}-拖动：一笔）
 	Mix	混合
 	Wetness Jitter	湿润度抖动
 	Mix Jitter	混合抖动

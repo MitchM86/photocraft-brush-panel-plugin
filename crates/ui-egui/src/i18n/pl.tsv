@@ -2025,6 +2025,8 @@
 	Mixer Brush Tool	Narzędzie Pędzel mieszający
 	Wet	Wilgotność
 	Current brush load ({alt}-click the image to load its colour)	Bieżące nasycenie pędzla ({alt}-klik w obrazie pobiera jego kolor)
+	Erase to History	Wymaż do historii
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Zamiast wymazywać, przywróć stan źródłowy pędzla historii ({alt}-przeciągnięcie: jedno pociągnięcie)
 	Mix	Mieszanie
 	Wetness Jitter	Rozrzut wilgotności
 	Mix Jitter	Rozrzut mieszania

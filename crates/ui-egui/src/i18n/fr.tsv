@@ -1999,6 +1999,8 @@
 	Mixer Brush	Pinceau mélangeur
 	Wet	Humidité
 	Current brush load ({alt}-click the image to load its colour)	Charge actuelle de la forme ({alt}-clic dans l'image pour charger sa couleur)
+	Erase to History	Effacer à partir de l'historique
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Repeindre l'état source du pinceau d'historique au lieu d'effacer ({alt}-glisser : un tracé)
 	Mix	Mélange
 	Wetness Jitter	Variation de l'humidité
 	Mix Jitter	Variation du mélange

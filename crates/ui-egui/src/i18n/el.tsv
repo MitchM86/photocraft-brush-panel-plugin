@@ -1895,6 +1895,8 @@
 	Mixer Brush Tool	Πινέλο ανάμειξης (Mixer Brush Tool)
 	Wet	Υγρασία
 	Current brush load ({alt}-click the image to load its colour)	Τρέχουσα φόρτωση πινέλου ({alt}-κλικ στην εικόνα φορτώνει το χρώμα της)
+	Erase to History	Σβήσιμο στο ιστορικό
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Επαναφορά της κατάστασης πηγής του πινέλου ιστορικού αντί για σβήσιμο ({alt}-σύρσιμο: μία πινελιά)
 	Load	Φόρτωση
 	Mix	Ανάμειξη
 	8 bit	8 bit ανά κανάλι

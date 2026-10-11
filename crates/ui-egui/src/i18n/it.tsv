@@ -2032,6 +2032,8 @@
 	Mixer Brush Tool	Strumento Pennello miscelatore
 	Wet	Bagnato
 	Current brush load ({alt}-click the image to load its colour)	Carico attuale del pennello ({alt}-clic sull'immagine per caricarne il colore)
+	Erase to History	Cancella fino alla storia
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Ridipingi lo stato sorgente del pennello storia invece di cancellare ({alt}-trascina: un tratto)
 	Mix	Miscela
 	Wetness Jitter	Variazione bagnato
 	Mix Jitter	Variazione miscela

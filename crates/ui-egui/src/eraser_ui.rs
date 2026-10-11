@@ -66,6 +66,28 @@ pub fn mode_dropdown(ui: &mut egui::Ui, mode: &mut String) -> bool {
     widgets::dropdown(ui, "eraser-mode", mode, &modes, 96.0)
 }
 
+/// The Eraser's Erase to History checkbox, with Photoshop's ⌥ shortcut in its tooltip.
+pub fn history_checkbox(ui: &mut egui::Ui, on: &mut bool) {
+    widgets::vline(ui, 22.0);
+    let tip = crate::i18n::fmt(
+        tl!("Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)"),
+        &[("alt", &crate::shortcuts::pretty("Alt"))],
+    );
+    widgets::checkbox(ui, on, tl!("Erase to History")).on_hover_text(tip);
+}
+
+/// The tool an Eraser stroke runs as: the History Brush with Erase to History on or ⌥ held (the
+/// Eraser's own brush, size and opacity paint it), else the Eraser.
+pub fn stroke_tool(app: &PhotocraftApp, tool: Tool, alt: bool) -> Tool {
+    if tool == Tool::Eraser && (app.ui.tool_options.erase_to_history || alt) { Tool::HistoryBrush } else { tool }
+}
+
+/// `paint.historyBrush` params beyond the brush: a Pencil-mode Eraser erasing to history paints
+/// with a hard edge, as it erases.
+pub fn history_params(app: &PhotocraftApp) -> Value {
+    if pencil_mode(app, app.ui.tool) { json!({"hardness": 100}) } else { json!({}) }
+}
+
 fn opt(ui: &mut egui::Ui, text: &str) {
     let t = Tokens::get(ui.ctx());
     ui.label(egui::RichText::new(tl!(&text)).color(t.text_dim).size(12.0));

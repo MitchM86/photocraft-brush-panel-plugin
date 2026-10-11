@@ -578,6 +578,9 @@ pub struct ToolOptions {
     /// `paint.pencil`), as in Photoshop's options bar (#2662).
     #[serde(default = "default_eraser_mode")]
     pub eraser_mode: String,
+    /// Eraser › Erase to History: strokes paint back the History Brush's source state instead of
+    /// erasing (⌥-drag does it for one stroke), as in Photoshop.
+    pub erase_to_history: bool,
     /// Magnetic Lasso: detection width (px, 1..256), edge contrast (%, 1..100), how often it
     /// fastens points by itself (0..100), and whether pen pressure narrows the width.
     pub magnetic_width: f32,
@@ -718,6 +721,7 @@ impl Default for ToolOptions {
             zoom_scrubby: true,
             pencil_auto_erase: false,
             eraser_mode: default_eraser_mode(),
+            erase_to_history: false,
             magnetic_width: 10.0,
             magnetic_contrast: 10.0,
             magnetic_frequency: 57.0,

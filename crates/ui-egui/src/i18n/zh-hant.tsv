@@ -2033,6 +2033,8 @@
 	Mixer Brush Tool	混合器筆刷工具
 	Wet	濕度
 	Current brush load ({alt}-click the image to load its colour)	目前筆刷載入（{alt}-按一下影像以載入其顏色）
+	Erase to History	清除至步驟記錄
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	不擦除，而是繪回步驟記錄筆刷的來源狀態（{alt}-拖曳：一筆）
 	Mix	混合
 	Wetness Jitter	濕度快速變換
 	Mix Jitter	混合快速變換

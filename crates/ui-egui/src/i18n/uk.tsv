@@ -949,6 +949,8 @@
 	Auto Clean Brush	Автоматично очищувати пензель
 	Wet	Вологість
 	Current brush load ({alt}-click the image to load its colour)	Поточне завантаження пензля ({alt}+клацання по зображенню завантажує його колір)
+	Erase to History	Стирати до історії
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Замість стирання повертати вихідний стан пензля історії ({alt}+перетягування: один мазок)
 	Rate	Частота
 	Airbrush: keeps depositing paint while the pointer rests.	Аерограф: продовжує наносити фарбу, коли вказівник нерухомий.
 	Pulled String Mode	Режим натягнутої нитки

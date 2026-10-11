@@ -2034,6 +2034,8 @@
 	Mixer Brush Tool	Herramienta Pincel mezclador
 	Wet	Húmedo
 	Current brush load ({alt}-click the image to load its colour)	Carga actual del pincel ({alt}-clic en la imagen para cargar su color)
+	Erase to History	Borrar a historia
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Volver a pintar el estado de origen del pincel de historia en lugar de borrar ({alt}-arrastrar: un trazo)
 	Mix	Mezcla
 	Wetness Jitter	Variación de humedad
 	Mix Jitter	Variación de mezcla

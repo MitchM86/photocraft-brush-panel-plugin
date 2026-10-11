@@ -2005,6 +2005,8 @@
 	Mixer Brush Tool	Mengpenseelgereedschap
 	Wet	Nat
 	Current brush load ({alt}-click the image to load its colour)	Huidige penseellading ({alt}-klik in de afbeelding om de kleur te laden)
+	Erase to History	Wissen naar historie
+	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	In plaats van wissen de bronstatus van het historiepenseel terugschilderen ({alt}-slepen: één streek)
 	Mix	Mengen
 	Wetness Jitter	Nattigheidsvariatie
 	Mix Jitter	Mengvariatie

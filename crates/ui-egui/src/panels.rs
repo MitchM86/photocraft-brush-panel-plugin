@@ -870,6 +870,9 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         if icons::button(ui, "circle-dot", 24.0, b.pressure_size, tl!("Always use pressure for size")).clicked() {
                             b.pressure_size = !b.pressure_size;
                         }
+                        if app.ui.tool == Tool::Eraser {
+                            crate::eraser_ui::history_checkbox(ui, &mut app.ui.tool_options.erase_to_history);
+                        }
                     }
                     // Pencil: Photoshop's options (no hardness or flow: the pencil is always hard).
                     Tool::Pencil => {
@@ -914,6 +917,9 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         widgets::toggle(ui, &mut b.pressure_size, tl!("Pressure for Size"));
                         widgets::toggle(ui, &mut b.pressure_opacity, tl!("Pressure for Opacity"));
                         widgets::toggle(ui, &mut b.pressure_flow, tl!("Pressure for Flow"));
+                        if app.ui.tool == Tool::Eraser {
+                            crate::eraser_ui::history_checkbox(ui, &mut app.ui.tool_options.erase_to_history);
+                        }
                     }
                     Tool::MixerBrush => {
                         brush_preset_chip(ui, b, &mut app.ui);

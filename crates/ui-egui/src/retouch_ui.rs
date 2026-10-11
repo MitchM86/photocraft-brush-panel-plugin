@@ -110,7 +110,7 @@ pub fn finish_stroke(app: &mut PhotocraftApp, tool: Tool, points: &[[f64; 3]], m
             };
             (if tool == Tool::Healing { "paint.healingBrush" } else { "paint.cloneStamp" }, p)
         }
-        Tool::HistoryBrush => ("paint.historyBrush", json!({})),
+        Tool::HistoryBrush => ("paint.historyBrush", crate::eraser_ui::history_params(app)),
         Tool::Blur | Tool::Sharpen | Tool::Smudge | Tool::Dodge | Tool::Burn | Tool::Sponge => match dab_params(app, tool, mods) {
             Some(cp) => cp,
             None => return false,
@@ -493,6 +493,32 @@ mod tests {
         tool_event(app, ToolEvent::Move { x: 50.0, y: 30.0, pressure: 1.0 }, m);
         tool_event(app, ToolEvent::Up { x: 50.0, y: 30.0 }, m);
         assert!(!app.ui.status_error, "{tool:?}: {}", app.ui.status);
+    }
+
+    #[test]
+    fn eraser_erases_to_history_with_the_option_or_alt() {
+        let run = |history: bool, mods: egui::Modifiers| {
+            let mut app = app();
+            let white = active(&app).surface().unwrap().rgba(30, 30);
+            app.run("paint.pencil", json!({"points": [[10, 30], [50, 30]], "size": 20, "color": "#ff0000"})).unwrap();
+            app.ui.tool = Tool::Eraser;
+            app.ui.tool_options.erase_to_history = history;
+            tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 30.0, pressure: 1.0 }, mods);
+            tool_event(&mut app, ToolEvent::Move { x: 50.0, y: 30.0, pressure: 1.0 }, mods);
+            tool_event(&mut app, ToolEvent::Up { x: 50.0, y: 30.0 }, mods);
+            assert!(!app.ui.status_error, "{}", app.ui.status);
+            assert_eq!(app.ui.tool, Tool::Eraser, "the tool stays the Eraser");
+            let id = app.session.journal.last().map(|(id, _)| id.clone()).unwrap();
+            (id, active(&app).surface().unwrap().rgba(30, 30) == white)
+        };
+        assert_eq!(run(true, egui::Modifiers::NONE), ("paint.historyBrush".into(), true), "Erase to History paints the opening state back");
+        assert_eq!(run(false, egui::Modifiers::ALT), ("paint.historyBrush".into(), true), "⌥-drag does it for one stroke");
+        assert_ne!(run(false, egui::Modifiers::NONE).0, "paint.historyBrush", "otherwise it erases");
+        // A Pencil-mode Eraser erases to history with a hard edge.
+        let mut app = app();
+        app.ui.tool = Tool::Eraser;
+        app.ui.tool_options.eraser_mode = "pencil".into();
+        assert_eq!(crate::eraser_ui::history_params(&app), json!({"hardness": 100}));
     }
 
     #[test]
