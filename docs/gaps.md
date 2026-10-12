@@ -54,11 +54,11 @@ what an agent can't finish alone.
   scripted check there) is the only real oracle.
 
 ### G6. Missing tools
-- **Missing (10 of 68):** Artboard, Single Row Marquee, Single Column Marquee, Perspective Crop,
-  Frame, Color Sampler (#1046), Color Replacement (engine command exists), Art History Brush,
+- **Missing (8 of 68):** Artboard, Perspective Crop, Frame, Color Sampler (#1046), Color Replacement (engine command exists), Art History Brush,
   Horizontal Type Mask, Vertical Type Mask. The Pen slot is complete since 2026-10-12: Freeform
   Pen (Curve Fit, Magnetic), Curvature Pen (#1054), Add Anchor Point, Delete Anchor
-  Point and Convert Point (`pen_tools.rs`, `path.addAnchor`, `path.deleteAnchor`).
+  Point and Convert Point (`pen_tools.rs`, `path.addAnchor`, `path.deleteAnchor`); Single Row and
+  Single Column Marquee since the same day.
 - **Evidence:** `Tool` enum (`crates/ui-egui/src/state.rs`) against the 67 `<tool>` entries of
   Photoshop's `Default Keyboard Shortcuts.kys` plus Remove, Triangle and Curvature Pen.
 - **Impact:** users look for them by name and shortcut; several are daily tools for designers.
@@ -212,6 +212,6 @@ what an agent can't finish alone.
 
 | Date | Change | Summary |
 |---|---|---|
-| 2026-10-12 | minor | G6: Freeform Pen, Curvature Pen, Add/Delete Anchor Point and Convert Point landed (10 of 68 tools left) |
+| 2026-10-12 | minor | G6: Freeform Pen, Curvature Pen, Add/Delete Anchor Point and Convert Point landed (10 of 68 tools left); then Single Row/Column Marquee (8 left) |
 | 2026-10-10 | minor | Checked against the alpha gate (no alpha blockers); #2374 marked closed |
 | 2026-10-10 | major | First version, from the full re-measure against Photoshop 2026 27.11.0 and the open issues |

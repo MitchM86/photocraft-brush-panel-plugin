@@ -4200,6 +4200,11 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
                     polygon_click(app, x, y, mods);
                     return;
                 }
+                // A click selects the 1 px row or column through it, across the whole image.
+                Tool::SingleRowMarquee | Tool::SingleColumnMarquee => {
+                    single_line_select(app, tool, x, y, mods);
+                    return;
+                }
                 Tool::Type | Tool::VerticalType if crate::type_tool::pointer_down(app, x, y, mods.shift) => return,
                 _ => {}
             }
@@ -4277,6 +4282,23 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
             finish_gesture(app, d);
             crate::move_mods::finish(app);
         }
+    }
+}
+
+/// Single Row / Single Column Marquee: the 1 px line through (`x`, `y`) across the document, in
+/// the selection mode the options bar and modifiers give, as in Photoshop.
+fn single_line_select(app: &mut PhotocraftApp, tool: Tool, x: f64, y: f64, mods: egui::Modifiers) {
+    let Some([w, h]) = app.session.active().map(|st| [f64::from(st.doc.size.width), f64::from(st.doc.size.height)]) else { return };
+    let (x, y) = (x.floor().clamp(0.0, (w - 1.0).max(0.0)), y.floor().clamp(0.0, (h - 1.0).max(0.0)));
+    let rect = if tool == Tool::SingleRowMarquee { json!({"x": 0, "y": y, "width": w, "height": 1}) } else { json!({"x": x, "y": 0, "width": 1, "height": h}) };
+    let mode = selection_mode(app, mods);
+    let mut p = rect;
+    p["mode"] = json!(mode);
+    p["antiAlias"] = json!(false);
+    p["feather"] = json!(app.ui.tool_options.feather);
+    if let Err(e) = app.run("select.rect", p) {
+        app.ui.status = e;
+        app.ui.status_error = true;
     }
 }
 

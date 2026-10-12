@@ -214,3 +214,21 @@ fn the_new_tools_sit_in_the_pen_slot_and_cycle_with_p() {
         assert!(crate::icons::exists(crate::icons::tool_icon(t)), "{t:?}");
     }
 }
+
+#[test]
+fn single_row_and_column_marquees_select_one_pixel_lines() {
+    let mut app = app(Tool::SingleRowMarquee);
+    click(&mut app, [37.6, 50.4], Modifiers::NONE);
+    let b = app.session.active().unwrap().doc.selection.as_ref().unwrap().content_bounds();
+    assert_eq!([b.x0, b.y0, b.x1, b.y1], [0, 50, 200, 51], "the whole row through the click");
+    // ⇧ adds a column.
+    app.ui.tool = Tool::SingleColumnMarquee;
+    click(&mut app, [120.2, 10.0], Modifiers::SHIFT);
+    let b = app.session.active().unwrap().doc.selection.as_ref().unwrap().content_bounds();
+    assert_eq!([b.x0, b.y0, b.x1, b.y1], [0, 0, 200, 200]);
+    assert!(app.drag.is_none(), "a click, not a drag");
+    for t in [Tool::SingleRowMarquee, Tool::SingleColumnMarquee] {
+        assert_eq!(t.key(), '\0');
+        assert!(crate::icons::exists(crate::icons::tool_icon(t)));
+    }
+}
