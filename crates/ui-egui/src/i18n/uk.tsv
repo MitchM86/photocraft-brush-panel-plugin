@@ -3616,3 +3616,32 @@ cameraRaw	Masking	Маскування
 	Single Column Marquee Tool	Інструмент «Область (один стовпець)»
 	Color Replacement Tool	Інструмент «Заміна кольору»
 	Color Sampler Tool	Інструмент «Зразок кольору»
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	HUD пензлів
+	Advanced Settings	Додаткові налаштування
+	Auto Spacing	Автоінтервал
+	Brush in hand	Поточний пензель
+	Current brush	Поточний пензель
+	Drop to remove	Відпустіть, щоб прибрати
+	Edit HUD	Змінити HUD
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	Змінити HUD: перетягніть, щоб змінити порядок; киньте в кошик або клацніть правою кнопкою, щоб прибрати (E)
+	Favorite Brushes	Улюблені пензлі
+	Favorite Brushes · none yet	Улюблені пензлі · поки немає
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	НАВЕДІТЬ ДЛЯ ПЕРЕГЛЯДУ · КЛАЦНІТЬ ДЛЯ ВИБОРУ · ПОДВІЙНИЙ КЛАЦ — МАЛЮВАТИ · ПРАВИЙ КЛАЦ — ДО УЛЮБЛЕНИХ · ESC — ЗАКРИТИ
+	Master Tool	Основний інструмент
+	More	Ще
+	No match	Немає збігів
+	PREVIEW · CLICK TO SELECT	ПЕРЕГЛЯД · КЛАЦНІТЬ ДЛЯ ВИБОРУ
+	Page {page}/{pages}	Сторінка {page}/{pages}
+	Put every removed brush back on the HUD	Повернути всі прибрані пензлі до HUD
+	Recent Brushes	Нещодавні пензлі
+	Recent Brushes · none yet	Нещодавні пензлі · поки немає
+	Added “{name}” to favorite brushes	«{name}» додано до улюблених пензлів
+	Removed “{name}” from favorite brushes	«{name}» прибрано з улюблених пензлів
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	«{name}» прибрано з HUD пензлів (Ctrl+Z — скасувати)
+	Switch between recent and favorite brushes	Перемкнути між нещодавніми й улюбленими пензлями
+	{family} · {count} VARIATION	{family} · {count} ВАРІАНТ
+	{family} · {count} VARIATIONS	{family} · ВАРІАНТІВ: {count}
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  РЕЖИМ РЕДАГУВАННЯ · ПЕРЕТЯГНІТЬ ДЛЯ ПЕРЕСТАНОВКИ · У КОШИК АБО ПРАВИЙ КЛАЦ — ПРИБРАТИ
+	★ Favorited	★ В улюблених
+	☆ Add to Favorites	☆ До улюблених

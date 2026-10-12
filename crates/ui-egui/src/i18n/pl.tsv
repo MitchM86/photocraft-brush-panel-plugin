@@ -3529,3 +3529,32 @@ cameraRaw	Roughness	Chropowatość
 	Single Column Marquee Tool	Narzędzie Zaznaczanie pojedynczej kolumny
 	Color Replacement Tool	Narzędzie Zastępowanie kolorów
 	Color Sampler Tool	Narzędzie Próbkowanie kolorów
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	HUD pędzli
+	Advanced Settings	Ustawienia zaawansowane
+	Auto Spacing	Automatyczne odstępy
+	Brush in hand	Używany pędzel
+	Current brush	Bieżący pędzel
+	Drop to remove	Upuść, aby usunąć
+	Edit HUD	Edytuj HUD
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	Edytuj HUD: przeciągnij, aby zmienić kolejność; upuść w koszu lub kliknij prawym przyciskiem, aby usunąć (E)
+	Favorite Brushes	Ulubione pędzle
+	Favorite Brushes · none yet	Ulubione pędzle · jeszcze brak
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	NAJEDŹ, ABY ZOBACZYĆ PODGLĄD · KLIKNIJ, ABY WYBRAĆ · KLIKNIJ DWUKROTNIE, ABY MALOWAĆ · PRAWY PRZYCISK — DO ULUBIONYCH · ESC — ZAMKNIJ
+	Master Tool	Główne narzędzie
+	More	Więcej
+	No match	Brak wyników
+	PREVIEW · CLICK TO SELECT	PODGLĄD · KLIKNIJ, ABY WYBRAĆ
+	Page {page}/{pages}	Strona {page}/{pages}
+	Put every removed brush back on the HUD	Przywróć wszystkie usunięte pędzle do HUD
+	Recent Brushes	Ostatnie pędzle
+	Recent Brushes · none yet	Ostatnie pędzle · jeszcze brak
+	Added “{name}” to favorite brushes	Dodano „{name}” do ulubionych pędzli
+	Removed “{name}” from favorite brushes	Usunięto „{name}” z ulubionych pędzli
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	Usunięto „{name}” z HUD pędzli (Ctrl+Z, aby cofnąć)
+	Switch between recent and favorite brushes	Przełącz między ostatnimi a ulubionymi pędzlami
+	{family} · {count} VARIATION	{family} · {count} WARIANT
+	{family} · {count} VARIATIONS	{family} · WARIANTY: {count}
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  TRYB EDYCJI · PRZECIĄGNIJ, ABY ZMIENIĆ UKŁAD · DO KOSZA LUB PRAWY PRZYCISK, ABY USUNĄĆ
+	★ Favorited	★ W ulubionych
+	☆ Add to Favorites	☆ Dodaj do ulubionych

@@ -96,8 +96,9 @@ choice!(
 );
 choice!(
     /// Right mouse button on the canvas with a painting tool: open the Brush Preset picker at the
-    /// pointer (Photoshop), or erase with the current brush while dragging (Krita, Paint).
-    RightClickPaint { BrushPicker = "brushPicker", Erase = "erase" } default BrushPicker
+    /// pointer (Photoshop), erase with the current brush while dragging (Krita, Paint), or open
+    /// the radial Brush HUD (a pen's barrel button sends a right-click, so it summons the HUD too).
+    RightClickPaint { BrushPicker = "brushPicker", Erase = "erase", BrushHud = "brushHud" } default BrushPicker
 );
 choice!(OtherCursor { Standard = "standard", Precise = "precise" } default Standard);
 choice!(CheckerSize { None = "none", Small = "small", Medium = "medium", Large = "large" } default Medium);
@@ -847,6 +848,10 @@ pub struct Preferences {
     /// the footer slider's card scale, saved as the user changes them and restored at launch.
     /// JSON owned by the shell.
     pub brush_picker: Value,
+    /// The Brush HUD's remembered layout (custom order and removed nodes), recent and favourite
+    /// brushes, and options, saved as the user changes them and restored at launch. JSON owned
+    /// by the shell.
+    pub brush_hud: Value,
     /// File › Scripts › Script Events Manager: event → script bindings.
     pub script_events: crate::automate_cmds::ScriptEvents,
 }

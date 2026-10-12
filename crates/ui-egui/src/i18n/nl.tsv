@@ -3684,3 +3684,31 @@ cameraRaw	Whites	Witten
 	Single Column Marquee Tool	Selectiekadergereedschap enkele kolom
 	Color Replacement Tool	Gereedschap Kleur vervangen
 	Color Sampler Tool	Gereedschap Kleurenpipet
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	Penseel-HUD
+	Advanced Settings	Geavanceerde instellingen
+	Auto Spacing	Automatische tussenruimte
+	Brush in hand	Penseel in gebruik
+	Current brush	Huidig penseel
+	Drop to remove	Neerzetten om te verwijderen
+	Edit HUD	HUD bewerken
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	HUD bewerken: sleep om te herschikken, zet neer op de prullenbak of klik met rechts om te verwijderen (E)
+	Favorite Brushes	Favoriete penselen
+	Favorite Brushes · none yet	Favoriete penselen · nog geen
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	AANWIJZEN VOOR VOORBEELD · KLIKKEN OM TE KIEZEN · DUBBELKLIKKEN OM TE SCHILDEREN · RECHTSKLIKKEN VOOR FAVORIET · ESC OM TE SLUITEN
+	Master Tool	Hoofdgereedschap
+	No match	Geen overeenkomst
+	PREVIEW · CLICK TO SELECT	VOORBEELD · KLIKKEN OM TE KIEZEN
+	Page {page}/{pages}	Pagina {page}/{pages}
+	Put every removed brush back on the HUD	Alle verwijderde penselen terugzetten in de HUD
+	Recent Brushes	Recente penselen
+	Recent Brushes · none yet	Recente penselen · nog geen
+	Added “{name}” to favorite brushes	‘{name}’ toegevoegd aan favoriete penselen
+	Removed “{name}” from favorite brushes	‘{name}’ verwijderd uit favoriete penselen
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	‘{name}’ verwijderd uit de penseel-HUD (Ctrl+Z om ongedaan te maken)
+	Switch between recent and favorite brushes	Wisselen tussen recente en favoriete penselen
+	{family} · {count} VARIATION	{family} · {count} VARIANT
+	{family} · {count} VARIATIONS	{family} · {count} VARIANTEN
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  BEWERKMODUS · SLEPEN OM TE HERSCHIKKEN · NAAR DE PRULLENBAK OF RECHTSKLIKKEN OM TE VERWIJDEREN
+	★ Favorited	★ Favoriet
+	☆ Add to Favorites	☆ Toevoegen aan favorieten

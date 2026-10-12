@@ -2512,3 +2512,32 @@ fontWeight	Italic	Kurzíva
 	Single Column Marquee Tool	Nástroj obdélníkový výběr jednoho sloupce
 	Color Replacement Tool	Nástroj nahrazení barvy
 	Color Sampler Tool	Nástroj vzorkovač barev
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	HUD štětců
+	Advanced Settings	Pokročilá nastavení
+	Auto Spacing	Automatické rozestupy
+	Brush in hand	Aktuální štětec
+	Current brush	Aktuální štětec
+	Drop to remove	Pusťte pro odebrání
+	Edit HUD	Upravit HUD
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	Upravit HUD: přetažením změníte pořadí, puštěním do koše nebo pravým kliknutím odeberete (E)
+	Favorite Brushes	Oblíbené štětce
+	Favorite Brushes · none yet	Oblíbené štětce · zatím žádné
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	NAJETÍM ZOBRAZÍTE NÁHLED · KLIKNUTÍM VYBERETE · DVOJKLIKEM ZAČNETE MALOVAT · PRAVÝM KLIKNUTÍM PŘIDÁTE DO OBLÍBENÝCH · ESC ZAVŘE
+	Master Tool	Hlavní nástroj
+	No match	Žádná shoda
+	PREVIEW · CLICK TO SELECT	NÁHLED · KLIKNUTÍM VYBERETE
+	Page {page}/{pages}	Strana {page}/{pages}
+	Put every removed brush back on the HUD	Vrátit všechny odebrané štětce do HUD
+	Recent Brushes	Nedávné štětce
+	Recent Brushes · none yet	Nedávné štětce · zatím žádné
+	Added “{name}” to favorite brushes	„{name}“ přidán do oblíbených štětců
+	Removed “{name}” from favorite brushes	„{name}“ odebrán z oblíbených štětců
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	„{name}“ odebrán z HUD štětců (Ctrl+Z vrátí zpět)
+	Switch between recent and favorite brushes	Přepnout mezi nedávnými a oblíbenými štětci
+	{family} · {count} VARIATION	{family} · {count} VARIANTA
+	{family} · {count} VARIATIONS	{family} · VARIANT: {count}
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  REŽIM ÚPRAV · PŘETAŽENÍM ZMĚNÍTE POŘADÍ · DO KOŠE NEBO PRAVÝM KLIKNUTÍM ODEBERETE
+	★ Favorited	★ V oblíbených
+	☆ Add to Favorites	☆ Přidat do oblíbených
+	More	Více

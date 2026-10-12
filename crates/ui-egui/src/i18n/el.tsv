@@ -3614,3 +3614,31 @@ fontWeight	Thin	Πολύ λεπτά
 	Single Column Marquee Tool	Μαρκίζα μίας στήλης (Single Column Marquee Tool)
 	Color Replacement Tool	Αντικατάσταση χρώματος (Color Replacement Tool)
 	Color Sampler Tool	Δειγματολήπτης χρωμάτων (Color Sampler Tool)
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	HUD πινέλων
+	Advanced Settings	Ρυθμίσεις για προχωρημένους
+	Auto Spacing	Αυτόματη απόσταση
+	Brush in hand	Πινέλο σε χρήση
+	Current brush	Τρέχον πινέλο
+	Drop to remove	Αφήστε για αφαίρεση
+	Edit HUD	Επεξεργασία HUD
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	Επεξεργασία HUD: σύρετε για αναδιάταξη, αφήστε στον κάδο ή κάντε δεξί κλικ για αφαίρεση (E)
+	Favorite Brushes	Αγαπημένα πινέλα
+	Favorite Brushes · none yet	Αγαπημένα πινέλα · κανένα ακόμη
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	ΠΕΡΑΣΤΕ ΤΟΝ ΔΕΙΚΤΗ ΓΙΑ ΠΡΟΕΠΙΣΚΟΠΗΣΗ · ΚΛΙΚ ΓΙΑ ΕΠΙΛΟΓΗ · ΔΙΠΛΟ ΚΛΙΚ ΓΙΑ ΖΩΓΡΑΦΙΚΗ · ΔΕΞΙ ΚΛΙΚ ΓΙΑ ΑΓΑΠΗΜΕΝΑ · ESC ΓΙΑ ΚΛΕΙΣΙΜΟ
+	Master Tool	Κύριο εργαλείο
+	No match	Καμία αντιστοιχία
+	PREVIEW · CLICK TO SELECT	ΠΡΟΕΠΙΣΚΟΠΗΣΗ · ΚΛΙΚ ΓΙΑ ΕΠΙΛΟΓΗ
+	Page {page}/{pages}	Σελίδα {page}/{pages}
+	Put every removed brush back on the HUD	Επαναφορά όλων των πινέλων που αφαιρέθηκαν στο HUD
+	Recent Brushes	Πρόσφατα πινέλα
+	Recent Brushes · none yet	Πρόσφατα πινέλα · κανένα ακόμη
+	Added “{name}” to favorite brushes	Το «{name}» προστέθηκε στα αγαπημένα πινέλα
+	Removed “{name}” from favorite brushes	Το «{name}» αφαιρέθηκε από τα αγαπημένα πινέλα
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	Το «{name}» αφαιρέθηκε από το HUD πινέλων (Ctrl+Z για αναίρεση)
+	Switch between recent and favorite brushes	Εναλλαγή μεταξύ πρόσφατων και αγαπημένων πινέλων
+	{family} · {count} VARIATION	{family} · {count} ΠΑΡΑΛΛΑΓΗ
+	{family} · {count} VARIATIONS	{family} · {count} ΠΑΡΑΛΛΑΓΕΣ
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  ΛΕΙΤΟΥΡΓΙΑ ΕΠΕΞΕΡΓΑΣΙΑΣ · ΣΥΡΕΤΕ ΓΙΑ ΑΝΑΔΙΑΤΑΞΗ · ΣΤΟΝ ΚΑΔΟ Η ΔΕΞΙ ΚΛΙΚ ΓΙΑ ΑΦΑΙΡΕΣΗ
+	★ Favorited	★ Στα αγαπημένα
+	☆ Add to Favorites	☆ Προσθήκη στα αγαπημένα

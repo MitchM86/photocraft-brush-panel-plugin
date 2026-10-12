@@ -2936,3 +2936,32 @@ fontWeight	Italic	Itálico
 	Single Column Marquee Tool	Ferramenta Letreiro de coluna única
 	Color Replacement Tool	Ferramenta Substituição de cor
 	Color Sampler Tool	Ferramenta Amostrador de cor
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	HUD de pincéis
+	Advanced Settings	Configurações avançadas
+	Auto Spacing	Espaçamento automático
+	Brush in hand	Pincel em uso
+	Current brush	Pincel atual
+	Drop to remove	Solte para remover
+	Edit HUD	Editar HUD
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	Editar HUD: arraste para reordenar; solte na lixeira ou clique com o botão direito para remover (E)
+	Favorite Brushes	Pincéis favoritos
+	Favorite Brushes · none yet	Pincéis favoritos · nenhum ainda
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	PASSE O CURSOR PARA VISUALIZAR · CLIQUE PARA SELECIONAR · CLIQUE DUPLO PARA PINTAR · CLIQUE DIREITO PARA FAVORITAR · ESC PARA FECHAR
+	Master Tool	Ferramenta principal
+	No match	Nenhum resultado
+	PREVIEW · CLICK TO SELECT	PRÉVIA · CLIQUE PARA SELECIONAR
+	Page {page}/{pages}	Página {page}/{pages}
+	Put every removed brush back on the HUD	Devolver ao HUD todos os pincéis removidos
+	Recent Brushes	Pincéis recentes
+	Recent Brushes · none yet	Pincéis recentes · nenhum ainda
+	Added “{name}” to favorite brushes	“{name}” adicionado aos pincéis favoritos
+	Removed “{name}” from favorite brushes	“{name}” removido dos pincéis favoritos
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	“{name}” removido do HUD de pincéis (Ctrl+Z para desfazer)
+	Switch between recent and favorite brushes	Alternar entre pincéis recentes e favoritos
+	{family} · {count} VARIATION	{family} · {count} VARIAÇÃO
+	{family} · {count} VARIATIONS	{family} · {count} VARIAÇÕES
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  MODO DE EDIÇÃO · ARRASTE PARA REORGANIZAR · ARRASTE PARA A LIXEIRA OU CLIQUE DIREITO PARA REMOVER
+	★ Favorited	★ Favoritado
+	☆ Add to Favorites	☆ Adicionar aos favoritos
+	More	Mais

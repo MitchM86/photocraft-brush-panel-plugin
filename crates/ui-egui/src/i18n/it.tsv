@@ -2581,3 +2581,32 @@ fontWeight	Italic	Corsivo
 	Single Column Marquee Tool	Strumento Selezione singola colonna
 	Color Replacement Tool	Strumento Sostituzione colore
 	Color Sampler Tool	Strumento Campionatore colore
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	HUD pennelli
+	Advanced Settings	Impostazioni avanzate
+	Auto Spacing	Spaziatura automatica
+	Brush in hand	Pennello in uso
+	Current brush	Pennello corrente
+	Drop to remove	Rilascia per rimuovere
+	Edit HUD	Modifica HUD
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	Modifica HUD: trascina per riordinare, rilascia nel cestino o fai clic destro per rimuovere (E)
+	Favorite Brushes	Pennelli preferiti
+	Favorite Brushes · none yet	Pennelli preferiti · ancora nessuno
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	PASSA SOPRA PER L’ANTEPRIMA · CLIC PER SELEZIONARE · DOPPIO CLIC PER DIPINGERE · CLIC DESTRO PER I PREFERITI · ESC PER CHIUDERE
+	Master Tool	Strumento principale
+	No match	Nessuna corrispondenza
+	PREVIEW · CLICK TO SELECT	ANTEPRIMA · CLIC PER SELEZIONARE
+	Page {page}/{pages}	Pagina {page}/{pages}
+	Put every removed brush back on the HUD	Rimetti nell’HUD tutti i pennelli rimossi
+	Recent Brushes	Pennelli recenti
+	Recent Brushes · none yet	Pennelli recenti · ancora nessuno
+	Added “{name}” to favorite brushes	“{name}” aggiunto ai pennelli preferiti
+	Removed “{name}” from favorite brushes	“{name}” rimosso dai pennelli preferiti
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	“{name}” rimosso dall’HUD pennelli (Ctrl+Z per annullare)
+	Switch between recent and favorite brushes	Passa tra pennelli recenti e preferiti
+	{family} · {count} VARIATION	{family} · {count} VARIANTE
+	{family} · {count} VARIATIONS	{family} · {count} VARIANTI
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  MODALITÀ MODIFICA · TRASCINA PER RIORDINARE · NEL CESTINO O CLIC DESTRO PER RIMUOVERE
+	★ Favorited	★ Nei preferiti
+	☆ Add to Favorites	☆ Aggiungi ai preferiti
+	More	Altro

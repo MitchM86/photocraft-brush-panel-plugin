@@ -104,7 +104,7 @@ pub fn canvas_buttons(app: &mut PhotocraftApp, response: &Response, tool: Tool) 
         && has_brush_picker(tool)
         && let Some(p) = response.interact_pointer_pos()
     {
-        app.ui.brush_picker = Some([p.x, p.y]);
+        open_brush_popup(app, &response.ctx, [p.x, p.y]);
     }
     let erase_click = erase && right_click;
     app.secondary_erase = right_start || erase_click;
@@ -121,7 +121,7 @@ pub fn canvas_buttons(app: &mut PhotocraftApp, response: &Response, tool: Tool) 
 /// Alt+right-drag brush resize, `brush_resize_armed` for its `Down`; or an erasing right stroke,
 /// `secondary_erase` armed for its `Down`). Otherwise a right-click with a painting tool opens
 /// the Brush Preset picker at screen point `at`, and nothing paints.
-pub fn pointer_secondary(app: &mut PhotocraftApp, down: bool, mods: egui::Modifiers, at: [f32; 2]) -> bool {
+pub fn pointer_secondary(app: &mut PhotocraftApp, ctx: &egui::Context, down: bool, mods: egui::Modifiers, at: [f32; 2]) -> bool {
     let tool = app.ui.tool;
     if crate::brush_resize::applies(tool) && (crate::brush_resize::is_right_gesture(mods) || app.brush_resize.is_some_and(|r| r.secondary)) {
         app.brush_resize_armed = down && app.drag.is_none();
@@ -132,9 +132,20 @@ pub fn pointer_secondary(app: &mut PhotocraftApp, down: bool, mods: egui::Modifi
         return true;
     }
     if down && has_brush_picker(tool) {
-        app.ui.brush_picker = Some(at);
+        open_brush_popup(app, ctx, at);
     }
     false
+}
+
+/// What a right-click (or a pen's barrel button, which sends one) opens with a painting tool:
+/// the Brush Preset picker at the pointer, or the radial Brush HUD when Preferences › Tools ›
+/// Right-click with painting tools says so.
+pub fn open_brush_popup(app: &mut PhotocraftApp, ctx: &egui::Context, at: [f32; 2]) {
+    if app.session.prefs().tools.right_click_with_painting_tools == RightClickPaint::BrushHud {
+        crate::brush_hud::open(app, ctx);
+    } else {
+        app.ui.brush_picker = Some(at);
+    }
 }
 
 /// The Brush Preset picker a right-click or the options-bar brush chip opened, at the pointer. It
@@ -491,7 +502,7 @@ mod tests {
         app.run("prefs.set", json!({"path": "tools.rightClickWithPaintingTools", "value": "erase"})).unwrap();
         app.ui.tool = Tool::Brush;
         let m = Modifiers::NONE;
-        assert!(pointer_secondary(&mut app, true, egui::Modifiers::NONE, [0.0, 0.0]));
+        assert!(pointer_secondary(&mut app, &egui::Context::default(), true, egui::Modifiers::NONE, [0.0, 0.0]));
         tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 40.0, pressure: 0.4 }, m);
         assert!(!app.secondary_erase, "armed for one stroke only");
         tool_event(&mut app, ToolEvent::Move { x: 100.0, y: 40.0, pressure: 0.8 }, m);
@@ -504,7 +515,7 @@ mod tests {
         assert_eq!(st.doc.layers[0].surface().unwrap().rgba(50, 40), [1.0, 1.0, 1.0, 1.0]);
         // With the default preference the right button opens the picker and nothing paints.
         app.run("prefs.set", json!({"path": "tools.rightClickWithPaintingTools", "value": "brushPicker"})).unwrap();
-        assert!(!pointer_secondary(&mut app, true, egui::Modifiers::NONE, [0.0, 0.0]));
+        assert!(!pointer_secondary(&mut app, &egui::Context::default(), true, egui::Modifiers::NONE, [0.0, 0.0]));
         assert!(app.ui.brush_picker.is_some() && !app.secondary_erase);
     }
 

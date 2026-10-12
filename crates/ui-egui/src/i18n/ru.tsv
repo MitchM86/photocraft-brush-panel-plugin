@@ -2794,3 +2794,32 @@ fontWeight	Italic	Курсив
 	Single Column Marquee Tool	Область (вертикальная строка)
 	Color Replacement Tool	Замена цвета
 	Color Sampler Tool	Цветовой эталон
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	HUD кистей
+	Advanced Settings	Дополнительные настройки
+	Auto Spacing	Автоинтервал
+	Brush in hand	Текущая кисть
+	Current brush	Текущая кисть
+	Drop to remove	Отпустите, чтобы убрать
+	Edit HUD	Изменить HUD
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	Изменить HUD: перетащите для изменения порядка, бросьте в корзину или щёлкните правой кнопкой, чтобы убрать (E)
+	Favorite Brushes	Избранные кисти
+	Favorite Brushes · none yet	Избранные кисти · пока нет
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	НАВЕДИТЕ ДЛЯ ПРЕДПРОСМОТРА · ЩЁЛКНИТЕ ДЛЯ ВЫБОРА · ДВОЙНОЙ ЩЕЛЧОК — РИСОВАТЬ · ПРАВЫЙ ЩЕЛЧОК — В ИЗБРАННОЕ · ESC — ЗАКРЫТЬ
+	Master Tool	Основной инструмент
+	More	Ещё
+	No match	Нет совпадений
+	PREVIEW · CLICK TO SELECT	ПРЕДПРОСМОТР · ЩЁЛКНИТЕ ДЛЯ ВЫБОРА
+	Page {page}/{pages}	Страница {page}/{pages}
+	Put every removed brush back on the HUD	Вернуть все убранные кисти в HUD
+	Recent Brushes	Недавние кисти
+	Recent Brushes · none yet	Недавние кисти · пока нет
+	Added “{name}” to favorite brushes	«{name}» добавлена в избранные кисти
+	Removed “{name}” from favorite brushes	«{name}» удалена из избранных кистей
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	«{name}» убрана из HUD кистей (Ctrl+Z — отменить)
+	Switch between recent and favorite brushes	Переключиться между недавними и избранными кистями
+	{family} · {count} VARIATION	{family} · {count} ВАРИАНТ
+	{family} · {count} VARIATIONS	{family} · ВАРИАНТОВ: {count}
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  РЕЖИМ ПРАВКИ · ПЕРЕТАЩИТЕ ДЛЯ ПЕРЕСТАНОВКИ · В КОРЗИНУ ИЛИ ПРАВЫЙ ЩЕЛЧОК — УБРАТЬ
+	★ Favorited	★ В избранном
+	☆ Add to Favorites	☆ В избранное

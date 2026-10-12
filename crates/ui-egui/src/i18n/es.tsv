@@ -2591,3 +2591,32 @@ fontWeight	Italic	Cursiva
 	Single Column Marquee Tool	Herramienta Marco de una columna
 	Color Replacement Tool	Herramienta Sustitución de color
 	Color Sampler Tool	Herramienta Muestra de color
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	HUD de pinceles
+	Advanced Settings	Ajustes avanzados
+	Auto Spacing	Espaciado automático
+	Brush in hand	Pincel en uso
+	Current brush	Pincel actual
+	Drop to remove	Suelta para quitar
+	Edit HUD	Editar HUD
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	Editar HUD: arrastra para reordenar; suelta en la papelera o haz clic derecho para quitar (E)
+	Favorite Brushes	Pinceles favoritos
+	Favorite Brushes · none yet	Pinceles favoritos · ninguno aún
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	PASA EL CURSOR PARA PREVISUALIZAR · CLIC PARA SELECCIONAR · DOBLE CLIC PARA PINTAR · CLIC DERECHO PARA FAVORITO · ESC PARA CERRAR
+	Master Tool	Herramienta principal
+	More	Más
+	No match	Sin coincidencias
+	PREVIEW · CLICK TO SELECT	VISTA PREVIA · CLIC PARA SELECCIONAR
+	Page {page}/{pages}	Página {page}/{pages}
+	Put every removed brush back on the HUD	Devuelve al HUD todos los pinceles quitados
+	Recent Brushes	Pinceles recientes
+	Recent Brushes · none yet	Pinceles recientes · ninguno aún
+	Added “{name}” to favorite brushes	Se añadió «{name}» a los pinceles favoritos
+	Removed “{name}” from favorite brushes	Se quitó «{name}» de los pinceles favoritos
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	Se quitó «{name}» del HUD de pinceles (Ctrl+Z para deshacer)
+	Switch between recent and favorite brushes	Alternar entre pinceles recientes y favoritos
+	{family} · {count} VARIATION	{family} · {count} VARIANTE
+	{family} · {count} VARIATIONS	{family} · {count} VARIANTES
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  MODO EDICIÓN · ARRASTRA PARA REORDENAR · ARRASTRA A LA PAPELERA O CLIC DERECHO PARA QUITAR
+	★ Favorited	★ En favoritos
+	☆ Add to Favorites	☆ Añadir a favoritos

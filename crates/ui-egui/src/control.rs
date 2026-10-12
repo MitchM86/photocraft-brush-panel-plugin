@@ -74,7 +74,7 @@ pub enum Outcome {
 /// field's value is validated before the first one is applied, so a typo, an unknown field, a
 /// bad value or a bad nested key can't reply with success while nothing — or only half of it —
 /// changed (#412).
-pub const UI_SET_FIELDS: [&str; 33] = [
+pub const UI_SET_FIELDS: [&str; 34] = [
     "tool",
     "panels",
     "dock",
@@ -97,6 +97,7 @@ pub const UI_SET_FIELDS: [&str; 33] = [
     "brushPickerStroke",
     "brushPickerTip",
     "brushPickerScale",
+    "brushHud",
     "brushSize",
     "gradientBlendMode",
     "gradientClassic",
@@ -475,6 +476,11 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
                     }
                     None => None,
                 };
+                // The radial Brush HUD: `null` closes it, an object opens/steers it.
+                let brush_hud = match p.get("brushHud") {
+                    Some(v) => Some(crate::brush_hud::parse_control(v)?),
+                    None => None,
+                };
                 // brushSize rides the journaled `tools.setBrush` command (#744). Numeric values
                 // are validated here so the command cannot fail after other fields were
                 // applied; non-numeric values keep the API's historical silent no-op.
@@ -613,6 +619,9 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
                 }
                 if let Some(at) = brush_picker {
                     app.ui.brush_picker = at;
+                }
+                if let Some(patch) = brush_hud {
+                    crate::brush_hud::apply_control(app, ctx, patch);
                 }
                 // Which chip the Color panel edits.
                 if let Some(c) = color_panel {
@@ -834,7 +843,7 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
                         }
                         continue;
                     }
-                    if !crate::paint_mouse::pointer_secondary(app, down, mods, screen_point(app, x, y)) {
+                    if !crate::paint_mouse::pointer_secondary(app, ctx, down, mods, screen_point(app, x, y)) {
                         continue;
                     }
                 }
@@ -989,6 +998,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         "textEdit": app.ui.text_edit,
         "typeTransform": app.ui.type_transform,
         "layerMenu": app.ui.layer_menu,
+        "brushHud": crate::brush_hud::inspect(app, ctx),
         "brushPicker": app.ui.brush_picker.map(|pos| json!({
             "pos": pos,
             // The picker's content size once its corner grip was dragged (null: the default).

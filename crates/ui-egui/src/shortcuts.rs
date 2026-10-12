@@ -285,6 +285,11 @@ pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if app.camera_raw.is_some() {
         return;
     }
+    // The Brush HUD is modal too: it handles its own keys (Esc, search, Edit HUD, 1–6) and only
+    // its own toggle shortcut reaches past it.
+    if crate::brush_hud::keys(app, ctx) {
+        return;
+    }
     // An open menu owns the keyboard (arrows, ↩, Esc), like a native menu.
     if crate::menu_nav::is_open(ctx) {
         return;

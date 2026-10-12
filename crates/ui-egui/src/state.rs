@@ -1011,6 +1011,10 @@ pub struct UiState {
     /// ([`crate::brush_picker::DEFAULT_SIZE`] before that).
     #[serde(default)]
     pub brush_picker_size: Option<[f32; 2]>,
+    /// The radial Brush HUD (Window › Brush HUD): open, its hub/family/spine, hover, search and
+    /// Edit HUD state, and the remembered layout (`brush_hud`).
+    #[serde(default)]
+    pub brush_hud: crate::brush_hud::HudState,
     /// Layers under the pointer, listed by a right-click on the canvas with the Move tool or
     /// ⌘/Ctrl+right-click with any tool (`layer_pick_ui`, #307).
     #[serde(default)]
@@ -1182,6 +1186,7 @@ impl Default for UiState {
             brush_picker: None,
             brush_picker_list: crate::brush_picker::list_state(),
             brush_picker_size: None,
+            brush_hud: crate::brush_hud::HudState::default(),
             layer_menu: None,
             canvas_tool_menu: None,
             brush_tool: Tool::Brush,

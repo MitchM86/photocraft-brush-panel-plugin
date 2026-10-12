@@ -24,6 +24,7 @@ pub mod analysis_ui;
 pub mod artboard_ui;
 pub(crate) mod blend_preview;
 mod brand;
+pub mod brush_hud;
 pub mod brush_panel;
 pub mod brush_picker;
 pub mod brush_preview;
@@ -1582,6 +1583,8 @@ impl eframe::App for PhotocraftApp {
         // remembered once the pointer is up. Here, after every panel, rather than in the
         // picker's own code: the control channel can set it while the picker is closed.
         brush_picker::persist(self, &ctx);
+        // The Brush HUD's layout, recents and favourites, the same way.
+        brush_hud::persist(self, &ctx);
         self.automation_input = false;
         native_menu::sync(self, &ctx);
         if screen_picker::busy(&ctx) {

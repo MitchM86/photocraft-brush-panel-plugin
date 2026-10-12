@@ -3529,3 +3529,32 @@ fontWeight	Italic	斜体
 	Single Column Marquee Tool	一列選択ツール
 	Color Replacement Tool	色の置き換えツール
 	Color Sampler Tool	カラーサンプラーツール
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	ブラシHUD
+	Advanced Settings	詳細設定
+	Auto Spacing	自動間隔
+	Brush in hand	使用中のブラシ
+	Current brush	現在のブラシ
+	Drop to remove	ドロップして削除
+	Edit HUD	HUDを編集
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	HUDを編集：ドラッグで並べ替え、ゴミ箱へのドロップまたは右クリックで削除 (E)
+	Favorite Brushes	お気に入りのブラシ
+	Favorite Brushes · none yet	お気に入りのブラシ · まだありません
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	ホバーでプレビュー · クリックで選択 · ダブルクリックで描画 · 右クリックでお気に入り · Escで閉じる
+	Master Tool	マスターツール
+	More	その他
+	No match	一致なし
+	PREVIEW · CLICK TO SELECT	プレビュー · クリックで選択
+	Page {page}/{pages}	ページ {page}/{pages}
+	Put every removed brush back on the HUD	削除したすべてのブラシをHUDに戻します
+	Recent Brushes	最近使用したブラシ
+	Recent Brushes · none yet	最近使用したブラシ · まだありません
+	Added “{name}” to favorite brushes	「{name}」をお気に入りのブラシに追加しました
+	Removed “{name}” from favorite brushes	「{name}」をお気に入りのブラシから削除しました
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	「{name}」をブラシHUDから削除しました (Ctrl+Zで取り消し)
+	Switch between recent and favorite brushes	最近使用したブラシとお気に入りのブラシを切り替えます
+	{family} · {count} VARIATION	{family} · {count} バリエーション
+	{family} · {count} VARIATIONS	{family} · {count} バリエーション
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  編集モード · ドラッグで並べ替え · ゴミ箱へドラッグまたは右クリックで削除
+	★ Favorited	★ お気に入り済み
+	☆ Add to Favorites	☆ お気に入りに追加

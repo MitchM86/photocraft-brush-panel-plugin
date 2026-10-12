@@ -2915,3 +2915,32 @@ fontWeight	Italic	Miring
 	Single Column Marquee Tool	Alat Single Column Marquee
 	Color Replacement Tool	Alat Color Replacement
 	Color Sampler Tool	Alat Color Sampler
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	HUD Kuas
+	Advanced Settings	Pengaturan Lanjutan
+	Auto Spacing	Jarak Otomatis
+	Brush in hand	Kuas yang dipakai
+	Current brush	Kuas saat ini
+	Drop to remove	Lepas untuk menghapus
+	Edit HUD	Edit HUD
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	Edit HUD: seret untuk menata ulang, lepas di tempat sampah atau klik kanan untuk menghapus (E)
+	Favorite Brushes	Kuas Favorit
+	Favorite Brushes · none yet	Kuas Favorit · belum ada
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	ARAHKAN UNTUK PRATINJAU · KLIK UNTUK MEMILIH · KLIK GANDA UNTUK MELUKIS · KLIK KANAN UNTUK FAVORIT · ESC UNTUK MENUTUP
+	Master Tool	Alat Utama
+	More	Lainnya
+	No match	Tidak ada yang cocok
+	PREVIEW · CLICK TO SELECT	PRATINJAU · KLIK UNTUK MEMILIH
+	Page {page}/{pages}	Halaman {page}/{pages}
+	Put every removed brush back on the HUD	Kembalikan semua kuas yang dihapus ke HUD
+	Recent Brushes	Kuas Terbaru
+	Recent Brushes · none yet	Kuas Terbaru · belum ada
+	Added “{name}” to favorite brushes	“{name}” ditambahkan ke kuas favorit
+	Removed “{name}” from favorite brushes	“{name}” dihapus dari kuas favorit
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	“{name}” dihapus dari HUD Kuas (Ctrl+Z untuk membatalkan)
+	Switch between recent and favorite brushes	Beralih antara kuas terbaru dan favorit
+	{family} · {count} VARIATION	{family} · {count} VARIASI
+	{family} · {count} VARIATIONS	{family} · {count} VARIASI
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  MODE EDIT · SERET UNTUK MENATA ULANG · SERET KE TEMPAT SAMPAH ATAU KLIK KANAN UNTUK MENGHAPUS
+	★ Favorited	★ Difavoritkan
+	☆ Add to Favorites	☆ Tambahkan ke Favorit

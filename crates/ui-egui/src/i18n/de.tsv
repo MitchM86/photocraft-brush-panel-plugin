@@ -2550,3 +2550,32 @@ fontWeight	Italic	Kursiv
 	Single Column Marquee Tool	Auswahlrechteck-Werkzeug (einzelne Spalte)
 	Color Replacement Tool	Farbe-ersetzen-Werkzeug
 	Color Sampler Tool	Farbaufnahme-Werkzeug
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	Pinsel-HUD
+	Advanced Settings	Erweiterte Einstellungen
+	Auto Spacing	Automatischer Malabstand
+	Brush in hand	Aktiver Pinsel
+	Current brush	Aktueller Pinsel
+	Drop to remove	Zum Entfernen ablegen
+	Edit HUD	HUD bearbeiten
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	HUD bearbeiten: zum Umordnen ziehen, zum Entfernen auf den Papierkorb ziehen oder rechtsklicken (E)
+	Favorite Brushes	Lieblingspinsel
+	Favorite Brushes · none yet	Lieblingspinsel · noch keine
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	ZUR VORSCHAU ÜBERFAHREN · ZUM AUSWÄHLEN KLICKEN · DOPPELKLICK ZUM MALEN · RECHTSKLICK FÜR FAVORITEN · ESC ZUM SCHLIESSEN
+	Master Tool	Hauptwerkzeug
+	More	Mehr
+	No match	Kein Treffer
+	PREVIEW · CLICK TO SELECT	VORSCHAU · ZUM AUSWÄHLEN KLICKEN
+	Page {page}/{pages}	Seite {page}/{pages}
+	Put every removed brush back on the HUD	Alle entfernten Pinsel zurück ins HUD legen
+	Recent Brushes	Zuletzt verwendete Pinsel
+	Recent Brushes · none yet	Zuletzt verwendete Pinsel · noch keine
+	Added “{name}” to favorite brushes	„{name}“ zu den Lieblingspinseln hinzugefügt
+	Removed “{name}” from favorite brushes	„{name}“ aus den Lieblingspinseln entfernt
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	„{name}“ aus dem Pinsel-HUD entfernt (Strg+Z zum Rückgängigmachen)
+	Switch between recent and favorite brushes	Zwischen zuletzt verwendeten und Lieblingspinseln wechseln
+	{family} · {count} VARIATION	{family} · {count} VARIANTE
+	{family} · {count} VARIATIONS	{family} · {count} VARIANTEN
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  BEARBEITUNGSMODUS · ZUM UMORDNEN ZIEHEN · ZUM ENTFERNEN AUF DEN PAPIERKORB ZIEHEN ODER RECHTSKLICKEN
+	★ Favorited	★ Favorit
+	☆ Add to Favorites	☆ Zu Favoriten hinzufügen

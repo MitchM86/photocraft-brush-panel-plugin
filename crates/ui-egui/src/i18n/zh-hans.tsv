@@ -2520,3 +2520,32 @@ fontWeight	Italic	斜体
 	Single Column Marquee Tool	单列选框工具
 	Color Replacement Tool	颜色替换工具
 	Color Sampler Tool	颜色取样器工具
+# Brush HUD (Window › Brush HUD)
+	Brush HUD	画笔 HUD
+	Advanced Settings	高级设置
+	Auto Spacing	自动间距
+	Brush in hand	当前使用的画笔
+	Current brush	当前画笔
+	Drop to remove	拖放到此处移除
+	Edit HUD	编辑 HUD
+	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	编辑 HUD：拖动以重新排序，拖到回收站或右键单击以移除 (E)
+	Favorite Brushes	收藏的画笔
+	Favorite Brushes · none yet	收藏的画笔 · 暂无
+	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	悬停以预览 · 单击以选择 · 双击以绘画 · 右键单击以收藏 · ESC 关闭
+	Master Tool	主工具
+	More	更多
+	No match	无匹配项
+	PREVIEW · CLICK TO SELECT	预览 · 单击以选择
+	Page {page}/{pages}	第 {page}/{pages} 页
+	Put every removed brush back on the HUD	将所有移除的画笔放回 HUD
+	Recent Brushes	最近使用的画笔
+	Recent Brushes · none yet	最近使用的画笔 · 暂无
+	Added “{name}” to favorite brushes	已将“{name}”加入收藏的画笔
+	Removed “{name}” from favorite brushes	已将“{name}”从收藏的画笔中移除
+	Removed “{name}” from the Brush HUD (Ctrl+Z to undo)	已将“{name}”从画笔 HUD 中移除（按 Ctrl+Z 撤销）
+	Switch between recent and favorite brushes	在最近使用和收藏的画笔之间切换
+	{family} · {count} VARIATION	{family} · {count} 种变体
+	{family} · {count} VARIATIONS	{family} · {count} 种变体
+	●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE	●  编辑模式 · 拖动以重新排列 · 拖到回收站或右键单击以移除
+	★ Favorited	★ 已收藏
+	☆ Add to Favorites	☆ 加入收藏
