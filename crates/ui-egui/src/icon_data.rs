@@ -29,6 +29,7 @@ pub static ICONS: &[(&str, &[u8])] = &[
     ("clip-release", include_bytes!("../../../assets/icons/clip-release.svg")),
     ("clock", include_bytes!("../../../assets/icons/clock.svg")),
     ("cloud", include_bytes!("../../../assets/icons/cloud.svg")),
+    ("color-sampler", include_bytes!("../../../assets/icons/color-sampler.svg")),
     ("compass", include_bytes!("../../../assets/icons/compass.svg")),
     ("contrast", include_bytes!("../../../assets/icons/contrast.svg")),
     ("convert-point", include_bytes!("../../../assets/icons/convert-point.svg")),

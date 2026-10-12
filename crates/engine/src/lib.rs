@@ -49,6 +49,7 @@ pub mod gradient_fill_cmds;
 pub mod group_view_cmds;
 pub mod hidden_target;
 pub mod history_cmds;
+pub mod sampler_cmds;
 pub mod image_cmds;
 pub mod inspect;
 pub mod jobs;
@@ -211,6 +212,8 @@ pub struct DocState {
     /// The snapshot `history.selectSnapshot` went back to, and the revision it left: the History
     /// panel shows that snapshot selected until the document changes again.
     pub selected_snapshot: Option<(usize, u64)>,
+    /// Color Sampler Tool points (document px), at most ten (view state, `sampler_cmds`).
+    pub color_samplers: Vec<[f64; 2]>,
 }
 
 impl DocState {
@@ -242,6 +245,7 @@ impl DocState {
             snapshots: vec![opening],
             history_source: None,
             selected_snapshot: None,
+            color_samplers: Vec::new(),
         }
     }
     /// The selected layers in bottom-to-top document order, always including the active layer.

@@ -3038,6 +3038,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         crate::distort_ui::draw_overlay(app, &painter, &xf);
         crate::retouch_ui::draw_source_marker(app, &painter, &xf);
         crate::vector_ui::draw_overlay(app, &painter, &xf, &doc);
+        crate::color_sampler_ui::draw(app, &painter, &|q: [f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32));
         crate::symmetry_ui::draw(app, &painter, &xf);
         crate::analysis_ui::draw_overlay(app, &painter, &xf);
         crate::gradient_ui::draw_overlay(app, &painter, &xf);
@@ -3981,6 +3982,10 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
     let ev = crate::move_mods::filter_event(app, ev, mods);
     // Path Selection: whole path components.
     if crate::path_select::pointer(app, ev, mods) {
+        return;
+    }
+    // Color Sampler: place, move and delete samplers.
+    if crate::color_sampler_ui::pointer(app, ev, mods) {
         return;
     }
     // Freeform Pen, Curvature Pen, Add and Delete Anchor Point (⌘ goes on to Direct Selection).

@@ -105,6 +105,7 @@ pub fn tool_icon(t: Tool) -> &'static str {
         Tool::BackgroundEraser => "eraser-background",
         Tool::MagicEraser => "eraser-magic",
         Tool::Eyedropper => "pipette",
+        Tool::ColorSampler => "color-sampler",
         Tool::Ruler => "ruler",
         Tool::Note => "message-square",
         Tool::Count => "circle-dot",

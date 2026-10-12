@@ -73,6 +73,7 @@ pub enum Tool {
     MagicWand,
     Crop,
     Eyedropper,
+    ColorSampler,
     Ruler,
     Note,
     Count,
@@ -126,7 +127,7 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: [Tool; 61] = [
+    pub const ALL: [Tool; 62] = [
         Tool::Move,
         Tool::RectMarquee,
         Tool::EllipseMarquee,
@@ -138,6 +139,7 @@ impl Tool {
         Tool::MagicWand,
         Tool::Crop,
         Tool::Eyedropper,
+        Tool::ColorSampler,
         Tool::Ruler,
         Tool::Note,
         Tool::Count,
@@ -205,6 +207,7 @@ impl Tool {
             Tool::BackgroundEraser => "Background Eraser Tool",
             Tool::MagicEraser => "Magic Eraser Tool",
             Tool::Eyedropper => "Eyedropper Tool",
+            Tool::ColorSampler => "Color Sampler Tool",
             Tool::Ruler => "Ruler Tool",
             Tool::Note => "Note Tool",
             Tool::Count => "Count Tool",
@@ -292,7 +295,7 @@ impl Tool {
             Tool::SingleRowMarquee | Tool::SingleColumnMarquee => '\0',
             Tool::Brush | Tool::Pencil | Tool::ColorReplacement | Tool::MixerBrush => 'B',
             Tool::Eraser | Tool::BackgroundEraser | Tool::MagicEraser => 'E',
-            Tool::Eyedropper | Tool::Ruler | Tool::Note | Tool::Count => 'I',
+            Tool::Eyedropper | Tool::ColorSampler | Tool::Ruler | Tool::Note | Tool::Count => 'I',
             Tool::Lasso | Tool::PolygonLasso | Tool::MagneticLasso => 'L',
             Tool::MagicWand => 'W',
             Tool::Crop | Tool::Slice | Tool::SliceSelect => 'C',
@@ -1028,6 +1031,9 @@ pub struct UiState {
     /// Freeform Pen stroke being drawn (document px).
     #[serde(skip)]
     pub freeform: Option<Vec<[f64; 2]>>,
+    /// Color Sampler being dragged.
+    #[serde(skip)]
+    pub sampler_drag: Option<crate::color_sampler_ui::SamplerDrag>,
     /// Curvature Pen path under construction.
     #[serde(default)]
     pub curvature: Option<crate::pen_tools::CurvaturePath>,
@@ -1196,6 +1202,7 @@ impl Default for UiState {
             layer_filter: Vec::new(),
             pen: None,
             freeform: None,
+            sampler_drag: None,
             curvature: None,
             stroke_editor: None,
             direct_selection: Default::default(),
@@ -1299,7 +1306,7 @@ mod tests {
         assert!(!Tool::RedEye.is_brushlike());
         assert_eq!(Tool::from_name("patternStamp"), Some(Tool::PatternStamp));
         assert_eq!(Tool::from_name("Pattern Stamp Tool"), Some(Tool::PatternStamp));
-        assert_eq!(Tool::ALL.len(), 61);
+        assert_eq!(Tool::ALL.len(), 62);
         assert_eq!(Tool::from_name("Remove Tool"), Some(Tool::Remove));
         assert_eq!(Tool::Remove.key(), 'J');
         assert!(Tool::Remove.is_brushlike());

@@ -59,6 +59,7 @@ pub mod dialogs;
 pub mod direct_select;
 pub mod path_select;
 pub mod pen_tools;
+pub mod color_sampler_ui;
 pub mod discard_ui;
 pub mod distort_ui;
 pub mod doc_props_ui;
@@ -621,6 +622,8 @@ pub struct PhotocraftApp {
     pub(crate) clone_preview: Option<crate::canvas::ClonePreviewCache>,
     /// Info panel sample cache: ((x, y, revision, Sample Size), composite RGBA).
     info_sample: Option<(InfoSampleKey, [f32; 4])>,
+    /// The Info panel's Color Sampler readouts and what they were read for (`color_sampler_ui`).
+    pub(crate) sampler_info: Option<color_sampler_ui::InfoCache>,
     /// Guide being dragged (from a ruler or with the Move tool).
     pub(crate) guide_drag: Option<rulers::GuideDrag>,
     /// Crop tool gesture in progress (see `crop_ui`).
@@ -744,6 +747,7 @@ impl PhotocraftApp {
             hover_doc: None,
             clone_preview: None,
             info_sample: None,
+            sampler_info: None,
             os_clip_sig: None,
             clip_external: false,
             clip_read_for_paste: false,
