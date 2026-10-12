@@ -2784,3 +2784,9 @@ fontWeight	Italic	Курсив
 	Follows only edges this close to the pointer ([ and ] change it)	Следует только за краями на таком расстоянии от указателя ([ и ] меняют его)
 	Higher values follow only edges that contrast sharply with their surroundings	Большие значения следуют только за краями, сильно контрастирующими с окружением
 	How often fastening points are placed by themselves	Как часто точки привязки ставятся сами
+	Sets the source for the History Brush	Задаёт источник для архивной кисти
+	Rename Snapshot…	Переименовать снимок…
+	Delete snapshot	Удалить снимок
+	Rename Snapshot	Переименовать снимок
+	Full Document	Весь документ
+	Merged Layers	Объединённые слои

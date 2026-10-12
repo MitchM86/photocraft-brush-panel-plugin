@@ -3519,3 +3519,9 @@ cameraRaw	Roughness	Chropowatość
 	Follows only edges this close to the pointer ([ and ] change it)	Podąża tylko za krawędziami tak blisko wskaźnika ([ i ] zmieniają)
 	Higher values follow only edges that contrast sharply with their surroundings	Wyższe wartości podążają tylko za krawędziami silnie kontrastującymi z otoczeniem
 	How often fastening points are placed by themselves	Jak często punkty mocowania są wstawiane samoczynnie
+	Sets the source for the History Brush	Ustawia źródło dla pędzla historii
+	Rename Snapshot…	Zmień nazwę migawki…
+	Delete snapshot	Usuń migawkę
+	Rename Snapshot	Zmień nazwę migawki
+	Full Document	Cały dokument
+	Merged Layers	Scalone warstwy

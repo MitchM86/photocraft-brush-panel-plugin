@@ -2926,3 +2926,9 @@ fontWeight	Italic	Itálico
 	Follows only edges this close to the pointer ([ and ] change it)	Segue apenas bordas a esta distância do ponteiro ([ e ] alteram)
 	Higher values follow only edges that contrast sharply with their surroundings	Valores maiores seguem apenas bordas com forte contraste em relação ao entorno
 	How often fastening points are placed by themselves	Com que frequência os pontos de fixação são colocados sozinhos
+	Sets the source for the History Brush	Define a origem do pincel do histórico
+	Rename Snapshot…	Renomear instantâneo…
+	Delete snapshot	Excluir instantâneo
+	Rename Snapshot	Renomear instantâneo
+	Full Document	Documento inteiro
+	Merged Layers	Camadas mescladas

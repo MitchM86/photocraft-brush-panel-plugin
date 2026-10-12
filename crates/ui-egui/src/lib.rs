@@ -1723,6 +1723,26 @@ impl PhotocraftApp {
         self.store_thumb(ctx, key, rev, img)
     }
 
+    /// A History panel snapshot's thumbnail: the whole image as the snapshot holds it, composited
+    /// once and kept while its layers' pixels are the same.
+    pub fn snapshot_thumb(&mut self, ctx: &egui::Context, doc: &Document) -> egui::TextureId {
+        let rev = doc.layers.iter().filter_map(|l| l.surface()).fold(doc.size.width as u64 ^ (doc.size.height as u64) << 32, |h, s| (h ^ surface_fingerprint(s)).wrapping_mul(0x100_0000_01b3));
+        let key = (photocraft_doc::LayerId(rev), mask_thumbs_ui::THUMB_SNAPSHOT);
+        if let Some((r, tex)) = self.thumbs.get(&key)
+            && *r == rev
+        {
+            return tex.id();
+        }
+        let flat = photocraft_compose::flatten_to_surface(doc, doc.pixel_format(), None);
+        let mut px = [0.0f32; 8];
+        let img = thumb_image(doc, 64, |x, y| {
+            let n = flat.channels();
+            flat.read_pixel(x, y, &mut px[..n]);
+            photocraft_raster::to_rgba(&flat.format(), &px[..n])
+        });
+        self.store_thumb(ctx, key, rev, img)
+    }
+
     pub fn mask_thumb(&mut self, ctx: &egui::Context, doc: &Document, id: photocraft_doc::LayerId, mask: &photocraft_doc::LayerMask) -> egui::TextureId {
         let rev = surface_fingerprint(&mask.surface) ^ (doc.size.width as u64) << 40;
         let key = (id, mask_thumbs_ui::THUMB_MASK);

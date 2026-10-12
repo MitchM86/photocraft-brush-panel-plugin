@@ -2604,48 +2604,113 @@ fn channels(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     crate::channels_panel::show(app, ui);
 }
 
+/// What a History panel click asks for; run after the rows are drawn.
+enum HistoryAction {
+    Step(isize),
+    Command(&'static str, Value),
+    Rename(usize, String),
+    NewSnapshotDialog,
+}
+
+/// The box left of a snapshot or state: the History Brush icon where it paints from; a click
+/// makes this row the source.
+fn history_source_box(ui: &mut egui::Ui, row: Rect, is_source: bool, id: egui::Id) -> bool {
+    let t = Tokens::get(ui.ctx());
+    let r = Rect::from_center_size(pos2(row.left() + 13.0, row.center().y), vec2(16.0, 16.0));
+    let resp = ui.interact(r, id, Sense::click()).on_hover_text(tl!("Sets the source for the History Brush"));
+    if resp.hovered() {
+        ui.painter().rect_stroke(r, 2.0, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+    }
+    if is_source {
+        icons::paint(ui, r, icons::tool_icon(Tool::HistoryBrush), 12.0, t.icon);
+    }
+    resp.clicked()
+}
+
 fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else {
         empty(ui, tl!("No document"));
         return;
     };
-    let doc = st.doc.clone();
     let entries = st.history.entries();
     let current = entries.len() - 1;
     let redo: Vec<String> = st.history.redo_labels().map(str::to_string).collect();
-    // Snapshot row (Photoshop shows the document's opening state with a thumbnail).
-    {
-        let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 38.0), Sense::hover());
-        let thumb = Rect::from_min_size(pos2(rect.left() + 28.0, rect.center().y - 14.0), vec2(28.0, 28.0));
-        let ctx = ui.ctx().clone();
-        if let Some(layer) = doc.layers.first() {
-            widgets::checker(ui.painter(), thumb, 4.0);
-            let tex = app.layer_thumb(&ctx, &doc, layer);
-            ui.painter().image(tex, thumb, Rect::from_min_max(egui::Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
-        }
-        ui.painter().rect_stroke(thumb, 0.0, Stroke::new(1.0, t.separator), StrokeKind::Outside);
-        ui.painter().text(pos2(thumb.right() + 8.0, rect.center().y), Align2::LEFT_CENTER, &doc.name, egui::FontId::proportional(12.0), t.text);
-        ui.painter().line_segment([rect.left_bottom(), rect.right_bottom()], Stroke::new(1.0, t.separator));
-    }
-    let mut target: Option<isize> = None;
-    let all = entries.iter().map(|e| (e.clone(), false)).chain(redo.iter().map(|e| (e.clone(), true)));
-    // The dock gives History a fixed height: the rows scroll above the footer.
+    let snapshots: Vec<(String, std::sync::Arc<photocraft_doc::Document>)> = st.snapshots.iter().map(|s| (s.name.clone(), s.doc.clone())).collect();
+    let selected_snapshot = photocraft_engine::history_cmds::selected_snapshot(st);
+    let source = photocraft_engine::history_cmds::source_json(st);
+    let source_snapshot = source.get("snapshot").and_then(Value::as_u64).map(|v| v as usize);
+    let source_state = source.get("state").and_then(Value::as_u64).map(|v| v as usize);
+    let mut action: Option<HistoryAction> = None;
+    // The dock gives History a fixed height: snapshots and states scroll above the footer.
     let footer = if t.pro { widgets::footer_height(ui) + ui.spacing().item_spacing.y } else { 0.0 };
     let max_h = (ui.available_height() - footer).max(40.0);
     egui::ScrollArea::vertical().id_salt("history-rows").max_height(max_h).auto_shrink([false, false]).show(ui, |ui| {
-        for (i, (e, is_redo)) in all.enumerate() {
-            let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::click());
-            if i == current {
+        // Snapshots, as in Photoshop: the opening one (named after the document) first.
+        for (i, (name, sdoc)) in snapshots.iter().enumerate() {
+            let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 38.0), Sense::click());
+            if selected_snapshot == Some(i) {
                 ui.painter().rect_filled(rect, if t.pro { 0.0 } else { t.radius_sm }, if t.pro { t.row_selected } else { t.accent_soft });
             } else if resp.hovered() {
                 ui.painter().rect_filled(rect, 0.0, t.hover.gamma_multiply(0.5));
+            }
+            let set_source = history_source_box(ui, rect, source_snapshot == Some(i), ui.id().with(("snapshot-source", i)));
+            if set_source {
+                action = Some(HistoryAction::Command("history.setSource", json!({"snapshot": i})));
+            }
+            let thumb = Rect::from_min_size(pos2(rect.left() + 28.0, rect.center().y - 14.0), vec2(28.0, 28.0));
+            if ui.is_rect_visible(thumb) {
+                let ctx = ui.ctx().clone();
+                widgets::checker(ui.painter(), thumb, 4.0);
+                let tex = app.snapshot_thumb(&ctx, sdoc);
+                ui.painter().image(tex, thumb, Rect::from_min_max(egui::Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
+            }
+            ui.painter().rect_stroke(thumb, 0.0, Stroke::new(1.0, t.separator), StrokeKind::Outside);
+            ui.painter().text(pos2(thumb.right() + 8.0, rect.center().y), Align2::LEFT_CENTER, name, egui::FontId::proportional(12.0), t.text);
+            if set_source {
+                // The box took the click.
+            } else if resp.double_clicked() {
+                action = Some(HistoryAction::Rename(i, name.clone()));
+            } else if resp.clicked() {
+                action = Some(HistoryAction::Command("history.selectSnapshot", json!({"snapshot": i})));
+            }
+            resp.context_menu(|ui| {
+                if ui.button(tl!("Rename Snapshot…")).clicked() {
+                    action = Some(HistoryAction::Rename(i, name.clone()));
+                    ui.close();
+                }
+                if ui.button(tl!("New Document")).clicked() {
+                    action = Some(HistoryAction::Command("history.newDocument", json!({"snapshot": i})));
+                    ui.close();
+                }
+                if ui.button(tl!("Delete Snapshot")).clicked() {
+                    action = Some(HistoryAction::Command("history.deleteSnapshot", json!({"snapshot": i})));
+                    ui.close();
+                }
+            });
+        }
+        if !snapshots.is_empty() {
+            let (line, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
+            ui.painter().line_segment([line.left_center(), line.right_center()], Stroke::new(1.0, t.separator));
+        }
+        let all = entries.iter().map(|e| (e.clone(), false)).chain(redo.iter().map(|e| (e.clone(), true)));
+        for (i, (e, is_redo)) in all.enumerate() {
+            let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::click());
+            // A selected snapshot is where the document is: the state row it made stays unlit.
+            if i == current && selected_snapshot.is_none() {
+                ui.painter().rect_filled(rect, if t.pro { 0.0 } else { t.radius_sm }, if t.pro { t.row_selected } else { t.accent_soft });
+            } else if resp.hovered() {
+                ui.painter().rect_filled(rect, 0.0, t.hover.gamma_multiply(0.5));
+            }
+            if !is_redo && history_source_box(ui, rect, source_state == Some(i), ui.id().with(("state-source", i))) {
+                action = Some(HistoryAction::Command("history.setSource", json!({"state": i})));
             }
             let icon = match e.as_str() {
                 s if s.contains("Brush") || s.contains("Eraser") => "brush",
                 s if s.contains("Layer") => "layers",
                 s if s.contains("Select") || s.contains("Marquee") || s.contains("Deselect") || s.contains("Lasso") => "square-dashed",
                 s if s.contains("Fill") => "paint-bucket",
+                s if snapshots.iter().any(|(n, _)| n == s) => "camera",
                 "Open" => "image",
                 _ => "sliders-horizontal",
             };
@@ -2658,41 +2723,82 @@ fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 if is_redo { t.text_faint } else { t.icon },
             );
             ui.painter().text(pos2(rect.left() + 58.0, rect.center().y), Align2::LEFT_CENTER, &e, egui::FontId::proportional(12.0), color);
-            if resp.clicked() {
-                target = Some(i as isize - current as isize);
+            if resp.clicked() && action.is_none() {
+                // Clicking the current state after selecting a snapshot just lights it again.
+                action = Some(HistoryAction::Step(i as isize - current as isize));
             }
         }
     });
-    let mut footer_cmd: Option<&str> = None;
     if t.pro {
-        let can_delete = app.session.is_enabled("history.deleteState");
         let can_new = app.session.is_enabled("history.newDocument");
+        // With a snapshot selected the trash deletes it, as in Photoshop; otherwise the state.
+        let (can_delete, delete_tip) = match selected_snapshot {
+            Some(_) => (true, tl!("Delete snapshot")),
+            None => (app.session.is_enabled("history.deleteState"), tl!("Delete current state")),
+        };
         widgets::panel_footer(ui, |ui| {
-            if ui.add_enabled_ui(can_delete, |ui| icons::button(ui, "trash", 26.0, false, tl!("Delete current state"))).inner.clicked() {
-                footer_cmd = Some("history.deleteState");
+            if ui.add_enabled_ui(can_delete, |ui| icons::button(ui, "trash", 26.0, false, delete_tip)).inner.clicked() {
+                action = Some(match selected_snapshot {
+                    Some(i) => HistoryAction::Command("history.deleteSnapshot", json!({"snapshot": i})),
+                    None => HistoryAction::Command("history.deleteState", json!({})),
+                });
             }
-            // Snapshots are not implemented yet: shown greyed, as Photoshop's footer has the button.
-            ui.add_enabled_ui(false, |ui| icons::button(ui, "scan", 26.0, false, tl!("Create new snapshot")));
+            // ⌥-click names the snapshot and picks what it holds.
+            if ui.add_enabled_ui(can_new, |ui| icons::button(ui, "camera", 26.0, false, tl!("Create new snapshot"))).inner.clicked() {
+                action = Some(if ui.input(|i| i.modifiers.alt) { HistoryAction::NewSnapshotDialog } else { HistoryAction::Command("history.newSnapshot", json!({})) });
+            }
             if ui.add_enabled_ui(can_new, |ui| icons::button(ui, "file-plus", 26.0, false, tl!("Create new document from current state"))).inner.clicked() {
-                footer_cmd = Some("history.newDocument");
+                action = Some(match selected_snapshot {
+                    Some(i) => HistoryAction::Command("history.newDocument", json!({"snapshot": i})),
+                    None => HistoryAction::Command("history.newDocument", json!({})),
+                });
             }
         });
     }
     // An open Free Transform owns Undo (transform_tool::intercept): stepping the document's history under
     // its box would leave it transforming pixels that changed.
-    if let Some(cmd) = footer_cmd.filter(|_| app.ui.transform.is_none())
-        && let Err(e) = app.run(cmd, json!({}))
-    {
+    let Some(action) = action.filter(|_| app.ui.transform.is_none()) else { return };
+    history_action(app, action);
+}
+
+fn history_action(app: &mut PhotocraftApp, action: HistoryAction) {
+    let result = match action {
+        HistoryAction::Command(cmd, params) => app.run(cmd, params).map(|_| ()),
+        HistoryAction::Step(0) => {
+            // The current state, after a snapshot was selected: nothing to step.
+            if let Some(st) = app.session.active_mut() {
+                st.selected_snapshot = None;
+            }
+            Ok(())
+        }
+        HistoryAction::Step(delta) => {
+            let (cmd, n) = if delta < 0 { ("edit.undo", -delta) } else { ("edit.redo", delta) };
+            for _ in 0..n {
+                if app.run(cmd, json!({})).is_err() {
+                    break;
+                }
+            }
+            Ok(())
+        }
+        HistoryAction::Rename(i, name) => {
+            let mut fields = serde_json::Map::new();
+            fields.insert("snapshot".into(), json!(i));
+            fields.insert("name".into(), json!(name));
+            crate::canvas_tool_menu::spec_dialog(app, "history.renameSnapshot", "Rename Snapshot", r##"{"name":text}"##, fields);
+            Ok(())
+        }
+        HistoryAction::NewSnapshotDialog => {
+            let next = app.session.active().map_or(0, |st| st.snapshots.iter().filter_map(|s| s.name.strip_prefix("Snapshot ")?.parse::<u64>().ok()).max().unwrap_or(0));
+            let mut fields = serde_json::Map::new();
+            fields.insert("name".into(), json!(format!("Snapshot {}", next.saturating_add(1))));
+            fields.insert("from".into(), json!("fullDocument"));
+            crate::canvas_tool_menu::spec_dialog(app, "history.newSnapshot", "New Snapshot", r##"{"name":text,"from":"fullDocument|mergedLayers|currentLayer"="fullDocument"}"##, fields);
+            Ok(())
+        }
+    };
+    if let Err(e) = result {
         app.ui.status = e;
         app.ui.status_error = true;
-    }
-    if let Some(delta) = target.filter(|_| app.ui.transform.is_none()) {
-        let (cmd, n) = if delta < 0 { ("edit.undo", -delta) } else { ("edit.redo", delta) };
-        for _ in 0..n {
-            if app.run(cmd, json!({})).is_err() {
-                break;
-            }
-        }
     }
 }
 
@@ -3828,7 +3934,7 @@ mod history_transform_tests {
     }
 
     /// The Photoshop-theme footer (#1117): trash deletes the current state, file-plus makes a
-    /// new document from it, and the snapshot button is greyed (snapshots aren't implemented).
+    /// new document from it, and the camera button takes a snapshot.
     #[test]
     fn history_footer_buttons_run_their_commands() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -3849,7 +3955,9 @@ mod history_transform_tests {
         };
         let b = buttons(&h);
         assert_eq!(b.len(), 3, "trash, snapshot, new document: {b:?}");
-        assert!(b[0].1 && !b[1].1 && b[2].1, "only the snapshot button is disabled: {b:?}");
+        assert!(b.iter().all(|b| b.1), "all enabled: {b:?}");
+        click(&mut h, b[1].0.center());
+        assert_eq!(h.state().session.active().unwrap().snapshots.len(), 2, "the camera takes a snapshot");
         let docs = h.state().session.documents().len();
         click(&mut h, b[2].0.center());
         assert_eq!(h.state().session.documents().len(), docs + 1, "file-plus makes a new document");
@@ -3861,6 +3969,50 @@ mod history_transform_tests {
         let st = h.state().session.active().unwrap();
         assert_eq!(st.history.entries().len(), steps - 1, "trash deletes the current state");
         assert!(!st.history.can_redo(), "and it can't be redone");
+    }
+
+    /// Snapshot rows sit above the states: a click goes back to one (the trash then deletes it),
+    /// and the box left of any row picks the History Brush's source.
+    #[test]
+    fn history_snapshots_select_delete_and_set_the_brush_source() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": 200, "height": 150})).unwrap();
+        app.run("layer.new.layer", json!({})).unwrap();
+        app.run("history.newSnapshot", json!({})).unwrap();
+        app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
+        let mut h = Harness::builder().with_size(vec2(300.0, 400.0)).build_ui_state(|ui, app: &mut PhotocraftApp| history(app, ui), app);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ProMedium);
+        h.state_mut().ui.theme = crate::theme::ThemeKind::ProMedium;
+        h.run_steps(3);
+        // The source boxes are the only 16 pt squares, top to bottom: 2 snapshots, then 3 states.
+        let boxes = |h: &Harness<'static, PhotocraftApp>| {
+            let mut b: Vec<Rect> = h.ctx.viewport(|v| v.prev_pass.widgets.layers().flat_map(|(_, w)| w.iter()).filter(|w| w.rect.size() == vec2(16.0, 16.0)).map(|w| w.rect).collect());
+            b.sort_by(|a, b| a.center().y.total_cmp(&b.center().y));
+            b.dedup_by(|a, b| (a.center().y - b.center().y).abs() < 1.0);
+            b
+        };
+        let b = boxes(&h);
+        assert_eq!(b.len(), 5, "{b:?}");
+        let source = |h: &Harness<'static, PhotocraftApp>| photocraft_engine::history_cmds::source_json(h.state().session.active().unwrap());
+        assert_eq!(source(&h), json!({"snapshot": 0}));
+        click(&mut h, b[3].center());
+        assert_eq!(source(&h), json!({"state": 1}), "a state's box");
+        let layers = h.state().session.active().unwrap().doc.layers.len();
+        assert_eq!(layers, 2);
+        // Click the opening snapshot's row (right of its box): the document goes back to it.
+        click(&mut h, b[0].center() + vec2(120.0, 0.0));
+        let st = h.state().session.active().unwrap();
+        assert_eq!((st.doc.layers.len(), photocraft_engine::history_cmds::selected_snapshot(st)), (1, Some(0)));
+        assert_eq!(source(&h), json!({"state": 1}), "selecting a snapshot leaves the source alone");
+        // The trash now deletes the selected snapshot.
+        let trash = h.ctx.viewport(|v| {
+            v.prev_pass.widgets.layers().flat_map(|(_, w)| w.iter()).filter(|w| w.rect.size() == vec2(26.0, 26.0)).map(|w| w.rect).max_by(|a, b| a.center().x.total_cmp(&b.center().x))
+        });
+        // The footer runs right to left: the trash is rightmost.
+        click(&mut h, trash.unwrap().center());
+        let st = h.state().session.active().unwrap();
+        assert_eq!(st.snapshots.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), vec!["Snapshot 1"]);
+        assert_eq!(st.doc.layers.len(), 1, "deleting a snapshot leaves the document as it is");
     }
 }
 

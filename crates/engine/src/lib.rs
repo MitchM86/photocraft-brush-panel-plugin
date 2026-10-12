@@ -201,15 +201,28 @@ pub struct DocState {
     /// A floating selection (`select.float`): the cut piece and where it floats, until dropped
     /// (view state: the document is unchanged until `select.drop`).
     pub floating: Option<float_cmds::Floating>,
+    /// History panel snapshots, oldest first. The first is taken when the document opens, as
+    /// Photoshop's "Automatically Create First Snapshot" does. Like Photoshop's, they are not saved
+    /// with the document (`history_cmds`).
+    pub snapshots: Vec<history_cmds::Snapshot>,
+    /// What the History Brush paints from (`history.setSource`): a snapshot or a state. None, or
+    /// one no longer held, means the first snapshot.
+    pub history_source: Option<history_cmds::Source>,
+    /// The snapshot `history.selectSnapshot` went back to, and the revision it left: the History
+    /// panel shows that snapshot selected until the document changes again.
+    pub selected_snapshot: Option<(usize, u64)>,
 }
 
 impl DocState {
     pub fn new(doc: Document, path: Option<String>) -> Self {
         let active_layer = doc.top_layer();
         let mut history = History::default();
-        history.set_current_layers(LayerTarget { active: active_layer, selected: active_layer.into_iter().collect() });
+        let layers = LayerTarget { active: active_layer, selected: active_layer.into_iter().collect() };
+        history.set_current_layers(layers.clone());
+        let doc = Arc::new(doc);
+        let opening = history_cmds::Snapshot { name: doc.name.clone(), doc: doc.clone(), layers };
         Self {
-            doc: Arc::new(doc),
+            doc,
             history,
             active_layer,
             selected_layers: active_layer.into_iter().collect(),
@@ -226,6 +239,9 @@ impl DocState {
             fx_collapsed: Vec::new(),
             show_only: None,
             floating: None,
+            snapshots: vec![opening],
+            history_source: None,
+            selected_snapshot: None,
         }
     }
     /// The selected layers in bottom-to-top document order, always including the active layer.

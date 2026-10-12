@@ -2918,3 +2918,9 @@ fontWeight	Italic	Italique
 	Follows only edges this close to the pointer ([ and ] change it)	Ne suit que les contours aussi proches du pointeur ([ et ] le modifient)
 	Higher values follow only edges that contrast sharply with their surroundings	Les valeurs élevées ne suivent que les contours très contrastés par rapport à leur entourage
 	How often fastening points are placed by themselves	Fréquence à laquelle les points d'ancrage se placent d'eux-mêmes
+	Sets the source for the History Brush	Définit la source de l'outil Forme d'historique
+	Rename Snapshot…	Renommer l'instantané…
+	Delete snapshot	Supprimer l'instantané
+	Rename Snapshot	Renommer l'instantané
+	Full Document	Document entier
+	Merged Layers	Calques fusionnés

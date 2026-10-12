@@ -22,6 +22,8 @@ pub const CHAIN_W: f32 = 12.0;
 pub const THUMB_LAYER: u8 = 0;
 pub const THUMB_MASK: u8 = 1;
 pub const THUMB_VECTOR: u8 = 2;
+/// A History panel snapshot (keyed by its content, `PhotocraftApp::snapshot_thumb`).
+pub const THUMB_SNAPSHOT: u8 = 3;
 
 /// Which of a layer's masks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

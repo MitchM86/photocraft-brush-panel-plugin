@@ -3519,3 +3519,9 @@ fontWeight	Italic	斜体
 	Follows only edges this close to the pointer ([ and ] change it)	ポインターからこの距離内のエッジだけをたどります（[ と ] で変更）
 	Higher values follow only edges that contrast sharply with their surroundings	値を大きくすると、周囲とのコントラストが強いエッジだけをたどります
 	How often fastening points are placed by themselves	固定ポイントが自動的に配置される頻度
+	Sets the source for the History Brush	ヒストリーブラシのソースを設定
+	Rename Snapshot…	スナップショット名を変更…
+	Delete snapshot	スナップショットを削除
+	Rename Snapshot	スナップショット名を変更
+	Full Document	ドキュメント全体
+	Merged Layers	統合されたレイヤー

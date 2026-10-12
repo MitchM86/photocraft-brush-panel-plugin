@@ -2477,3 +2477,11 @@ fontWeight	Italic	斜體
 	Follows only edges this close to the pointer ([ and ] change it)	只跟隨距指標這麼近的邊緣（[ 和 ] 可變更）
 	Higher values follow only edges that contrast sharply with their surroundings	數值越高，只跟隨與周圍對比強烈的邊緣
 	How often fastening points are placed by themselves	固定點自動放置的頻率
+	Sets the source for the History Brush	設定步驟記錄筆刷的來源
+	Rename Snapshot…	重新命名快照…
+	Delete Snapshot	刪除快照
+	Delete snapshot	刪除快照
+	Rename Snapshot	重新命名快照
+	New Snapshot	新增快照
+	Full Document	完整文件
+	Merged Layers	合併的圖層

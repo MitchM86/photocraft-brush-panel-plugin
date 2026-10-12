@@ -3604,3 +3604,9 @@ fontWeight	Thin	Πολύ λεπτά
 	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	Κλικ: προσθήκη σημείου · Διπλό κλικ ή {alt}-κλικ σε σημείο: γωνία · Σύρσιμο σημείου: μετακίνηση · {key}: τέλος
 	Magnetic	Μαγνητικό
 	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	Κλικ και μετά κίνηση κατά μήκος μιας ακμής · {alt}-κλικ: ευθεία · {key}: τέλος · διπλό κλικ: κλείσιμο
+	Sets the source for the History Brush	Ορίζει την πηγή για το Πινέλο ιστορικού
+	Rename Snapshot…	Μετονομασία στιγμιότυπου…
+	Delete snapshot	Διαγραφή στιγμιότυπου
+	Rename Snapshot	Μετονομασία στιγμιότυπου
+	Full Document	Ολόκληρο έγγραφο
+	Merged Layers	Συγχωνευμένα επίπεδα

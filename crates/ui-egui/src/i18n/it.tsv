@@ -2569,3 +2569,11 @@ fontWeight	Italic	Corsivo
 	Follows only edges this close to the pointer ([ and ] change it)	Segue solo i bordi così vicini al puntatore ([ e ] lo cambiano)
 	Higher values follow only edges that contrast sharply with their surroundings	Valori più alti seguono solo i bordi molto contrastati rispetto all'intorno
 	How often fastening points are placed by themselves	Con quale frequenza i punti di fissaggio vengono posizionati da soli
+	Sets the source for the History Brush	Imposta l'origine per il Pennello storia
+	Rename Snapshot…	Rinomina istantanea…
+	Delete Snapshot	Elimina istantanea
+	Delete snapshot	Elimina istantanea
+	Rename Snapshot	Rinomina istantanea
+	New Snapshot	Nuova istantanea
+	Full Document	Documento intero
+	Merged Layers	Livelli uniti

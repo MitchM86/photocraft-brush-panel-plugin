@@ -1,6 +1,6 @@
 # PhotoCraft vs Adobe Photoshop: target-app parity
 
-> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-12 · **Change:** minor (toolbox 58/68: the Pen slot's five tools) · **Target:** Adobe Photoshop 2026
+> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-12 · **Change:** minor (History snapshots; toolbox 58/68) · **Target:** Adobe Photoshop 2026
 
 The authoritative answer to "how close is PhotoCraft to Photoshop, and how much work is left". The
 one-page summary is [`ROADMAP.md`](../ROADMAP.md); the ranked work list is [`gaps.md`](gaps.md);
@@ -146,7 +146,7 @@ workflows, PSD exchange edge cases, and everything excluded above.
 | Select (marquee, lasso, magic wand, object) | 10% | 75% | |
 | Move and Free Transform | 10% | 70% | no commit/cancel buttons (#2442) |
 | Brush and eraser | 10% | 70% | lag with big brushes (#2619) |
-| Undo, History | 8% | 90% | |
+| Undo, History | 8% | 90% | History panel snapshots since 2026-10-12: the opening snapshot, Create new snapshot (⌥: name, Full Document / Merged Layers / Current Layer), select, rename, delete, New Document from one, and the History Brush source box on every snapshot and state. Not saved with the file, as in Photoshop. Missing: History Options (non-linear history, snapshot on save) |
 | Basic adjustments (brightness, levels, curves, hue/saturation) | 8% | 80% | |
 | Crop and straighten | 6% | 85% | |
 | Text | 6% | 55% | freeze report (#2518) |
@@ -527,6 +527,7 @@ See [method and results](octagonal-mask-performance.md).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-12 | minor | Undo, History: snapshots and the History Brush source |
 | 2026-10-12 | minor | Toolbox tools 53 → 58 of 68 (78% → 85%): Freeform Pen, Curvature Pen, Add/Delete Anchor Point, Convert Point |
 | 2026-10-10 | minor | Readiness-by-audience table: percent and hours for full, mainstream and essentials; full number confirmed as the additive weighted sum over dimensions (46%, reported ~45%) |
 | 2026-10-10 | minor | Added mainstream-practitioner (~43%) and essentials-user (~61%) numbers with written weights and discounts; full ready-for-real-work rechecked against its written weights (46%, reported ~45%), unchanged |

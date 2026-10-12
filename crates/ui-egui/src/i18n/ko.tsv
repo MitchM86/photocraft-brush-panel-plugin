@@ -3078,3 +3078,11 @@ fontWeight	Italic	기울임
 	Follows only edges this close to the pointer ([ and ] change it)	포인터에서 이 거리 안의 가장자리만 따라갑니다([ 및 ]로 변경)
 	Higher values follow only edges that contrast sharply with their surroundings	값이 높을수록 주변과 대비가 뚜렷한 가장자리만 따라갑니다
 	How often fastening points are placed by themselves	고정점이 자동으로 배치되는 빈도
+	Sets the source for the History Brush	작업 내역 브러시의 소스 설정
+	Rename Snapshot…	스냅숏 이름 바꾸기…
+	Delete Snapshot	스냅숏 삭제
+	Delete snapshot	스냅숏 삭제
+	Rename Snapshot	스냅숏 이름 바꾸기
+	New Snapshot	새 스냅숏
+	Full Document	전체 문서
+	Merged Layers	병합된 레이어

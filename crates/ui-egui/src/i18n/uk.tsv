@@ -3606,3 +3606,9 @@ cameraRaw	Masking	Маскування
 	Follows only edges this close to the pointer ([ and ] change it)	Стежить лише за краями на такій відстані від вказівника ([ і ] змінюють її)
 	Higher values follow only edges that contrast sharply with their surroundings	Більші значення стежать лише за краями, що сильно контрастують з оточенням
 	How often fastening points are placed by themselves	Як часто точки кріплення ставляться самі
+	Sets the source for the History Brush	Задає джерело для пензля історії
+	Rename Snapshot…	Перейменувати знімок…
+	Delete snapshot	Видалити знімок
+	Rename Snapshot	Перейменувати знімок
+	Full Document	Увесь документ
+	Merged Layers	Об'єднані шари

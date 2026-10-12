@@ -2538,3 +2538,11 @@ fontWeight	Italic	Kursiv
 	Follows only edges this close to the pointer ([ and ] change it)	Folgt nur Kanten so nah am Zeiger ([ und ] ändern den Wert)
 	Higher values follow only edges that contrast sharply with their surroundings	Höhere Werte folgen nur Kanten, die sich stark von ihrer Umgebung abheben
 	How often fastening points are placed by themselves	Wie oft Befestigungspunkte von selbst gesetzt werden
+	Sets the source for the History Brush	Legt die Quelle für den Protokoll-Pinsel fest
+	Rename Snapshot…	Schnappschuss umbenennen…
+	Delete Snapshot	Schnappschuss löschen
+	Delete snapshot	Schnappschuss löschen
+	Rename Snapshot	Schnappschuss umbenennen
+	New Snapshot	Neuer Schnappschuss
+	Full Document	Gesamtes Dokument
+	Merged Layers	Zusammengefügte Ebenen
