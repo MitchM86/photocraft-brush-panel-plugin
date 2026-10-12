@@ -93,7 +93,34 @@ fn opt(ui: &mut egui::Ui, text: &str) {
     ui.label(egui::RichText::new(tl!(&text)).color(t.text_dim).size(12.0));
 }
 
-/// Options bar for the Magic Eraser and Background Eraser. Returns false for other tools.
+/// Sampling (Continuous / Once / Background Swatch, as icon toggles), Limits and Tolerance, as
+/// the Background Eraser and Color Replacement tools show them in Photoshop.
+fn sampling_and_limits(ui: &mut egui::Ui, id: &str, sampling: &mut String, limits: &mut String, tolerance: &mut f32) {
+    ui.spacing_mut().item_spacing.x = 2.0;
+    for (k, icon, tip) in [
+        ("continuous", "pipette", tl!("Sampling: Continuous")),
+        ("once", "circle-dot", tl!("Sampling: Once")),
+        ("backgroundSwatch", "square", tl!("Sampling: Background Swatch")),
+    ] {
+        if icons::button(ui, icon, 24.0, *sampling == k, tip).clicked() {
+            *sampling = k.into();
+        }
+    }
+    ui.spacing_mut().item_spacing.x = 8.0;
+    widgets::vline(ui, 22.0);
+    opt(ui, tl!("Limits:"));
+    let choices = [
+        ("discontiguous".to_string(), tl!("Discontiguous")),
+        ("contiguous".to_string(), tl!("Contiguous")),
+        ("findEdges".to_string(), tl!("Find Edges")),
+    ];
+    widgets::dropdown(ui, id, limits, &choices, 110.0);
+    opt(ui, tl!("Tolerance:"));
+    widgets::value_field(ui, tolerance, 0.0..=100.0, "%", 62.0);
+}
+
+/// Options bar for the Magic Eraser, Background Eraser and Color Replacement tools. Returns false
+/// for other tools.
 pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bool {
     let o = &mut app.ui.tool_options;
     match tool {
@@ -108,29 +135,22 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
             widgets::value_field(ui, &mut o.magic_eraser_opacity, 1.0..=100.0, "%", 62.0);
         }
         Tool::BackgroundEraser => {
-            // Sampling: Continuous / Once / Background Swatch, as icon toggles (Photoshop).
-            ui.spacing_mut().item_spacing.x = 2.0;
-            for (k, icon, tip) in [
-                ("continuous", "pipette", tl!("Sampling: Continuous")),
-                ("once", "circle-dot", tl!("Sampling: Once")),
-                ("backgroundSwatch", "square", tl!("Sampling: Background Swatch")),
-            ] {
-                if icons::button(ui, icon, 24.0, o.bg_sampling == k, tip).clicked() {
-                    o.bg_sampling = k.into();
-                }
-            }
-            ui.spacing_mut().item_spacing.x = 8.0;
-            widgets::vline(ui, 22.0);
-            opt(ui, tl!("Limits:"));
-            let limits = [
-                ("discontiguous".to_string(), tl!("Discontiguous")),
-                ("contiguous".to_string(), tl!("Contiguous")),
-                ("findEdges".to_string(), tl!("Find Edges")),
-            ];
-            widgets::dropdown(ui, "bg-eraser-limits", &mut o.bg_limits, &limits, 110.0);
-            opt(ui, tl!("Tolerance:"));
-            widgets::value_field(ui, &mut o.bg_tolerance, 0.0..=100.0, "%", 62.0);
+            sampling_and_limits(ui, "bg-eraser-limits", &mut o.bg_sampling, &mut o.bg_limits, &mut o.bg_tolerance);
             widgets::checkbox(ui, &mut o.bg_protect_fg, tl!("Protect Foreground Color"));
+        }
+        // Color Replacement: Mode, then the Background Eraser's Sampling / Limits / Tolerance.
+        Tool::ColorReplacement => {
+            opt(ui, tl!("Mode:"));
+            let modes = [
+                ("hue".to_string(), tl!("Hue")),
+                ("saturation".to_string(), tl!("Saturation")),
+                ("color".to_string(), tl!("Color")),
+                ("luminosity".to_string(), tl!("Luminosity")),
+            ];
+            widgets::dropdown(ui, "color-replace-mode", &mut o.replace_mode, &modes, 100.0);
+            widgets::vline(ui, 22.0);
+            sampling_and_limits(ui, "color-replace-limits", &mut o.replace_sampling, &mut o.replace_limits, &mut o.replace_tolerance);
+            widgets::checkbox(ui, &mut o.anti_alias, tl!("Anti-alias"));
         }
         _ => return false,
     }

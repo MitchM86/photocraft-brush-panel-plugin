@@ -79,6 +79,10 @@ pub fn finish_stroke(app: &mut PhotocraftApp, tool: Tool, points: &[[f64; 3]], m
         Tool::SpotHealing => ("paint.spotHealing", json!({"type": o.spot_type, "sampleAllLayers": o.sample_all_layers})),
         Tool::Remove => ("paint.remove", json!({"sampleAllLayers": o.sample_all_layers})),
         Tool::MixerBrush => ("paint.mixerBrush", json!({"color": mixer_color(app)})),
+        Tool::ColorReplacement => (
+            "paint.colorReplacement",
+            json!({"mode": o.replace_mode, "sampling": o.replace_sampling, "limits": o.replace_limits, "tolerance": o.replace_tolerance, "antiAlias": o.anti_alias}),
+        ),
         Tool::PatternStamp => {
             let mut p = json!({
                 "aligned": o.pattern_stamp_aligned,
@@ -519,6 +523,25 @@ mod tests {
         app.ui.tool = Tool::Eraser;
         app.ui.tool_options.eraser_mode = "pencil".into();
         assert_eq!(crate::eraser_ui::history_params(&app), json!({"hardness": 100}));
+    }
+
+    #[test]
+    fn color_replacement_paints_the_foreground_hue_over_a_colour() {
+        let mut app = app();
+        app.run("layer.new.layer", json!({})).unwrap();
+        app.run("edit.fill", json!({"color": "#cc2222"})).unwrap();
+        app.run("tools.setColors", json!({"foreground": "#2222cc"})).unwrap();
+        app.ui.tool = Tool::ColorReplacement;
+        app.ui.tool_options.replace_mode = "hue".into();
+        let none = egui::Modifiers::NONE;
+        tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 30.0, pressure: 1.0 }, none);
+        tool_event(&mut app, ToolEvent::Move { x: 50.0, y: 30.0, pressure: 1.0 }, none);
+        tool_event(&mut app, ToolEvent::Up { x: 50.0, y: 30.0 }, none);
+        let (id, p) = app.session.journal.last().cloned().unwrap();
+        assert_eq!((id.as_str(), &p["mode"], &p["limits"], &p["tolerance"]), ("paint.colorReplacement", &json!("hue"), &json!("contiguous"), &json!(30.0)));
+        let st = app.session.active().unwrap();
+        let px = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().rgba(30, 30);
+        assert!(px[2] > px[0], "red turned blue under the stroke: {px:?}");
     }
 
     #[test]

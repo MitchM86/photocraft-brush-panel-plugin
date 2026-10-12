@@ -78,6 +78,7 @@ pub enum Tool {
     Count,
     Brush,
     Pencil,
+    ColorReplacement,
     MixerBrush,
     Eraser,
     BackgroundEraser,
@@ -125,7 +126,7 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: [Tool; 60] = [
+    pub const ALL: [Tool; 61] = [
         Tool::Move,
         Tool::RectMarquee,
         Tool::EllipseMarquee,
@@ -142,6 +143,7 @@ impl Tool {
         Tool::Count,
         Tool::Brush,
         Tool::Pencil,
+        Tool::ColorReplacement,
         Tool::MixerBrush,
         Tool::Eraser,
         Tool::BackgroundEraser,
@@ -197,6 +199,7 @@ impl Tool {
             Tool::SingleColumnMarquee => "Single Column Marquee Tool",
             Tool::Brush => "Brush Tool",
             Tool::Pencil => "Pencil Tool",
+            Tool::ColorReplacement => "Color Replacement Tool",
             Tool::MixerBrush => "Mixer Brush Tool",
             Tool::Eraser => "Eraser Tool",
             Tool::BackgroundEraser => "Background Eraser Tool",
@@ -262,6 +265,7 @@ impl Tool {
             self,
             Tool::Brush
                 | Tool::Pencil
+                | Tool::ColorReplacement
                 | Tool::MixerBrush
                 | Tool::Eraser
                 | Tool::BackgroundEraser
@@ -286,7 +290,7 @@ impl Tool {
             Tool::RectMarquee | Tool::EllipseMarquee => 'M',
             // Photoshop gives the single-pixel marquees no key of their own.
             Tool::SingleRowMarquee | Tool::SingleColumnMarquee => '\0',
-            Tool::Brush | Tool::Pencil | Tool::MixerBrush => 'B',
+            Tool::Brush | Tool::Pencil | Tool::ColorReplacement | Tool::MixerBrush => 'B',
             Tool::Eraser | Tool::BackgroundEraser | Tool::MagicEraser => 'E',
             Tool::Eyedropper | Tool::Ruler | Tool::Note | Tool::Count => 'I',
             Tool::Lasso | Tool::PolygonLasso | Tool::MagneticLasso => 'L',
@@ -613,6 +617,18 @@ pub struct ToolOptions {
     /// Width, Contrast and Frequency.
     #[serde(default)]
     pub freeform_magnetic: bool,
+    /// Color Replacement › Mode: `hue`, `saturation`, `color` or `luminosity`.
+    #[serde(default = "default_replace_mode")]
+    pub replace_mode: String,
+    /// Color Replacement › Sampling: `continuous`, `once` or `backgroundSwatch`.
+    #[serde(default = "default_continuous")]
+    pub replace_sampling: String,
+    /// Color Replacement › Limits: `discontiguous`, `contiguous` or `findEdges`.
+    #[serde(default = "default_contiguous")]
+    pub replace_limits: String,
+    /// Color Replacement › Tolerance (%).
+    #[serde(default = "default_replace_tolerance")]
+    pub replace_tolerance: f32,
     /// Magnetic Lasso: detection width (px, 1..256), edge contrast (%, 1..100), how often it
     /// fastens points by itself (0..100), and whether pen pressure narrows the width.
     pub magnetic_width: f32,
@@ -648,6 +664,22 @@ fn default_crop_resolution_unit() -> String {
 
 fn default_move_target() -> String {
     "layer".into()
+}
+
+fn default_replace_mode() -> String {
+    "color".into()
+}
+
+fn default_continuous() -> String {
+    "continuous".into()
+}
+
+fn default_contiguous() -> String {
+    "contiguous".into()
+}
+
+fn default_replace_tolerance() -> f32 {
+    30.0
 }
 
 fn default_curve_fit() -> f32 {
@@ -760,6 +792,10 @@ impl Default for ToolOptions {
             erase_to_history: false,
             freeform_curve_fit: default_curve_fit(),
             freeform_magnetic: false,
+            replace_mode: default_replace_mode(),
+            replace_sampling: default_continuous(),
+            replace_limits: default_contiguous(),
+            replace_tolerance: default_replace_tolerance(),
             magnetic_width: 10.0,
             magnetic_contrast: 10.0,
             magnetic_frequency: 57.0,
@@ -1263,7 +1299,7 @@ mod tests {
         assert!(!Tool::RedEye.is_brushlike());
         assert_eq!(Tool::from_name("patternStamp"), Some(Tool::PatternStamp));
         assert_eq!(Tool::from_name("Pattern Stamp Tool"), Some(Tool::PatternStamp));
-        assert_eq!(Tool::ALL.len(), 60);
+        assert_eq!(Tool::ALL.len(), 61);
         assert_eq!(Tool::from_name("Remove Tool"), Some(Tool::Remove));
         assert_eq!(Tool::Remove.key(), 'J');
         assert!(Tool::Remove.is_brushlike());
