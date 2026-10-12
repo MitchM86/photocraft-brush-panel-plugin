@@ -2768,3 +2768,19 @@ fontWeight	Italic	Курсив
 	JPEG (medium quality)	JPEG (среднее качество)
 	JPEG (high quality)	JPEG (высокое качество)
 	JPEG (maximum quality)	JPEG (наилучшее качество)
+	Freeform Pen Tool	Свободное перо
+	Curvature Pen Tool	Перо кривизны
+	Add Anchor Point Tool	Добавить опорную точку
+	Delete Anchor Point Tool	Удалить опорную точку
+	Convert Point Tool	Угол
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	Клик по сегменту: добавить опорную точку · {alt}: удалить опорную точку
+	Click an anchor: delete it · {alt}: Add Anchor Point	Клик по опорной точке: удалить · {alt}: добавить опорную точку
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	Клик по опорной точке: угол · перетаскивание от опорной точки: гладкая · перетаскивание маркера: двигать только его
+	Curve Fit:	Подгонка кривой:
+	Drag: draw a path · Release over its start: close	Перетаскивание: нарисовать контур · отпустить над началом: замкнуть
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	Клик: добавить точку · двойной клик или {alt}-клик по точке: угол · перетаскивание точки: двигать · {key} завершить
+	Magnetic	Магнитное
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	Клик, затем ведите вдоль края · {alt}-клик: прямо · {key} завершить · двойной клик: замкнуть
+	Follows only edges this close to the pointer ([ and ] change it)	Следует только за краями на таком расстоянии от указателя ([ и ] меняют его)
+	Higher values follow only edges that contrast sharply with their surroundings	Большие значения следуют только за краями, сильно контрастирующими с окружением
+	How often fastening points are placed by themselves	Как часто точки привязки ставятся сами

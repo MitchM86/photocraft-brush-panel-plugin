@@ -3503,3 +3503,19 @@ cameraRaw	Roughness	Chropowatość
 	JPEG (medium quality)	JPEG (średnia jakość)
 	JPEG (high quality)	JPEG (wysoka jakość)
 	JPEG (maximum quality)	JPEG (maksymalna jakość)
+	Freeform Pen Tool	Narzędzie Pióro swobodne
+	Curvature Pen Tool	Narzędzie Pióro krzywizny
+	Add Anchor Point Tool	Narzędzie Dodaj punkt kontrolny
+	Delete Anchor Point Tool	Narzędzie Usuń punkt kontrolny
+	Convert Point Tool	Narzędzie Konwertuj punkt
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	Klik w segment: dodaj punkt kontrolny · {alt}: Usuń punkt kontrolny
+	Click an anchor: delete it · {alt}: Add Anchor Point	Klik w punkt kontrolny: usuń go · {alt}: Dodaj punkt kontrolny
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	Klik w punkt kontrolny: narożnik · Przeciągnięcie od punktu: gładki · Przeciągnięcie uchwytu: przesuń tylko jego
+	Curve Fit:	Dopasowanie krzywej:
+	Drag: draw a path · Release over its start: close	Przeciągnięcie: rysuj ścieżkę · Puszczenie nad początkiem: zamknij
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	Klik: dodaj punkt · Dwuklik lub {alt}+klik w punkt: narożnik · Przeciągnięcie punktu: przesuń · {key} zakończ
+	Magnetic	Magnetyczne
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	Kliknij, potem prowadź wzdłuż krawędzi · {alt}+klik: prosto · {key} zakończ · dwuklik: zamknij
+	Follows only edges this close to the pointer ([ and ] change it)	Podąża tylko za krawędziami tak blisko wskaźnika ([ i ] zmieniają)
+	Higher values follow only edges that contrast sharply with their surroundings	Wyższe wartości podążają tylko za krawędziami silnie kontrastującymi z otoczeniem
+	How often fastening points are placed by themselves	Jak często punkty mocowania są wstawiane samoczynnie

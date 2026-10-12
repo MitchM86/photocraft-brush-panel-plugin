@@ -3503,3 +3503,19 @@ fontWeight	Italic	斜体
 	JPEG (medium quality)	JPEG（中画質）
 	JPEG (high quality)	JPEG（高画質）
 	JPEG (maximum quality)	JPEG（最高画質）
+	Freeform Pen Tool	フリーフォームペンツール
+	Curvature Pen Tool	曲線ペンツール
+	Add Anchor Point Tool	アンカーポイントの追加ツール
+	Delete Anchor Point Tool	アンカーポイントの削除ツール
+	Convert Point Tool	アンカーポイントの切り替えツール
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	セグメントをクリック: アンカーポイントを追加 · {alt}: アンカーポイントの削除
+	Click an anchor: delete it · {alt}: Add Anchor Point	アンカーポイントをクリック: 削除 · {alt}: アンカーポイントの追加
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	アンカーポイントをクリック: 角 · アンカーポイントからドラッグ: 滑らか · ハンドルをドラッグ: 単独で移動
+	Curve Fit:	カーブフィット:
+	Drag: draw a path · Release over its start: close	ドラッグ: パスを描画 · 始点の上で放す: 閉じる
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	クリック: 点を追加 · 点をダブルクリックまたは {alt}-クリック: 角 · 点をドラッグ: 移動 · {key} 完了
+	Magnetic	マグネット
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	クリックしてエッジに沿って移動 · {alt}-クリック: 直線 · {key} 完了 · ダブルクリック: 閉じる
+	Follows only edges this close to the pointer ([ and ] change it)	ポインターからこの距離内のエッジだけをたどります（[ と ] で変更）
+	Higher values follow only edges that contrast sharply with their surroundings	値を大きくすると、周囲とのコントラストが強いエッジだけをたどります
+	How often fastening points are placed by themselves	固定ポイントが自動的に配置される頻度

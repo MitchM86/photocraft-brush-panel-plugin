@@ -1,6 +1,6 @@
 # Where PhotoCraft falls short of Photoshop
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** major (first version: every known shortfall ranked, from the 2026-10-10 re-measure) · **Target:** Adobe Photoshop 2026
+> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-12 · **Change:** minor (G6: the five Pen-slot tools landed) · **Target:** Adobe Photoshop 2026
 
 Every known shortfall against Photoshop 2026 (27.11.0), one entry each, ranked by user impact
 on the way to beta. This is the work list agents pick from: take the highest-ranked entry that
@@ -54,14 +54,15 @@ what an agent can't finish alone.
   scripted check there) is the only real oracle.
 
 ### G6. Missing tools
-- **Missing (15 of 68):** Artboard, Single Row Marquee, Single Column Marquee, Perspective Crop,
+- **Missing (10 of 68):** Artboard, Single Row Marquee, Single Column Marquee, Perspective Crop,
   Frame, Color Sampler (#1046), Color Replacement (engine command exists), Art History Brush,
-  Freeform Pen and Curvature Pen (#1054), Add Anchor Point, Delete Anchor Point, Convert Point
-  (only as Pen + ⌥), Horizontal Type Mask, Vertical Type Mask.
+  Horizontal Type Mask, Vertical Type Mask. The Pen slot is complete since 2026-10-12: Freeform
+  Pen (Curve Fit, Magnetic), Curvature Pen (#1054), Add Anchor Point, Delete Anchor
+  Point and Convert Point (`pen_tools.rs`, `path.addAnchor`, `path.deleteAnchor`).
 - **Evidence:** `Tool` enum (`crates/ui-egui/src/state.rs`) against the 67 `<tool>` entries of
   Photoshop's `Default Keyboard Shortcuts.kys` plus Remove, Triangle and Curvature Pen.
 - **Impact:** users look for them by name and shortcut; several are daily tools for designers.
-- **Estimate:** 60–100 h (2–9 h each, per the calibration).
+- **Estimate:** 40–70 h (2–9 h each, per the calibration).
 
 ### G7. Workspaces shown as parameter dialogs
 - **Missing:** Select and Mask workspace with view modes, Refine Edge brush and outputs
@@ -211,5 +212,6 @@ what an agent can't finish alone.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-12 | minor | G6: Freeform Pen, Curvature Pen, Add/Delete Anchor Point and Convert Point landed (10 of 68 tools left) |
 | 2026-10-10 | minor | Checked against the alpha gate (no alpha blockers); #2374 marked closed |
 | 2026-10-10 | major | First version, from the full re-measure against Photoshop 2026 27.11.0 and the open issues |

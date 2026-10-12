@@ -3661,3 +3661,16 @@ cameraRaw	Whites	Witten
 	JPEG (medium quality)	JPEG (gemiddelde kwaliteit)
 	JPEG (high quality)	JPEG (hoge kwaliteit)
 	JPEG (maximum quality)	JPEG (maximale kwaliteit)
+	Freeform Pen Tool	Pen voor vrije vormgereedschap
+	Curvature Pen Tool	Kromtepengereedschap
+	Add Anchor Point Tool	Ankerpunt-toevoegengereedschap
+	Delete Anchor Point Tool	Ankerpunt-verwijderengereedschap
+	Convert Point Tool	Punt-omzettengereedschap
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	Klik op een segment: ankerpunt toevoegen · {alt}: Ankerpunt verwijderen
+	Click an anchor: delete it · {alt}: Add Anchor Point	Klik op een ankerpunt: verwijderen · {alt}: Ankerpunt toevoegen
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	Klik op een ankerpunt: hoek · Slepen vanaf een ankerpunt: vloeiend · Een handgreep slepen: alleen die verplaatsen
+	Curve Fit:	Curve aanpassen:
+	Drag: draw a path · Release over its start: close	Slepen: pad tekenen · Loslaten boven het begin: sluiten
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	Klik: punt toevoegen · Dubbelklik of {alt}-klik op een punt: hoek · Punt slepen: verplaatsen · {key} voltooien
+	Magnetic	Magnetisch
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	Klik en beweeg langs een rand · {alt}-klik: recht · {key} voltooien · dubbelklik: sluiten

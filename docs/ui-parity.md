@@ -1,6 +1,6 @@
 # UI parity: tools, handles, modifiers and feel
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** major (first version: tools, transform, nudging, snapping, modifiers, navigation, shortcuts, panels audited from source and open issues) · **Target:** Adobe Photoshop 2026
+> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-12 · **Change:** minor (Pen slot complete: tools 58/68) · **Target:** Adobe Photoshop 2026
 
 How PhotoCraft's direct manipulation compares with Photoshop 2026 (27.11.0): the toolbox, the
 handles and modifier keys of each gesture, nudging, snapping, numeric precision, navigation,
@@ -12,8 +12,8 @@ Status: **done** (behaves as in Photoshop, with a test), **partial** (exists, di
 **missing**. Evidence is a file under `crates/ui-egui/src/` unless another path is given, a
 scorecard id, or an issue. Modifier names are macOS first (⌘ ⌥ ⇧); Windows/Linux use Ctrl and Alt.
 
-**Summary (estimated, weights = how often the gesture is used):** ~40% ready. Tools 53/68
-present (78%, measured). Free Transform modifiers and Crop are close to Photoshop; the gaps are
+**Summary (estimated, weights = how often the gesture is used):** ~40% ready. Tools 58/68
+present (85%, measured). Free Transform modifiers and Crop are close to Photoshop; the gaps are
 in the long tail of modifiers, in-transform UI, spring-loaded tools, panels and preferences.
 Remaining: 60–110 h for transforms and modifiers (gap G5), 60–100 h for tools (G6), 150–250 h
 for panels and workspace (G9).
@@ -40,7 +40,7 @@ Triangle and Curvature Pen (minus legacy Rounded Rectangle and Targeted Adjustme
 | Eraser | Eraser, Background Eraser, Magic Eraser | |
 | Fill | Gradient, Paint Bucket | |
 | Focus, toning | Blur, Sharpen, Smudge, Dodge, Burn, Sponge | |
-| Pen | Pen | Freeform Pen, Curvature Pen (#1054), Add Anchor Point, Delete Anchor Point, Convert Point (⌥ with Pen only) |
+| Pen | Pen, Freeform Pen, Curvature Pen (#1054), Add Anchor Point, Delete Anchor Point, Convert Point | |
 | Type | Horizontal, Vertical | Horizontal Type Mask, Vertical Type Mask |
 | Path selection | Path Selection, Direct Selection | |
 | Shapes | Rectangle, Ellipse, Triangle, Polygon, Line, Custom Shape | (Star is a Polygon option in Photoshop) |
@@ -203,4 +203,5 @@ Paragraph; the rest open as in-app floating windows.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-12 | minor | Pen slot complete: Freeform Pen, Curvature Pen, Add/Delete Anchor Point, Convert Point (tools 58/68) |
 | 2026-10-10 | major | First version, from a source audit against Photoshop 2026 27.11.0's shortcuts file and the open issues |

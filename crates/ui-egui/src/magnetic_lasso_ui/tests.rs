@@ -394,3 +394,56 @@ fn on_the_canvas_a_double_click_closes_the_border() {
     assert!((area - 5600.0).abs() < 120.0, "{area}");
     assert_eq!(last_step(h.state()).as_deref(), Some("Magnetic Lasso"));
 }
+
+/// The Freeform Pen with Magnetic ticked: the same border, finished as a path.
+fn pen_app() -> PhotocraftApp {
+    let mut app = app();
+    app.ui.tool = Tool::FreeformPen;
+    app.ui.tool_options.freeform_magnetic = true;
+    app
+}
+
+fn work_path(app: &PhotocraftApp) -> Option<photocraft_doc::vector::Path> {
+    app.session.active().unwrap().doc.work_path.clone()
+}
+
+#[test]
+fn magnetic_freeform_pen_traces_an_edge_into_a_closed_path() {
+    let mut app = pen_app();
+    let selection_before = app.session.active().unwrap().doc.selection.is_some();
+    click(&mut app, AROUND[0][0], AROUND[0][1], Modifiers::NONE);
+    assert!(app.ui.magnetic.active() && app.ui.magnetic.pen);
+    hover_along(&mut app, &AROUND[..5]);
+    // Clicking the first point closes the path along the edges.
+    click(&mut app, AROUND[0][0], AROUND[0][1], Modifiers::NONE);
+    assert!(!app.ui.magnetic.active());
+    let path = work_path(&app).expect("a work path");
+    let sp = &path.subpaths[0];
+    assert!(sp.closed);
+    assert!(sp.knots.len() >= 4 && sp.knots.len() <= 16, "fitted to a few anchors: {}", sp.knots.len());
+    assert!(sp.knots.iter().all(|k| on_square([k.anchor.x, k.anchor.y], 2.5)), "anchors on the square's outline: {:?}", sp.knots);
+    assert_eq!(app.session.active().unwrap().doc.selection.is_some(), selection_before, "a path, not a selection");
+    assert_eq!(app.ui.selected_path.as_deref(), Some("work"));
+}
+
+#[test]
+fn magnetic_freeform_pen_enter_ends_open_and_switching_off_leaves_freehand() {
+    let mut app = pen_app();
+    click(&mut app, AROUND[0][0], AROUND[0][1], Modifiers::NONE);
+    hover_along(&mut app, &AROUND[..3]);
+    finish_open(&mut app);
+    let sp = work_path(&app).expect("a work path").subpaths[0].clone();
+    assert!(!sp.closed && sp.knots.len() >= 2);
+    assert!(sp.knots.iter().all(|k| on_square([k.anchor.x, k.anchor.y], 2.5)), "{:?}", sp.knots);
+    // ⌘ goes to Direct Selection when no border is being drawn.
+    tool_event(&mut app, ToolEvent::Down { x: 60.0, y: 60.0, pressure: 1.0 }, Modifiers::COMMAND);
+    tool_event(&mut app, ToolEvent::Up { x: 60.0, y: 60.0 }, Modifiers::COMMAND);
+    assert!(!app.ui.magnetic.active());
+    // Unticked, the Freeform Pen draws freehand again; a border left over is dropped.
+    click(&mut app, AROUND[0][0], AROUND[0][1], Modifiers::NONE);
+    app.ui.tool_options.freeform_magnetic = false;
+    frame(&mut app);
+    assert!(!app.ui.magnetic.active());
+    tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 10.0, pressure: 1.0 }, Modifiers::NONE);
+    assert!(app.ui.freeform.is_some());
+}

@@ -370,6 +370,26 @@ pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context) {
             return;
         }
     }
+    // The same for the Curvature Pen: ⌘Z / ⌫ remove the point last touched, ↩ / Esc finish.
+    if app.ui.curvature.is_some() {
+        let mods = ctx.input(|i| i.modifiers);
+        let command_undo = effective_shortcut(app, "edit.undo", default_shortcut("edit.undo").as_deref())
+            .and_then(|shortcut| parse(&shortcut))
+            .is_some_and(|shortcut| consume(ctx, &shortcut));
+        let remove = !mods.command
+            && !mods.ctrl
+            && !mods.shift
+            && !mods.alt
+            && ctx.input_mut(|i| i.consume_key(mods, Key::Backspace) || i.consume_key(mods, Key::Delete));
+        if command_undo || remove {
+            crate::pen_tools::curvature_remove_point(app);
+            return;
+        }
+        if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter) || i.consume_key(Modifiers::NONE, Key::Escape)) {
+            crate::pen_tools::curvature_commit(app, false);
+            return;
+        }
+    }
     // Pen path in progress: ↩ and Esc both end it as an open path and keep it, as in Photoshop (#1769).
     if app.ui.pen.is_some() && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter) || i.consume_key(Modifiers::NONE, Key::Escape)) {
         crate::vector_ui::pen_commit(app, false);

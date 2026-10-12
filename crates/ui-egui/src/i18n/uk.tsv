@@ -3590,3 +3590,19 @@ cameraRaw	Masking	Маскування
 	JPEG (medium quality)	JPEG (середня якість)
 	JPEG (high quality)	JPEG (висока якість)
 	JPEG (maximum quality)	JPEG (максимальна якість)
+	Freeform Pen Tool	Інструмент «Довільне перо»
+	Curvature Pen Tool	Інструмент «Перо кривизни»
+	Add Anchor Point Tool	Інструмент «Додати опорну точку»
+	Delete Anchor Point Tool	Інструмент «Видалити опорну точку»
+	Convert Point Tool	Інструмент «Перетворити точку»
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	Клацання сегмента: додати опорну точку · {alt}: видалити опорну точку
+	Click an anchor: delete it · {alt}: Add Anchor Point	Клацання опорної точки: видалити її · {alt}: додати опорну точку
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	Клацання опорної точки: кут · Перетягування від опорної точки: плавна точка · Перетягування маркера: рухати лише його
+	Curve Fit:	Припасування кривої:
+	Drag: draw a path · Release over its start: close	Перетягування: намалювати контур · Відпустити над початком: замкнути
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	Клацання: додати точку · Подвійне клацання або {alt}-клацання точки: кут · Перетягування точки: рухати · {key}: завершити
+	Magnetic	Магнітне
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	Клацніть, потім ведіть уздовж краю · {alt}-клацання: прямо · {key}: завершити · подвійне клацання: замкнути
+	Follows only edges this close to the pointer ([ and ] change it)	Стежить лише за краями на такій відстані від вказівника ([ і ] змінюють її)
+	Higher values follow only edges that contrast sharply with their surroundings	Більші значення стежать лише за краями, що сильно контрастують з оточенням
+	How often fastening points are placed by themselves	Як часто точки кріплення ставляться самі

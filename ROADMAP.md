@@ -2,7 +2,7 @@
 
 **Stage: alpha** · next: beta, ~30 points (ready for real work ~45% → ~75%, with reliable PSD) and ~1,100–1,800 h away
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** major (first version: full re-measure against Photoshop 2026 27.11.0) · **Target:** Adobe Photoshop 2026
+> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-12 · **Change:** minor (tools 58/68) · **Target:** Adobe Photoshop 2026
 
 PhotoCraft's one-page summary of how close it is to Adobe Photoshop 2026 (27.11.0, measured from
 the installed app on 2026-10-10) at version 0.6.0. Detail: [target-app parity](docs/target-app-parity.md)
@@ -19,7 +19,7 @@ About 80% of the work parallelizes.
 
 | | Value | Kind |
 |---|---|---|
-| **Feature breadth** | **~76%** | partly measured: menus 628/628, tools 53/68, panels 30/35, formats 13+4 of 31 |
+| **Feature breadth** | **~76%** | partly measured: menus 628/628, tools 58/68, panels 30/35, formats 13+4 of 31 |
 | **Ready for real work** | **~45%** (40–50%) | estimated: weighted by dimension below |
 | Mainstream practitioner | ~43% (38–48%) | estimated: weekly areas of a typical pro, with discounts ([method](docs/target-app-parity.md#mainstream-practitioner-43)) |
 | Essentials user | ~61% (55–67%) | estimated: core features only ([method](docs/target-app-parity.md#essentials-user-61)) |
@@ -135,6 +135,7 @@ Detail and the next releases: [docs/roadmap.md](docs/roadmap.md).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-12 | minor | Tools 53 → 58 of 68: the Pen slot is complete |
 | 2026-10-10 | minor | Readiness by audience with hours per tier |
 | 2026-10-10 | minor | Mainstream-practitioner and essentials-user numbers added |
 | 2026-10-10 | minor | Alpha gate result (passes; stays alpha) in the stage explanation |

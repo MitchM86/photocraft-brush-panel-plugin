@@ -109,6 +109,25 @@ fn convert_point(s: &mut Session, p: &Value) -> Result<Value> {
     edit_path(s, CMD, p, "Convert Point", |path| edit::convert_point(path, k, out))
 }
 
+fn add_anchor(s: &mut Session, p: &Value) -> Result<Value> {
+    const CMD: &str = "path.addAnchor";
+    let k = knot(CMD, p)?;
+    let t = match p.get("t") {
+        Some(v) => v.as_f64().filter(|t| (0.0..=1.0).contains(t)).ok_or_else(|| bad(CMD, "`t` must be between 0 and 1"))?,
+        None => 0.5,
+    };
+    let mut added = k;
+    let mut r = edit_path(s, CMD, p, "Add Anchor Point", |path| edit::add_anchor(path, k, t).map(|n| added = n))?;
+    r["knot"] = json!(added);
+    Ok(r)
+}
+
+fn delete_anchor(s: &mut Session, p: &Value) -> Result<Value> {
+    const CMD: &str = "path.deleteAnchor";
+    let k = knot(CMD, p)?;
+    edit_path(s, CMD, p, "Delete Anchor Point", |path| edit::delete_anchor(path, k))
+}
+
 fn subpaths(cmd: &str, p: &Value) -> Result<Vec<usize>> {
     p.get("subpaths")
         .and_then(Value::as_array)
@@ -168,6 +187,18 @@ pub fn specs() -> Vec<CommandSpec> {
             convert_point,
         ),
         spec(
+            "path.addAnchor",
+            "Add Anchor Point",
+            r#""subpath":i,"knot":j (the segment leaving it),"t":0..1=0.5 (where on it; the outline doesn't change) → also "knot": [subpath, knot] of the new anchor"#.into(),
+            add_anchor,
+        ),
+        spec(
+            "path.deleteAnchor",
+            "Delete Anchor Point",
+            r#""subpath":i,"knot":j (its neighbours join; not the path's only anchor: delete the path instead)"#.into(),
+            delete_anchor,
+        ),
+        spec(
             "path.moveSubpaths",
             "Drag Path",
             r#""subpaths":[i,…],"move":[dx,dy],"duplicate":bool=false (Path Selection drag; duplicate = ⌥, moved copies are added after the last subpath) → also "subpaths": the indices that moved"#.into(),
@@ -225,6 +256,25 @@ mod tests {
         assert!(s.execute("path.moveSubpaths", json!({"subpaths": [4], "move": [1, 1]})).is_err());
         s.execute("edit.undo", json!({})).unwrap();
         assert_eq!(work(&s).subpaths.len(), 3);
+    }
+
+    #[test]
+    fn anchors_are_added_and_deleted_in_one_undoable_step_each() {
+        let mut s = session();
+        s.execute("path.set", json!({"path": square()})).unwrap();
+        let before = work(&s);
+        let r = s.execute("path.addAnchor", json!({"subpath": 0, "knot": 3, "t": 0.5})).unwrap();
+        assert_eq!((r["knot"].clone(), anchor(&r, 4)), (json!([0, 4]), [10.0, 35.0]), "the closing segment's new anchor goes last");
+        assert_eq!(s.active().unwrap().history.undo_label(), Some("Add Anchor Point"));
+        let r = s.execute("path.deleteAnchor", json!({"subpath": 0, "knot": 0})).unwrap();
+        assert_eq!((r["path"]["subpaths"][0]["knots"].as_array().map(Vec::len), anchor(&r, 0)), (Some(4), [60.0, 10.0]));
+        assert_eq!(s.active().unwrap().history.undo_label(), Some("Delete Anchor Point"));
+        assert!(s.undo() && s.undo());
+        assert_eq!(work(&s), before);
+        assert!(s.execute("path.addAnchor", json!({"subpath": 0, "knot": 9})).is_err());
+        assert!(s.execute("path.addAnchor", json!({"subpath": 0, "knot": 0, "t": 2})).is_err());
+        assert!(s.execute("path.deleteAnchor", json!({"subpath": 1, "knot": 0})).is_err());
+        assert!(s.execute("path.deleteAnchor", json!({"knot": 0})).is_err());
     }
 
     #[test]

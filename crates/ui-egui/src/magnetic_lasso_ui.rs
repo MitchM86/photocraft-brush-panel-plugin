@@ -11,6 +11,10 @@
 //!
 //! The border closes through `select.magneticLasso` with `"trace": false`: the selection is exactly
 //! the outline drawn, in one history step, and an action replays that outline.
+//!
+//! The Freeform Pen with Magnetic ticked draws the same way, as in Photoshop, but the border
+//! becomes a path (fitted within the pen's Curve Fit, `pen_tools::freeform_finish`): ↩ ends it
+//! open, and clicking the first point or a double-click closes it (⌥ double-click straight).
 
 use egui::{Color32, Key, Modifiers, Pos2, Rect, Stroke, vec2};
 use photocraft_algo::magnetic::{self, Settings};
@@ -40,6 +44,8 @@ pub struct MagneticLasso {
     pub doc: u64,
     /// An ⌥-drag is drawing a freehand segment.
     pub freehand: bool,
+    /// Drawn by the Freeform Pen's Magnetic option: it becomes a path, not a selection.
+    pub pen: bool,
 }
 
 impl MagneticLasso {
@@ -102,10 +108,18 @@ fn trace(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2], guide: &[[f64; 2
     if t.is_empty() { vec![from, to] } else { t }
 }
 
-/// Pointer events while the Magnetic Lasso is the tool (it takes them all).
+/// Is magnetic drawing what `tool` does: the Magnetic Lasso, or the Freeform Pen with Magnetic.
+pub fn magnetic_tool(app: &PhotocraftApp, tool: Tool) -> bool {
+    tool == Tool::MagneticLasso || (tool == Tool::FreeformPen && app.ui.tool_options.freeform_magnetic)
+}
+
+/// Pointer events while the Magnetic Lasso (or the magnetic Freeform Pen) is the tool (it takes
+/// them all).
 pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool {
-    // ⌘ held makes it the Move tool (`hold_keys::cmd_moves`): nothing to take then.
-    if app.active_tool() != Tool::MagneticLasso {
+    // ⌘ held makes the lasso the Move tool (`hold_keys::cmd_moves`) and the pen Direct Selection:
+    // nothing to take then.
+    let tool = app.active_tool();
+    if !magnetic_tool(app, tool) || (tool == Tool::FreeformPen && mods.command && !app.ui.magnetic.active()) {
         return false;
     }
     match ev {
@@ -121,11 +135,12 @@ fn down(app: &mut PhotocraftApp, p: [f64; 2], pressure: f32, mods: Modifiers) {
     let s = settings(app, pressure);
     if !app.ui.magnetic.active() {
         // The first fastening point; the modifiers held now set the selection mode.
-        let mode = crate::canvas::selection_mode(app, mods).to_owned();
+        let pen = app.active_tool() == Tool::FreeformPen;
+        let mode = if pen { String::new() } else { crate::canvas::selection_mode(app, mods).to_owned() };
         app.magnetic = Runtime::default();
         let start = snap(app, p, s);
         let doc = app.session.active().map_or(0, |d| d.doc.id.0);
-        app.ui.magnetic = MagneticLasso { path: vec![start], anchors: vec![0], trail: vec![p], mode, doc, ..Default::default() };
+        app.ui.magnetic = MagneticLasso { path: vec![start], anchors: vec![0], trail: vec![p], mode, doc, pen, ..Default::default() };
         return;
     }
     if near_start(app, p) {
@@ -141,7 +156,7 @@ fn down(app: &mut PhotocraftApp, p: [f64; 2], pressure: f32, mods: Modifiers) {
         let m = &mut app.ui.magnetic;
         m.path.extend(closing.into_iter().skip(1));
         m.live.clear();
-        commit(app);
+        commit(app, true);
         return;
     }
     if mods.alt {
@@ -315,13 +330,37 @@ pub fn close(app: &mut PhotocraftApp, straight: bool) {
         closing.pop();
         app.ui.magnetic.path.extend(closing.into_iter().skip(1));
     }
-    commit(app);
+    commit(app, true);
 }
 
-/// Select the border as drawn (in the mode the first click set) and finish.
-fn commit(app: &mut PhotocraftApp) {
+/// ↩ with the magnetic Freeform Pen: the live segment fastens and the path ends open.
+pub fn finish_open(app: &mut PhotocraftApp) {
+    if !app.ui.magnetic.active() {
+        return;
+    }
+    end_freehand(app);
+    fasten_live(app);
+    commit(app, false);
+}
+
+/// Select the border as drawn (in the mode the first click set) and finish; the magnetic Freeform
+/// Pen's border becomes a path instead, `closed` or open.
+fn commit(app: &mut PhotocraftApp, closed: bool) {
     let m = std::mem::take(&mut app.ui.magnetic);
     app.magnetic = Runtime::default();
+    if m.pen {
+        if closed && m.path.len() > 2 {
+            // The border ends on its first point: the closed path doesn't repeat it.
+            let mut pts = m.path;
+            if pts.first().zip(pts.last()).is_some_and(|(a, b)| dist(*a, *b) < 1e-6) {
+                pts.pop();
+            }
+            crate::pen_tools::fit_and_commit(app, &pts, true);
+        } else {
+            crate::pen_tools::fit_and_commit(app, &m.path, false);
+        }
+        return;
+    }
     if m.path.len() < 3 {
         return;
     }
@@ -368,19 +407,25 @@ pub fn replaces_selection(app: &PhotocraftApp) -> bool {
 /// Once a frame: a border left behind by a tool or document switch is dropped.
 pub fn frame(app: &mut PhotocraftApp) {
     let m = &app.ui.magnetic;
-    if m.active() && (app.ui.tool != Tool::MagneticLasso || app.session.active().map(|d| d.doc.id.0) != Some(m.doc)) {
+    let tool_left = if m.pen { !(app.ui.tool == Tool::FreeformPen && app.ui.tool_options.freeform_magnetic) } else { app.ui.tool != Tool::MagneticLasso };
+    if m.active() && (tool_left || app.session.active().map(|d| d.doc.id.0) != Some(m.doc)) {
         cancel(app);
     }
 }
 
 /// Keys while the Magnetic Lasso is the tool: ↩ closes the border along the edges (⌥↩ straight),
 /// Esc cancels it, ⌫ / Delete remove the last fastening point, and [ / ] change the detection width
-/// by 1 px. Returns whether a key was taken.
+/// by 1 px. With the magnetic Freeform Pen, ↩ ends the path open instead. Returns whether a key
+/// was taken.
 pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
-    if app.ui.tool != Tool::MagneticLasso {
+    if !magnetic_tool(app, app.ui.tool) {
         return false;
     }
     let pressed = |m: Modifiers, k: Key| ctx.input_mut(|i| i.consume_key(m, k));
+    if app.ui.magnetic.active() && app.ui.magnetic.pen && pressed(Modifiers::NONE, Key::Enter) {
+        finish_open(app);
+        return true;
+    }
     if app.ui.magnetic.active() {
         if pressed(Modifiers::ALT, Key::Enter) {
             close(app, true);
@@ -420,7 +465,12 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, hover:
     }
     let screen = |q: &[f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
     let pts: Vec<Pos2> = m.path.iter().chain(m.live.iter().skip(1)).map(screen).collect();
-    crate::tool_feedback::draw_ants(painter, &pts, false);
+    if m.pen {
+        // A path in progress, drawn as the Pen draws one.
+        painter.add(egui::Shape::line(pts, Stroke::new(1.5, crate::theme::Tokens::get(painter.ctx()).accent)));
+    } else {
+        crate::tool_feedback::draw_ants(painter, &pts, false);
+    }
     for p in m.anchors.iter().filter_map(|&i| m.path.get(i)).map(screen) {
         let r = Rect::from_center_size(p, vec2(5.0, 5.0));
         painter.rect_filled(r, 0.0, Color32::WHITE);

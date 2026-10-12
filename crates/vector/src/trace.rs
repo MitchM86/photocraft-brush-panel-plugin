@@ -268,6 +268,97 @@ fn fit_closed(lp: &[P], tol: f64) -> Subpath {
     Subpath { closed: true, knots, op: PathOp::Combine }
 }
 
+/// Freeform Pen: cubic Béziers within `tolerance` px (Photoshop's Curve Fit, 0.5–10) of a
+/// hand-drawn polyline, with corners where it turns sharply. `None` for fewer than two distinct
+/// points. A closed subpath doesn't repeat its first point at the end.
+pub fn fit_points(points: &[[f64; 2]], tolerance: f64, closed: bool) -> Option<Subpath> {
+    let tol = if tolerance.is_finite() { tolerance.clamp(0.5, 10.0) } else { 2.0 };
+    // Thin the samples: jitter closer than half the tolerance only makes wiggles.
+    let spacing = tol * 0.5;
+    let mut pts: Vec<P> = Vec::new();
+    for p in points.iter().filter(|p| p[0].is_finite() && p[1].is_finite()) {
+        if pts.last().is_none_or(|l| len(sub((p[0], p[1]), *l)) >= spacing) {
+            pts.push((p[0], p[1]));
+        }
+    }
+    // The stroke ends where it was released, even when thinning dropped that sample.
+    let many = pts.len() > 1;
+    if let (Some(p), Some(l)) = (points.last(), pts.last_mut())
+        && p[0].is_finite()
+        && p[1].is_finite()
+        && many
+    {
+        *l = (p[0], p[1]);
+    }
+    if closed && pts.len() > 2 && pts.first().zip(pts.last()).is_some_and(|(a, b)| len(sub(*a, *b)) < spacing) {
+        pts.pop();
+    }
+    let n = pts.len();
+    if n < 2 {
+        return None;
+    }
+    let closed = closed && n >= 3;
+    let at = |i: isize| pts[i.rem_euclid(n as isize) as usize];
+    // Corners: the direction two samples back and two ahead differ by more than 70°.
+    let cos_thresh = 70f64.to_radians().cos();
+    let turn = |i: usize| {
+        let i = i as isize;
+        dot(norm(sub(at(i), at(i - 2))), norm(sub(at(i + 2), at(i))))
+    };
+    let inner = if closed { 0..n } else { 2.min(n)..n.saturating_sub(2) };
+    let mut cs: Vec<usize> = inner.filter(|&i| turn(i) < cos_thresh && turn(i) <= turn((i + 1) % n) && turn(i) < turn((i + n - 1) % n)).collect();
+    if !closed {
+        cs.insert(0, 0);
+        cs.push(n - 1);
+    }
+    let err2 = tol * tol;
+    let mut segs: Vec<[P; 4]> = Vec::new();
+    let mut corner_at_start: Vec<bool> = Vec::new();
+    if closed && cs.is_empty() {
+        // A smooth loop: start at 0 with a shared tangent at the seam.
+        let mut run = pts.clone();
+        run.push(pts[0]);
+        let t = norm(sub(pts[1], pts[n - 1]));
+        fit_cubic(&run, t, mul(t, -1.0), err2, &mut segs, 0);
+        corner_at_start.resize(segs.len(), false);
+    } else {
+        let runs = if closed { cs.len() } else { cs.len() - 1 };
+        for r in 0..runs {
+            let (a, b) = (cs[r], cs[(r + 1) % cs.len()]);
+            let mut run = vec![pts[a]];
+            let mut j = a;
+            while j != b {
+                j = (j + 1) % n;
+                run.push(pts[j]);
+            }
+            let m = run.len();
+            let t1 = norm(sub(run[2.min(m - 1)], run[0]));
+            let t2 = norm(sub(run[m.saturating_sub(3)], run[m - 1]));
+            let before = segs.len();
+            fit_cubic(&run, t1, t2, err2, &mut segs, 0);
+            corner_at_start.extend((before..segs.len()).map(|q| q == before));
+        }
+    }
+    let pt = |p: P| Point::new(p.0, p.1);
+    let mut knots: Vec<Knot> = segs.iter().zip(&corner_at_start).map(|(s, c)| Knot { anchor: pt(s[0]), in_ctrl: pt(s[0]), out_ctrl: pt(s[1]), smooth: !c }).collect();
+    let m = segs.len();
+    if closed {
+        for i in 0..m {
+            knots[(i + 1) % m].in_ctrl = pt(segs[i][2]);
+        }
+    } else {
+        for i in 1..m {
+            knots[i].in_ctrl = pt(segs[i - 1][2]);
+        }
+        let last = segs.last()?;
+        knots.push(Knot { anchor: pt(last[3]), in_ctrl: pt(last[2]), out_ctrl: pt(last[3]), smooth: false });
+        if let Some(k) = knots.first_mut() {
+            k.smooth = false;
+        }
+    }
+    Some(Subpath { closed, knots, op: PathOp::Combine })
+}
+
 fn bezier(b: &[P; 4], t: f64) -> P {
     let mt = 1.0 - t;
     let (a, bb, c, d) = (mt * mt * mt, 3.0 * mt * mt * t, 3.0 * mt * t * t, t * t * t);
@@ -426,6 +517,53 @@ mod tests {
         // Pixels 1..5 x 1..4 → contour through their outer half-pixel boundary (4×3 area with
         // 45° chamfered corners: 12 − 4·0.125).
         assert!((a - 11.5).abs() < 1e-9, "area {a}");
+    }
+
+    /// Distance from `p` to the nearest of many samples along `s`.
+    fn off(s: &Subpath, p: [f64; 2]) -> f64 {
+        s.segments().iter().flat_map(|seg| (0..=200).map(move |i| bezier(&seg.map(|q| (q.x, q.y)), i as f64 / 200.0))).map(|q| len(sub(q, (p[0], p[1])))).fold(f64::MAX, f64::min)
+    }
+
+    #[test]
+    fn freeform_arc_fits_within_tolerance_with_few_smooth_knots() {
+        // A wobbly half circle, sampled every pixel or so, as a hand would draw it.
+        let pts: Vec<[f64; 2]> = (0..=160)
+            .map(|i| {
+                let a = std::f64::consts::PI * i as f64 / 160.0;
+                let r = 50.0 + 0.3 * (i as f64 * 1.7).sin();
+                [100.0 + r * a.cos(), 100.0 - r * a.sin()]
+            })
+            .collect();
+        let s = fit_points(&pts, 2.0, false).unwrap();
+        assert!(!s.closed);
+        assert!((2..=6).contains(&s.knots.len()), "{} knots", s.knots.len());
+        assert!(s.knots[1..s.knots.len() - 1].iter().all(|k| k.smooth));
+        assert_eq!((s.knots[0].anchor, s.knots.last().unwrap().anchor), (Point::new(150.0, 100.0), Point::new(pts[160][0], pts[160][1])));
+        assert!(pts.iter().all(|p| off(&s, *p) < 2.5), "within the curve fit");
+    }
+
+    #[test]
+    fn freeform_square_loop_closes_with_corners() {
+        let mut pts = Vec::new();
+        for (a, b) in [([0.0, 0.0], [60.0, 0.0]), ([60.0, 0.0], [60.0, 60.0]), ([60.0, 60.0], [0.0, 60.0]), ([0.0, 60.0], [0.0, 0.0])] {
+            for i in 0..60 {
+                let t = i as f64 / 60.0;
+                pts.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+            }
+        }
+        pts.push([0.0, 0.0]);
+        let s = fit_points(&pts, 2.0, true).unwrap();
+        assert!(s.closed);
+        assert_eq!(s.knots.iter().filter(|k| !k.smooth).count(), 4, "{:?}", s.knots);
+        assert!(pts.iter().all(|p| off(&s, *p) < 2.5));
+    }
+
+    #[test]
+    fn freeform_degenerate_input() {
+        assert!(fit_points(&[], 2.0, false).is_none());
+        assert!(fit_points(&[[5.0, 5.0], [5.2, 5.0], [f64::NAN, 1.0]], 2.0, false).is_none());
+        let line = fit_points(&[[0.0, 0.0], [10.0, 0.0]], f64::NAN, true).unwrap();
+        assert_eq!((line.closed, line.knots.len()), (false, 2), "two points can't close");
     }
 
     #[test]

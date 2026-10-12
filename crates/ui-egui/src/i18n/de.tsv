@@ -2522,3 +2522,19 @@ fontWeight	Italic	Kursiv
 	JPEG (medium quality)	JPEG (mittlere Qualität)
 	JPEG (high quality)	JPEG (hohe Qualität)
 	JPEG (maximum quality)	JPEG (maximale Qualität)
+	Freeform Pen Tool	Freiform-Zeichenstift-Werkzeug
+	Curvature Pen Tool	Krümmungsstift-Werkzeug
+	Add Anchor Point Tool	Ankerpunkt-hinzufügen-Werkzeug
+	Delete Anchor Point Tool	Ankerpunkt-löschen-Werkzeug
+	Convert Point Tool	Punkt-umwandeln-Werkzeug
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	Segment klicken: Ankerpunkt hinzufügen · {alt}: Ankerpunkt löschen
+	Click an anchor: delete it · {alt}: Add Anchor Point	Ankerpunkt klicken: löschen · {alt}: Ankerpunkt hinzufügen
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	Ankerpunkt klicken: Ecke · Vom Ankerpunkt ziehen: weich · Griff ziehen: allein bewegen
+	Curve Fit:	Kurvenanpassung:
+	Drag: draw a path · Release over its start: close	Ziehen: Pfad zeichnen · Über dem Anfang loslassen: schließen
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	Klick: Punkt hinzufügen · Doppelklick oder {alt}-Klick auf einen Punkt: Ecke · Punkt ziehen: bewegen · {key} fertig
+	Magnetic	Magnetisch
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	Klicken, dann an einer Kante entlangfahren · {alt}-Klick: gerade · {key} fertig · Doppelklick: schließen
+	Follows only edges this close to the pointer ([ and ] change it)	Folgt nur Kanten so nah am Zeiger ([ und ] ändern den Wert)
+	Higher values follow only edges that contrast sharply with their surroundings	Höhere Werte folgen nur Kanten, die sich stark von ihrer Umgebung abheben
+	How often fastening points are placed by themselves	Wie oft Befestigungspunkte von selbst gesetzt werden

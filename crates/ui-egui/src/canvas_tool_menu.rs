@@ -328,8 +328,8 @@ fn pen_dialog(app: &mut PhotocraftApp, command: &str, label: &str, name: &str) {
     let spec = match command {
         "edit.defineCustomShape" => r##"{"name":text}"##,
         "path.toSelection" => r##"{"feather":0..250=0,"antiAlias":bool=true,"mode":"replace|add|subtract|intersect"="replace"}"##,
-        "path.fill" => r##"{"color":text,"opacity":0..100=100,"feather":0..250=0,"antiAlias":bool=true}"##,
-        "path.stroke" => r##"{"tool":"brush|pencil|eraser"="brush","size":1..500=10,"color":text,"opacity":0..100=100}"##,
+        "path.fill" => r##"{"color":color,"opacity":0..100=100,"feather":0..250=0,"antiAlias":bool=true}"##,
+        "path.stroke" => r##"{"tool":"brush|pencil|eraser"="brush","size":1..500=10,"color":color,"opacity":0..100=100}"##,
         "path.clippingPath.set" => r##"{"flatness":0..100=0}"##,
         "path.transform" => r##"{"translateX":-30000..30000=0,"translateY":-30000..30000=0,"scaleX":0.01..100=1,"scaleY":0.01..100=1,"angle":-360..360=0}"##,
         _ => "{}",
@@ -768,6 +768,9 @@ mod tests {
         choose_open(&mut app, "path.fill");
         let id = app.ui.dialogs.last().map(|d| d.id).unwrap();
         assert_eq!(app.ui.dialogs.last().unwrap().fields.get("name"), Some(&json!("work")));
+        // The colour is a swatch that opens the Color Picker, not a text box for a hex code.
+        let spec = app.ui.dialogs.last().unwrap().fields.get("__spec").and_then(|v| v.as_str()).unwrap_or_default().to_owned();
+        assert!(spec.contains(r#""color":color,"#), "{spec}");
         crate::dialogs::confirm(&mut app, id).unwrap();
         assert_eq!(app.session.journal.last().map(|(id, _)| id.as_str()), Some("path.fill"));
         choose_open(&mut app, "path.delete");

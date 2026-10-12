@@ -147,7 +147,7 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
         return crate::symmetry_ui::begin(app).map(|_| Value::Null);
     }
     // A pending Pen anchor is gesture state; Edit › Undo must match the keyboard.
-    if id == "edit.undo" && crate::vector_ui::pen_undo_last_point(app) {
+    if id == "edit.undo" && (crate::vector_ui::pen_undo_last_point(app) || crate::pen_tools::curvature_remove_point(app)) {
         return Ok(Value::Null);
     }
     // Image › Crop while the Crop tool has a pending frame commits that frame (#1918).

@@ -2563,3 +2563,19 @@ fontWeight	Italic	Cursiva
 	JPEG (medium quality)	JPEG (calidad media)
 	JPEG (high quality)	JPEG (calidad alta)
 	JPEG (maximum quality)	JPEG (calidad máxima)
+	Freeform Pen Tool	Herramienta Pluma de forma libre
+	Curvature Pen Tool	Herramienta Pluma de curvatura
+	Add Anchor Point Tool	Herramienta Añadir punto de ancla
+	Delete Anchor Point Tool	Herramienta Eliminar punto de ancla
+	Convert Point Tool	Herramienta Convertir punto
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	Clic en un segmento: añadir un punto de ancla · {alt}: Eliminar punto de ancla
+	Click an anchor: delete it · {alt}: Add Anchor Point	Clic en un punto de ancla: eliminarlo · {alt}: Añadir punto de ancla
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	Clic en un punto de ancla: esquina · Arrastrar desde un punto de ancla: suavizar · Arrastrar un manejador: moverlo solo
+	Curve Fit:	Ajuste de curva:
+	Drag: draw a path · Release over its start: close	Arrastrar: dibujar un trazado · Soltar sobre su inicio: cerrar
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	Clic: añadir punto · Doble clic o {alt}+clic en un punto: esquina · Arrastrar un punto: mover · {key}: terminar
+	Magnetic	Magnético
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	Clic y mover a lo largo de un borde · {alt}+clic: recto · {key}: terminar · doble clic: cerrar
+	Follows only edges this close to the pointer ([ and ] change it)	Sigue solo bordes así de cerca del puntero ([ y ] lo cambian)
+	Higher values follow only edges that contrast sharply with their surroundings	Los valores altos siguen solo bordes con mucho contraste respecto a su entorno
+	How often fastening points are placed by themselves	Con qué frecuencia se colocan solos los puntos de fijación

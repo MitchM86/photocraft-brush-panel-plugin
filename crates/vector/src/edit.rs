@@ -167,6 +167,53 @@ pub fn bend_segment(path: &mut Path, knot: [usize; 2], t: f64, d: [f64; 2]) -> R
     Ok(())
 }
 
+/// Add Anchor Point: splits the segment leaving `knot` at curve parameter `t` (de Casteljau), so
+/// the outline doesn't change, and returns the new knot. On a straight segment the new anchor is
+/// a corner without handles; on a curve it is smooth, and the two neighbours' handles shorten.
+pub fn add_anchor(path: &mut Path, knot: [usize; 2], t: f64) -> Result<[usize; 2], String> {
+    let end = segment_end(path, knot)?;
+    let a = *knot_mut(path, knot)?;
+    let b = *knot_mut(path, end)?;
+    let t = if t.is_finite() { t.clamp(0.001, 0.999) } else { 0.5 };
+    let lerp = |p: Point, q: Point| Point::new(p.x + (q.x - p.x) * t, p.y + (q.y - p.y) * t);
+    let straight = dist(a.out_ctrl, a.anchor) < 1e-9 && dist(b.in_ctrl, b.anchor) < 1e-9;
+    let (p01, p12, p23) = (lerp(a.anchor, a.out_ctrl), lerp(a.out_ctrl, b.in_ctrl), lerp(b.in_ctrl, b.anchor));
+    let (p012, p123) = (lerp(p01, p12), lerp(p12, p23));
+    let m = lerp(p012, p123);
+    let new = if straight {
+        Knot::corner(m.x, m.y)
+    } else {
+        knot_mut(path, knot)?.out_ctrl = p01;
+        knot_mut(path, end)?.in_ctrl = p23;
+        Knot::smooth(m, p012, p123)
+    };
+    let [s, k] = knot;
+    let sp = path.subpaths.get_mut(s).ok_or_else(|| format!("no subpath {s}"))?;
+    // The closing segment of a closed subpath ends at knot 0: its new knot goes last.
+    let at = if end[1] == 0 { sp.knots.len() } else { k + 1 };
+    sp.knots.insert(at, new);
+    Ok([s, at])
+}
+
+/// Delete Anchor Point: removes a knot; its neighbours join with the handles they had. A
+/// subpath left without knots goes; the path's only anchor can't (delete the path instead).
+pub fn delete_anchor(path: &mut Path, [s, k]: [usize; 2]) -> Result<(), String> {
+    knot_mut(path, [s, k])?;
+    let total: usize = path.subpaths.iter().map(|sp| sp.knots.len()).sum();
+    if total <= 1 {
+        return Err("that is the path's only anchor: delete the path instead".into());
+    }
+    let sp = path.subpaths.get_mut(s).ok_or_else(|| format!("no subpath {s}"))?;
+    sp.knots.remove(k);
+    if sp.knots.len() < 2 {
+        sp.closed = false;
+    }
+    if sp.knots.is_empty() {
+        path.subpaths.remove(s);
+    }
+    Ok(())
+}
+
 /// Every anchor of subpath `s` (⌥-click with Direct Selection selects the whole subpath).
 pub fn subpath_anchors(path: &Path, s: usize) -> Vec<[usize; 2]> {
     path.subpaths.get(s).map_or_else(Vec::new, |sp| (0..sp.knots.len()).map(|k| [s, k]).collect())
@@ -474,6 +521,47 @@ mod tests {
         assert_eq!(r, [0, 0]);
         assert!((t - 0.5).abs() < 0.02, "{t}");
         assert_eq!(hit(&tri(), Point::new(50.0, 40.0), 3.0, &[]), None);
+    }
+
+    #[test]
+    fn added_anchors_keep_the_outline() {
+        // A straight edge gets a handle-less corner at the curve point `t` (where `hit` found it).
+        let mut p = tri();
+        assert_eq!(add_anchor(&mut p, [0, 0], 0.25), Ok([0, 1]));
+        assert_eq!(at(&p, 0, 1), Knot::corner(15.625, 0.0));
+        assert_eq!((p.subpaths[0].knots.len(), at(&p, 0, 2).anchor), (4, Point::new(100.0, 0.0)));
+        // The closing segment's new knot goes last.
+        assert_eq!(add_anchor(&mut p, [0, 3], 0.5), Ok([0, 4]));
+        assert_eq!(at(&p, 0, 4).anchor, Point::new(25.0, 40.0));
+        // On a curve, both halves trace the old curve.
+        let mut c = curve();
+        let before = c.subpaths[0].segments()[0];
+        assert_eq!(add_anchor(&mut c, [0, 0], 0.4), Ok([0, 1]));
+        let k = at(&c, 0, 1);
+        assert!(k.smooth);
+        assert!(dist(k.anchor, eval(&before, 0.4)) < 1e-9);
+        let halves = c.subpaths[0].segments();
+        for i in 0..=10 {
+            let s = i as f64 / 10.0;
+            assert!(dist(eval(&halves[0], s), eval(&before, 0.4 * s)) < 1e-9);
+            assert!(dist(eval(&halves[1], s), eval(&before, 0.4 + 0.6 * s)) < 1e-9);
+        }
+        assert!(add_anchor(&mut c, [0, 3], 0.5).is_err(), "an open subpath's last knot starts no segment");
+        assert!(add_anchor(&mut c, [2, 0], 0.5).is_err());
+    }
+
+    #[test]
+    fn deleted_anchors_join_their_neighbours() {
+        let mut p = two();
+        delete_anchor(&mut p, [1, 2]).unwrap();
+        assert_eq!(p.subpaths[1].knots.len(), 3);
+        assert!(p.subpaths[1].closed);
+        assert!(delete_anchor(&mut p, [1, 3]).is_err());
+        let mut single = Path::new(vec![Subpath::polyline(&[(0.0, 0.0), (10.0, 0.0)]), Subpath::polyline(&[(50.0, 50.0)])]);
+        delete_anchor(&mut single, [1, 0]).unwrap();
+        assert_eq!(single.subpaths.len(), 1, "an empty subpath goes");
+        delete_anchor(&mut single, [0, 0]).unwrap();
+        assert!(delete_anchor(&mut single, [0, 0]).is_err(), "the path's only anchor stays");
     }
 
     #[test]

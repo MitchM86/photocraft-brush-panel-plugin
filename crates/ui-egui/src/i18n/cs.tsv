@@ -2484,3 +2484,19 @@ fontWeight	Italic	Kurzíva
 	JPEG (medium quality)	JPEG (střední kvalita)
 	JPEG (high quality)	JPEG (vysoká kvalita)
 	JPEG (maximum quality)	JPEG (maximální kvalita)
+	Freeform Pen Tool	Nástroj pero od ruky
+	Curvature Pen Tool	Nástroj pero zakřivení
+	Add Anchor Point Tool	Nástroj přidat kotevní bod
+	Delete Anchor Point Tool	Nástroj odstranit kotevní bod
+	Convert Point Tool	Nástroj změnit kotevní bod
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	Kliknutí na segment: přidat kotevní bod · {alt}: odstranit kotevní bod
+	Click an anchor: delete it · {alt}: Add Anchor Point	Kliknutí na kotevní bod: odstranit · {alt}: přidat kotevní bod
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	Kliknutí na kotevní bod: roh · tažení z kotevního bodu: hladký bod · tažení úchytu: posunout jen ten
+	Curve Fit:	Přizpůsobení křivky:
+	Drag: draw a path · Release over its start: close	Tažení: nakreslit cestu · uvolnění nad začátkem: uzavřít
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	Kliknutí: přidat bod · dvojité kliknutí nebo {alt}+kliknutí na bod: roh · tažení bodu: posunout · {key} dokončit
+	Magnetic	Magnetické
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	Klikněte a veďte podél hrany · {alt}+kliknutí: rovně · {key} dokončit · dvojité kliknutí: uzavřít
+	Follows only edges this close to the pointer ([ and ] change it)	Sleduje jen hrany takto blízko ukazatele ([ a ] ji mění)
+	Higher values follow only edges that contrast sharply with their surroundings	Vyšší hodnoty sledují jen hrany s výrazným kontrastem k okolí
+	How often fastening points are placed by themselves	Jak často se kotevní body umísťují samy

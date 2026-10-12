@@ -2889,3 +2889,19 @@ fontWeight	Italic	Miring
 	JPEG (medium quality)	JPEG (kualitas sedang)
 	JPEG (high quality)	JPEG (kualitas tinggi)
 	JPEG (maximum quality)	JPEG (kualitas maksimum)
+	Freeform Pen Tool	Alat Freeform Pen
+	Curvature Pen Tool	Alat Curvature Pen
+	Add Anchor Point Tool	Alat Add Anchor Point
+	Delete Anchor Point Tool	Alat Delete Anchor Point
+	Convert Point Tool	Alat Convert Point
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	Klik segmen: tambah titik jangkar · {alt}: Delete Anchor Point
+	Click an anchor: delete it · {alt}: Add Anchor Point	Klik titik jangkar: hapus · {alt}: Add Anchor Point
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	Klik titik jangkar: sudut · Seret dari titik jangkar: halus · Seret pegangan: pindahkan sendiri
+	Curve Fit:	Kecocokan Kurva:
+	Drag: draw a path · Release over its start: close	Seret: gambar path · Lepas di atas titik awal: tutup
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	Klik: tambah titik · Klik ganda atau {alt}-klik titik: sudut · Seret titik: pindahkan · {key} selesai
+	Magnetic	Magnetis
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	Klik, lalu gerakkan di sepanjang tepi · {alt}-klik: lurus · {key} selesai · klik ganda: tutup
+	Follows only edges this close to the pointer ([ and ] change it)	Hanya mengikuti tepi sedekat ini dengan penunjuk ([ dan ] mengubahnya)
+	Higher values follow only edges that contrast sharply with their surroundings	Nilai lebih tinggi hanya mengikuti tepi yang sangat kontras dengan sekitarnya
+	How often fastening points are placed by themselves	Seberapa sering titik pengikat ditempatkan dengan sendirinya

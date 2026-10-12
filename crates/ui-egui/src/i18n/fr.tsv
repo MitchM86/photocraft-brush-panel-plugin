@@ -2902,3 +2902,19 @@ fontWeight	Italic	Italique
 	JPEG (medium quality)	JPEG (qualité moyenne)
 	JPEG (high quality)	JPEG (qualité élevée)
 	JPEG (maximum quality)	JPEG (qualité maximale)
+	Freeform Pen Tool	Outil Plume libre
+	Curvature Pen Tool	Outil Plume de courbure
+	Add Anchor Point Tool	Outil Ajout de point d'ancrage
+	Delete Anchor Point Tool	Outil Suppression de point d'ancrage
+	Convert Point Tool	Outil Conversion de point
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	Clic sur un segment : ajouter un point d'ancrage · {alt} : Suppression de point d'ancrage
+	Click an anchor: delete it · {alt}: Add Anchor Point	Clic sur un point d'ancrage : le supprimer · {alt} : Ajout de point d'ancrage
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	Clic sur un point d'ancrage : angle · Glisser depuis un point d'ancrage : lisse · Glisser une poignée : la déplacer seule
+	Curve Fit:	Ajustement de la courbe :
+	Drag: draw a path · Release over its start: close	Glisser : dessiner un tracé · Relâcher sur son début : fermer
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	Clic : ajouter un point · Double-clic ou {alt}-clic sur un point : angle · Glisser un point : déplacer · {key} : terminer
+	Magnetic	Magnétique
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	Cliquer, puis suivre un contour · {alt}-clic : droit · {key} : terminer · double-clic : fermer
+	Follows only edges this close to the pointer ([ and ] change it)	Ne suit que les contours aussi proches du pointeur ([ et ] le modifient)
+	Higher values follow only edges that contrast sharply with their surroundings	Les valeurs élevées ne suivent que les contours très contrastés par rapport à leur entourage
+	How often fastening points are placed by themselves	Fréquence à laquelle les points d'ancrage se placent d'eux-mêmes

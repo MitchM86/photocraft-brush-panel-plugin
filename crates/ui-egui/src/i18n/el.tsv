@@ -3591,3 +3591,16 @@ fontWeight	Thin	Πολύ λεπτά
 	JPEG (medium quality)	JPEG (μέτρια ποιότητα)
 	JPEG (high quality)	JPEG (υψηλή ποιότητα)
 	JPEG (maximum quality)	JPEG (μέγιστη ποιότητα)
+	Freeform Pen Tool	Πένα ελεύθερης σχεδίασης (Freeform Pen Tool)
+	Curvature Pen Tool	Πένα καμπυλότητας (Curvature Pen Tool)
+	Add Anchor Point Tool	Προσθήκη σημείου αγκύρωσης (Add Anchor Point Tool)
+	Delete Anchor Point Tool	Διαγραφή σημείου αγκύρωσης (Delete Anchor Point Tool)
+	Convert Point Tool	Μετατροπή σημείου (Convert Point Tool)
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	Κλικ σε τμήμα: προσθήκη σημείου αγκύρωσης · {alt}: Διαγραφή σημείου αγκύρωσης
+	Click an anchor: delete it · {alt}: Add Anchor Point	Κλικ σε σημείο αγκύρωσης: διαγραφή · {alt}: Προσθήκη σημείου αγκύρωσης
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	Κλικ σε σημείο αγκύρωσης: γωνία · Σύρσιμο από σημείο αγκύρωσης: εξομάλυνση · Σύρσιμο λαβής: μετακίνηση μόνο αυτής
+	Curve Fit:	Προσαρμογή καμπύλης:
+	Drag: draw a path · Release over its start: close	Σύρσιμο: σχεδίαση διαδρομής · Αφήστε πάνω από την αρχή: κλείσιμο
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	Κλικ: προσθήκη σημείου · Διπλό κλικ ή {alt}-κλικ σε σημείο: γωνία · Σύρσιμο σημείου: μετακίνηση · {key}: τέλος
+	Magnetic	Μαγνητικό
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	Κλικ και μετά κίνηση κατά μήκος μιας ακμής · {alt}-κλικ: ευθεία · {key}: τέλος · διπλό κλικ: κλείσιμο

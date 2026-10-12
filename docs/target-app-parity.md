@@ -1,6 +1,6 @@
 # PhotoCraft vs Adobe Photoshop: target-app parity
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** major (full re-measure against Photoshop 2026 27.11.0; merged `parity-estimate.md` and the roadmap's honest assessment into this file) · **Target:** Adobe Photoshop 2026
+> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-12 · **Change:** minor (toolbox 58/68: the Pen slot's five tools) · **Target:** Adobe Photoshop 2026
 
 The authoritative answer to "how close is PhotoCraft to Photoshop, and how much work is left". The
 one-page summary is [`ROADMAP.md`](../ROADMAP.md); the ranked work list is [`gaps.md`](gaps.md);
@@ -61,7 +61,7 @@ architecture and the PSD writer are the serial parts.
 | Component | Weight | Ours / Photoshop | % | Kind |
 |---|---:|---|---:|---|
 | Menu commands | 30% | 628 / 628 catalog items dispatch a live command | 100% | measured (`cargo xtask parity`) |
-| Toolbox tools | 15% | 53 / 68 (Photoshop's 67 `.kys` tools plus Remove, Triangle, Curvature Pen; minus legacy Rounded Rectangle and Targeted Adjustment) | 78% | measured (`Tool` enum in `ui-egui/src/state.rs`, `TOOL_SECTIONS` in `panels.rs`) |
+| Toolbox tools | 15% | 58 / 68 (Photoshop's 67 `.kys` tools plus Remove, Triangle, Curvature Pen; minus legacy Rounded Rectangle and Targeted Adjustment) | 85% | measured (`Tool` enum in `ui-egui/src/state.rs`, `TOOL_SECTIONS` in `panels.rs`) |
 | Panels | 10% | 30 / 35 Window-menu panels | 86% | measured (`view_cmds.rs`, panel modules) |
 | Filters and adjustments | 10% | every Filter and Image › Adjustments item live; Filter Gallery 47 looks | 100% | measured (menu catalog) |
 | File formats (usage-weighted) | 15% | 13 of 31 Photoshop formats supported in Photoshop's directions, 4 partial; the common ones (PSD/PSB, TIFF, JPEG, PNG, WebP) all present | ~80% (48% by count) | measured list, estimated weights ([file-format-parity.md](file-format-parity.md)) |
@@ -174,7 +174,7 @@ parity for the area and are already contained in the dimension rows above.
 | Transform, warp, puppet, perspective, liquify | 55% | 100–180 | Free Transform modifiers right; no transform context menu (TOOL-214-5), no skew fields, puppet mesh is a block grid (TOOL-214-6), Liquify called "useless" by a user (#2606) |
 | Adjustments and filters | 70% | 120–200 | All present; smart-filter re-render matches Photoshop on 5 of 30 files; Filter Gallery looks approximate; no Neural Filters |
 | Type | 40% | 120–200 | Engine works; no type on a path, manual kerning, RTL paragraphs, OpenType panel UI, live Warp Text preview; Type tool freeze on macOS (#2518) |
-| Vector shapes and paths | 55% | 80–140 | Pen, Direct/Path Selection, shapes, shape strokes. Missing Freeform/Curvature Pen, anchor tools, on-canvas corner radius, path-point nudge; shape parity tracking issue #2496 |
+| Vector shapes and paths | 55% | 80–140 | Pen, Freeform and Curvature Pen, Add/Delete Anchor Point, Convert Point, Direct/Path Selection, shapes, shape strokes. Missing on-canvas corner radius, path-point nudge; shape parity tracking issue #2496 |
 | Colour management and modes | 70% | 60–100 | Own ICC engine, soft proof, CMYK/Lab/Indexed/Duotone/Multichannel; no Adobe CMYK profiles, no spot plates (FILE-215-17), monitor profile only at launch |
 | Camera Raw and computational photo (Photomerge, HDR, lens) | 45% | 120–200 | Raw for DNG/CR2/NEF/ARW/RW2/ORF/RAF(uncompressed)/PEF; no CR3; ACR dialog partial (no masking, calibration); generic lens profiles only |
 | Automation, actions, batch, scripting | 45% | 120–200 | CLI/MCP/control channel ahead of Photoshop; Actions panel and recording not document-independent (AUTO-219-1/2), no .atn, no ExtendScript/UXP |
@@ -527,6 +527,7 @@ See [method and results](octagonal-mask-performance.md).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-12 | minor | Toolbox tools 53 → 58 of 68 (78% → 85%): Freeform Pen, Curvature Pen, Add/Delete Anchor Point, Convert Point |
 | 2026-10-10 | minor | Readiness-by-audience table: percent and hours for full, mainstream and essentials; full number confirmed as the additive weighted sum over dimensions (46%, reported ~45%) |
 | 2026-10-10 | minor | Added mainstream-practitioner (~43%) and essentials-user (~61%) numbers with written weights and discounts; full ready-for-real-work rechecked against its written weights (46%, reported ~45%), unchanged |
 | 2026-10-10 | minor | Stage checked against the core-workflow alpha gate in `roadmap.md`: passes |

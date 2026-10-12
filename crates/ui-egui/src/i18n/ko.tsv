@@ -3062,3 +3062,19 @@ fontWeight	Italic	기울임
 	JPEG (medium quality)	JPEG(중간 품질)
 	JPEG (high quality)	JPEG(높은 품질)
 	JPEG (maximum quality)	JPEG(최고 품질)
+	Freeform Pen Tool	자유 형태 펜 도구
+	Curvature Pen Tool	곡률 펜 도구
+	Add Anchor Point Tool	기준점 추가 도구
+	Delete Anchor Point Tool	기준점 삭제 도구
+	Convert Point Tool	기준점 변환 도구
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	선분 클릭: 기준점 추가 · {alt}: 기준점 삭제
+	Click an anchor: delete it · {alt}: Add Anchor Point	기준점 클릭: 삭제 · {alt}: 기준점 추가
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	기준점 클릭: 모서리 · 기준점에서 드래그: 곡선 · 핸들 드래그: 핸들만 이동
+	Curve Fit:	곡선 맞춤:
+	Drag: draw a path · Release over its start: close	드래그: 패스 그리기 · 시작점 위에서 놓기: 닫기
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	클릭: 점 추가 · 점을 더블 클릭 또는 {alt}-클릭: 모서리 · 점 드래그: 이동 · {key}: 완료
+	Magnetic	자석
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	클릭한 다음 가장자리를 따라 이동 · {alt}-클릭: 직선 · {key}: 완료 · 더블 클릭: 닫기
+	Follows only edges this close to the pointer ([ and ] change it)	포인터에서 이 거리 안의 가장자리만 따라갑니다([ 및 ]로 변경)
+	Higher values follow only edges that contrast sharply with their surroundings	값이 높을수록 주변과 대비가 뚜렷한 가장자리만 따라갑니다
+	How often fastening points are placed by themselves	고정점이 자동으로 배치되는 빈도

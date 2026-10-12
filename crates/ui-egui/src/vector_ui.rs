@@ -331,7 +331,12 @@ pub fn pen_commit(app: &mut PhotocraftApp, closed: bool) {
     if pen.knots.len() < 2 {
         return;
     }
-    let path = pen_to_json(&pen, closed);
+    commit_path(app, pen_to_json(&pen, closed), closed);
+}
+
+/// A path drawn with one of the pens (`{"subpaths": [one]}`), finished as the Pen does: a new
+/// shape layer (Shape mode), a subpath of the targeted vector mask, or the work path.
+pub fn commit_path(app: &mut PhotocraftApp, path: Value, closed: bool) {
     let r = if app.ui.tool_options.vector_mode == "shape" {
         let fill = if closed && app.ui.tool_options.shape_fill { json!(hex(app.session.tools.foreground)) } else { Value::Null };
         let stroke = if closed {
@@ -552,7 +557,7 @@ pub(crate) fn draw_handle(painter: &egui::Painter, anchor: Pos2, handle: Pos2, a
 /// Work path / active shape path outlines, anchors, and the pen path in progress.
 pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, doc: &Document) {
     let tool = app.ui.tool;
-    let vector_tool = tool == Tool::Pen || is_shape_tool(tool);
+    let vector_tool = matches!(tool, Tool::Pen | Tool::FreeformPen | Tool::CurvaturePen) || is_shape_tool(tool);
     let accent = Tokens::get(painter.ctx()).accent;
     let to_scr = |q: [f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
     let draw_path = |p: &Path| draw_outline(painter, p, &to_scr, accent);
@@ -582,6 +587,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
             draw_path(&p);
         }
     }
+    crate::pen_tools::draw_overlay(app, painter, &to_scr, accent);
     // Pen path in progress, with handles of the last knot and a rubber band to the pointer.
     if let Some(pen) = &app.ui.pen {
         let mut pts = Vec::new();
@@ -615,7 +621,8 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
 
 /// Options bar for vector tools; false for other tools.
 pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bool {
-    if !(is_shape_tool(tool) || matches!(tool, Tool::Pen | Tool::PathSelection | Tool::DirectSelection)) {
+    let pen = matches!(tool, Tool::Pen | Tool::FreeformPen | Tool::CurvaturePen);
+    if !(is_shape_tool(tool) || pen || crate::pen_tools::is_anchor_tool(tool) || matches!(tool, Tool::PathSelection | Tool::DirectSelection)) {
         return false;
     }
     let t = Tokens::get(ui.ctx());
@@ -645,7 +652,17 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
         );
         return true;
     }
-    if tool == Tool::Pen {
+    let alt = crate::shortcuts::pretty("Alt");
+    match tool {
+        Tool::AddAnchorPoint => lbl(ui, &crate::i18n::fmt(tl!("Click a segment: add an anchor · {alt}: Delete Anchor Point"), &[("alt", &alt)])),
+        Tool::DeleteAnchorPoint => lbl(ui, &crate::i18n::fmt(tl!("Click an anchor: delete it · {alt}: Add Anchor Point"), &[("alt", &alt)])),
+        Tool::ConvertPoint => lbl(ui, tl!("Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone")),
+        _ => {}
+    }
+    if crate::pen_tools::is_anchor_tool(tool) {
+        return true;
+    }
+    if pen {
         let opts = [("path".to_string(), tl!("Path")), ("shape".to_string(), tl!("Shape"))];
         crate::widgets::dropdown(ui, "pen-mode", &mut o.vector_mode, &opts, 80.0);
         crate::widgets::vline(ui, 22.0);
@@ -655,13 +672,48 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
                 o.shape_stroke = style;
             }
         }
-        lbl(
-            ui,
-            &crate::i18n::fmt(
-                tl!("Click: corner · Drag: smooth · Click first point: close · {key} finish · Esc cancel"),
-                &[("key", &crate::shortcuts::pretty("Enter"))],
+        let enter = crate::shortcuts::pretty("Enter");
+        match tool {
+            Tool::FreeformPen => {
+                crate::widgets::vline(ui, 22.0);
+                lbl(ui, tl!("Curve Fit:"));
+                crate::widgets::value_field(ui, &mut o.freeform_curve_fit, 0.5..=10.0, "px", 58.0);
+                crate::widgets::checkbox(ui, &mut o.freeform_magnetic, tl!("Magnetic"));
+                if o.freeform_magnetic {
+                    // The Magnetic Lasso's detection settings (`magnetic_lasso_ui`).
+                    lbl(ui, tl!("Width"));
+                    crate::widgets::value_field(ui, &mut o.magnetic_width, 1.0..=256.0, "px", 58.0)
+                        .on_hover_text(tl!("Follows only edges this close to the pointer ([ and ] change it)"));
+                    lbl(ui, tl!("Contrast"));
+                    crate::widgets::value_field(ui, &mut o.magnetic_contrast, 1.0..=100.0, "%", 58.0)
+                        .on_hover_text(tl!("Higher values follow only edges that contrast sharply with their surroundings"));
+                    lbl(ui, tl!("Frequency"));
+                    crate::widgets::value_field(ui, &mut o.magnetic_frequency, 0.0..=100.0, "", 50.0)
+                        .on_hover_text(tl!("How often fastening points are placed by themselves"));
+                    if crate::icons::button(ui, "circle-dot", 24.0, o.magnetic_pressure, tl!("Use tablet pressure to change pen width")).clicked() {
+                        o.magnetic_pressure = !o.magnetic_pressure;
+                    }
+                    crate::widgets::vline(ui, 22.0);
+                    lbl(
+                        ui,
+                        &crate::i18n::fmt(
+                            tl!("Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close"),
+                            &[("alt", &alt), ("key", &enter)],
+                        ),
+                    );
+                } else {
+                    lbl(ui, tl!("Drag: draw a path · Release over its start: close"));
+                }
+            }
+            Tool::CurvaturePen => lbl(
+                ui,
+                &crate::i18n::fmt(
+                    tl!("Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish"),
+                    &[("alt", &alt), ("key", &enter)],
+                ),
             ),
-        );
+            _ => lbl(ui, &crate::i18n::fmt(tl!("Click: corner · Drag: smooth · Click first point: close · {key} finish · Esc cancel"), &[("key", &enter)])),
+        }
         return true;
     }
     let mut mode = "shape".to_string();

@@ -58,6 +58,7 @@ pub mod dialog_blend_ui;
 pub mod dialogs;
 pub mod direct_select;
 pub mod path_select;
+pub mod pen_tools;
 pub mod discard_ui;
 pub mod distort_ui;
 pub mod doc_props_ui;
@@ -1418,6 +1419,9 @@ impl eframe::App for PhotocraftApp {
         }
         if self.ui.pen.is_some() && self.ui.tool != state::Tool::Pen {
             vector_ui::pen_commit(self, false);
+        }
+        if self.ui.curvature.is_some() && self.ui.tool != state::Tool::CurvaturePen {
+            pen_tools::curvature_commit(self, false);
         }
         transform_tool::end_if_left(self);
         self.collect_screenshots(ctx);

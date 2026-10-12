@@ -2461,3 +2461,19 @@ fontWeight	Italic	斜體
 	JPEG (medium quality)	JPEG（中品質）
 	JPEG (high quality)	JPEG（高品質）
 	JPEG (maximum quality)	JPEG（最高品質）
+	Freeform Pen Tool	創意筆工具
+	Curvature Pen Tool	曲線筆工具
+	Add Anchor Point Tool	增加錨點工具
+	Delete Anchor Point Tool	刪除錨點工具
+	Convert Point Tool	轉換錨點工具
+	Click a segment: add an anchor · {alt}: Delete Anchor Point	按一下線段：增加錨點 · {alt}：刪除錨點
+	Click an anchor: delete it · {alt}: Add Anchor Point	按一下錨點：刪除 · {alt}：增加錨點
+	Click an anchor: corner · Drag from an anchor: smooth · Drag a handle: move it alone	按一下錨點：轉角 · 從錨點拖曳：平滑 · 拖曳把手：單獨移動
+	Curve Fit:	曲線符合：
+	Drag: draw a path · Release over its start: close	拖曳：繪製路徑 · 在起點上放開：閉合
+	Click: add point · Double-click or {alt}-click a point: corner · Drag a point: move · {key} finish	按一下：增加點 · 按兩下或 {alt}-按一下點：轉角 · 拖曳點：移動 · {key} 完成
+	Magnetic	磁性的
+	Click, then move along an edge · {alt}-click: straight · {key} finish · double-click: close	按一下，然後沿著邊緣移動 · {alt}-按一下：直線 · {key} 完成 · 按兩下：閉合
+	Follows only edges this close to the pointer ([ and ] change it)	只跟隨距指標這麼近的邊緣（[ 和 ] 可變更）
+	Higher values follow only edges that contrast sharply with their surroundings	數值越高，只跟隨與周圍對比強烈的邊緣
+	How often fastening points are placed by themselves	固定點自動放置的頻率

@@ -106,14 +106,16 @@ impl Edit {
     }
 }
 
-/// Is Direct Selection what the pointer does now: its own tool, or the Pen with ⌘/Ctrl held.
+/// Is Direct Selection what the pointer does now: its own tool, or a pen tool with ⌘/Ctrl held.
 fn direct(tool: Tool, mods: Modifiers) -> bool {
-    tool == Tool::DirectSelection || (tool == Tool::Pen && mods.command)
+    tool == Tool::DirectSelection
+        || (mods.command && matches!(tool, Tool::Pen | Tool::FreeformPen | Tool::AddAnchorPoint | Tool::DeleteAnchorPoint | Tool::ConvertPoint))
 }
 
-/// Does the canvas draw Direct Selection's overlay instead of the plain path outlines?
+/// Does the canvas draw Direct Selection's overlay instead of the plain path outlines? The
+/// anchor-point tools always do: their targets are the anchors and segments it shows.
 pub fn shows(app: &PhotocraftApp, mods: Modifiers) -> bool {
-    direct(app.ui.tool, mods) || app.ui.direct_selection.drag.is_some()
+    direct(app.ui.tool, mods) || crate::pen_tools::is_anchor_tool(app.ui.tool) || app.ui.direct_selection.drag.is_some()
 }
 
 /// The paths Direct Selection edits, front first: the targeted vector mask or the active shape
@@ -158,7 +160,7 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool 
                 return true;
             }
             // Pen + ⌥ is Convert Point only while no path is being drawn.
-            let convert = tool == Tool::Pen && mods.alt && !mods.command && pen_idle;
+            let convert = (tool == Tool::Pen && mods.alt && !mods.command && pen_idle) || (tool == Tool::ConvertPoint && !mods.command);
             if !(direct(tool, mods) || convert) {
                 return false;
             }
@@ -166,7 +168,8 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool 
                 // ⌘-click off it ends the path being drawn, which becomes editable, as in Photoshop.
                 crate::vector_ui::pen_commit(app, false);
             }
-            press(app, [x, y], mods, convert)
+            // The Convert Point tool keeps a press that hit nothing (the Pen would add a point).
+            press(app, [x, y], mods, convert) || tool == Tool::ConvertPoint
         }
         ToolEvent::Move { x, y, .. } => {
             if crate::vector_ui::pen_edit_move(app, x, y) {
@@ -179,7 +182,7 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool 
                     *preview = edit.preview(base, *start, *end);
                 }
                 Some(Drag::Marquee { end, .. }) => *end = [x, y],
-                None => return tool == Tool::DirectSelection,
+                None => return tool == Tool::DirectSelection || crate::pen_tools::is_anchor_tool(tool),
             }
             true
         }
@@ -193,20 +196,26 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool 
                 marquee(app, start, [x, y], add);
                 true
             }
-            None => tool == Tool::DirectSelection,
+            None => tool == Tool::DirectSelection || crate::pen_tools::is_anchor_tool(tool),
         },
     }
 }
 
-/// A press: pick what's under the pointer and start a drag. False lets the Pen handle a ⌥-press
-/// that hit nothing.
-fn press(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers, convert: bool) -> bool {
+/// What's under document point `p` on the paths Direct Selection edits (front first): a shown
+/// handle, an anchor or a segment, with its path.
+pub(crate) fn hit_at(app: &PhotocraftApp, p: [f64; 2]) -> Option<(PathRef, Path, Hit)> {
     let tol = 6.0 / f64::from(app.point_zoom().max(0.01));
     let ds = &app.ui.direct_selection;
-    let found = candidates(app).into_iter().find_map(|(r, path)| {
+    candidates(app).into_iter().find_map(|(r, path)| {
         let handles = if ds.target == Some(r) { shown_handles(ds, &path) } else { Vec::new() };
         edit::hit(&path, Point::new(p[0], p[1]), tol, &handles).map(|h| (r, path, h))
-    });
+    })
+}
+
+/// A press: pick what's under the pointer and start a drag. False lets the Pen handle a ⌥-press
+/// that hit nothing.
+pub(crate) fn press(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers, convert: bool) -> bool {
+    let found = hit_at(app, p);
     let ds = &mut app.ui.direct_selection;
     let Some((target, base, hit)) = found else {
         if convert {

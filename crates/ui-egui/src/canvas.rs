@@ -574,6 +574,7 @@ pub(crate) fn freehand_tool(tool: Tool) -> bool {
             | Tool::Sponge
             | Tool::Lasso
             | Tool::MagneticLasso
+            | Tool::FreeformPen
             | Tool::Patch
             | Tool::ContentAwareMove
             | Tool::QuickSelection
@@ -2966,6 +2967,10 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                 Tool::PolygonLasso if response.double_clicked() || response.triple_clicked() => commit_polygon(app),
                 // The same for the Magnetic Lasso: along the edges, or straight with ⌥.
                 Tool::MagneticLasso if response.double_clicked() || response.triple_clicked() => crate::magnetic_lasso_ui::close(app, mods.alt),
+                // The magnetic Freeform Pen closes its path the same way.
+                Tool::FreeformPen if app.ui.magnetic.active() && (response.double_clicked() || response.triple_clicked()) => {
+                    crate::magnetic_lasso_ui::close(app, mods.alt)
+                }
                 _ => {
                     if tool == Tool::Move && app.ui.transform.is_none() {
                         begin_transform_controls_at(app, &ctx, &xf, p);
@@ -2979,7 +2984,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             }
         }
         // Magnetic Lasso: between clicks the border follows the pointer with the button up.
-        if tool == Tool::MagneticLasso && app.ui.magnetic.active() && !(buttons.started || buttons.dragged || buttons.stopped) && response.hovered() {
+        if crate::magnetic_lasso_ui::magnetic_tool(app, tool) && app.ui.magnetic.active() && !(buttons.started || buttons.dragged || buttons.stopped) && response.hovered() {
             let moves: Vec<Pos2> = ui.input(|i| i.events.iter().filter_map(|e| if let egui::Event::PointerMoved(p) = e { Some(*p) } else { None }).collect());
             app.defer_live_stroke = true;
             for p in moves.into_iter().filter(|p| rect.contains(*p)) {
@@ -2995,6 +3000,12 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         // Crop: a double-click inside the frame commits it, as ↵ does (#1792).
         if tool == Tool::Crop && response.double_clicked() && response.interact_pointer_pos().is_some_and(|p| crate::crop_ui::commits_at(app, xf.to_doc(p))) {
             commit_crop(app);
+        }
+        if tool == Tool::CurvaturePen
+            && response.double_clicked()
+            && let Some(p) = response.interact_pointer_pos()
+        {
+            crate::pen_tools::curvature_double_click(app, xf.to_doc(p));
         }
         if tool.is_type() && response.double_clicked() && !crate::type_transform::visible(app, crate::workspace_ui::sticky_mods(app, mods)) {
             crate::type_tool::select_word(app);
@@ -3180,6 +3191,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                 }
                 Tool::Type | Tool::VerticalType => egui::CursorIcon::Text,
                 Tool::MagneticLasso => crate::magnetic_lasso_ui::cursor(app, &painter, p, xf.zoom),
+                Tool::FreeformPen if app.ui.tool_options.freeform_magnetic => crate::magnetic_lasso_ui::cursor(app, &painter, p, xf.zoom),
                 Tool::RedEye => {
                     let pupil = app.ui.tool_options.red_eye_pupil_size.clamp(1.0, 100.0);
                     let r_doc = photocraft_algo::redeye::search_radius(pupil);
@@ -3969,6 +3981,10 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
     let ev = crate::move_mods::filter_event(app, ev, mods);
     // Path Selection: whole path components.
     if crate::path_select::pointer(app, ev, mods) {
+        return;
+    }
+    // Freeform Pen, Curvature Pen, Add and Delete Anchor Point (⌘ goes on to Direct Selection).
+    if crate::pen_tools::pointer(app, ev, mods) {
         return;
     }
     // Direct Selection, and the Pen's ⌘ (Direct Selection) and ⌥ (Convert Point) modes (#790).
@@ -5310,6 +5326,7 @@ mod tests {
             Tool::Dodge,
             Tool::Lasso,
             Tool::QuickSelection,
+            Tool::FreeformPen,
         ] {
             assert!(freehand_tool(t), "{t:?} paints or retouches along a path");
         }

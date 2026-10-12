@@ -105,6 +105,11 @@ pub enum Tool {
     QuickSelection,
     ObjectSelection,
     Pen,
+    FreeformPen,
+    CurvaturePen,
+    AddAnchorPoint,
+    DeleteAnchorPoint,
+    ConvertPoint,
     PathSelection,
     DirectSelection,
     Rectangle,
@@ -118,7 +123,7 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: [Tool; 53] = [
+    pub const ALL: [Tool; 58] = [
         Tool::Move,
         Tool::RectMarquee,
         Tool::EllipseMarquee,
@@ -162,6 +167,11 @@ impl Tool {
         Tool::QuickSelection,
         Tool::ObjectSelection,
         Tool::Pen,
+        Tool::FreeformPen,
+        Tool::CurvaturePen,
+        Tool::AddAnchorPoint,
+        Tool::DeleteAnchorPoint,
+        Tool::ConvertPoint,
         Tool::PathSelection,
         Tool::DirectSelection,
         Tool::Rectangle,
@@ -221,6 +231,11 @@ impl Tool {
             Tool::QuickSelection => "Quick Selection Tool",
             Tool::ObjectSelection => "Object Selection Tool",
             Tool::Pen => "Pen Tool",
+            Tool::FreeformPen => "Freeform Pen Tool",
+            Tool::CurvaturePen => "Curvature Pen Tool",
+            Tool::AddAnchorPoint => "Add Anchor Point Tool",
+            Tool::DeleteAnchorPoint => "Delete Anchor Point Tool",
+            Tool::ConvertPoint => "Convert Point Tool",
             Tool::PathSelection => "Path Selection Tool",
             Tool::DirectSelection => "Direct Selection Tool",
             Tool::Rectangle => "Rectangle Tool",
@@ -280,7 +295,9 @@ impl Tool {
             Tool::Blur | Tool::Sharpen | Tool::Smudge => '\0',
             Tool::Dodge | Tool::Burn | Tool::Sponge => 'O',
             Tool::QuickSelection | Tool::ObjectSelection => 'W',
-            Tool::Pen => 'P',
+            Tool::Pen | Tool::FreeformPen | Tool::CurvaturePen => 'P',
+            // Photoshop gives the anchor-point tools no key of their own.
+            Tool::AddAnchorPoint | Tool::DeleteAnchorPoint | Tool::ConvertPoint => '\0',
             Tool::PathSelection | Tool::DirectSelection => 'A',
             Tool::Rectangle | Tool::EllipseShape | Tool::Triangle | Tool::Polygon | Tool::Line | Tool::CustomShape => 'U',
         }
@@ -581,6 +598,13 @@ pub struct ToolOptions {
     /// Eraser › Erase to History: strokes paint back the History Brush's source state instead of
     /// erasing (⌥-drag does it for one stroke), as in Photoshop.
     pub erase_to_history: bool,
+    /// Freeform Pen › Curve Fit: how closely (0.5–10 px) the path follows the drawn stroke.
+    #[serde(default = "default_curve_fit")]
+    pub freeform_curve_fit: f32,
+    /// Freeform Pen › Magnetic: the path follows edges in the image, with the Magnetic Lasso's
+    /// Width, Contrast and Frequency.
+    #[serde(default)]
+    pub freeform_magnetic: bool,
     /// Magnetic Lasso: detection width (px, 1..256), edge contrast (%, 1..100), how often it
     /// fastens points by itself (0..100), and whether pen pressure narrows the width.
     pub magnetic_width: f32,
@@ -616,6 +640,10 @@ fn default_crop_resolution_unit() -> String {
 
 fn default_move_target() -> String {
     "layer".into()
+}
+
+fn default_curve_fit() -> f32 {
+    2.0
 }
 
 fn default_eraser_mode() -> String {
@@ -722,6 +750,8 @@ impl Default for ToolOptions {
             pencil_auto_erase: false,
             eraser_mode: default_eraser_mode(),
             erase_to_history: false,
+            freeform_curve_fit: default_curve_fit(),
+            freeform_magnetic: false,
             magnetic_width: 10.0,
             magnetic_contrast: 10.0,
             magnetic_frequency: 57.0,
@@ -951,6 +981,12 @@ pub struct UiState {
     /// Pen path under construction.
     #[serde(default)]
     pub pen: Option<crate::vector_ui::PenPath>,
+    /// Freeform Pen stroke being drawn (document px).
+    #[serde(skip)]
+    pub freeform: Option<Vec<[f64; 2]>>,
+    /// Curvature Pen path under construction.
+    #[serde(default)]
+    pub curvature: Option<crate::pen_tools::CurvaturePath>,
     #[serde(default)]
     pub stroke_editor: Option<crate::shape_stroke_ui::StrokeEditor>,
     /// Direct Selection tool: selected anchors and the drag in progress (#790).
@@ -1115,6 +1151,8 @@ impl Default for UiState {
             shell: Default::default(),
             layer_filter: Vec::new(),
             pen: None,
+            freeform: None,
+            curvature: None,
             stroke_editor: None,
             direct_selection: Default::default(),
             path_selection: Default::default(),
@@ -1217,7 +1255,7 @@ mod tests {
         assert!(!Tool::RedEye.is_brushlike());
         assert_eq!(Tool::from_name("patternStamp"), Some(Tool::PatternStamp));
         assert_eq!(Tool::from_name("Pattern Stamp Tool"), Some(Tool::PatternStamp));
-        assert_eq!(Tool::ALL.len(), 53);
+        assert_eq!(Tool::ALL.len(), 58);
         assert_eq!(Tool::from_name("Remove Tool"), Some(Tool::Remove));
         assert_eq!(Tool::Remove.key(), 'J');
         assert!(Tool::Remove.is_brushlike());
