@@ -537,6 +537,8 @@ pub struct PhotocraftApp {
     /// sent again only when it changes, so idle frames don't spam the backend.
     last_window_title: String,
     fonts_ready: bool,
+    /// The restored window was checked against the screen mode (see `ui`).
+    window_mode_checked: bool,
     /// Screen rect of the main canvas last frame (for overlays and the navigator).
     pub last_canvas_rect: egui::Rect,
     /// Bumped when the dock layout is replaced as a whole (a workspace, Reset, `ui.set {dock}`):
@@ -717,6 +719,7 @@ impl PhotocraftApp {
             custom_titlebar: false,
             last_window_title: String::new(),
             fonts_ready: false,
+            window_mode_checked: false,
             last_canvas_rect: egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0)),
             dock_generation: 0,
             ppp: 1.0,
@@ -1504,6 +1507,12 @@ impl eframe::App for PhotocraftApp {
             ctx.request_repaint();
             self.automation_input = false;
             return;
+        }
+        // The window remembers being full screen but not the screen mode, which starts as
+        // Standard: a window closed in a full-screen mode comes back full screen with no way out
+        // short of cycling the modes. Bring it back to a normal window once at launch.
+        if !std::mem::replace(&mut self.window_mode_checked, true) && self.ui.view.screen_mode == "standard" && ctx.input(|i| i.viewport().fullscreen == Some(true)) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(false));
         }
         let t0 = gpu_canvas::now_ms();
         // Each painting tool keeps its own brush (#218), so switch the active tool's brush in
