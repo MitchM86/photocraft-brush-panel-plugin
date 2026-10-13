@@ -14,8 +14,17 @@ use crate::PhotocraftApp;
 use crate::theme::{self, Tokens};
 use crate::widgets;
 
-/// The dynamics sections the panel lists: Brush Settings section index and title.
-const SECTIONS: [(usize, &str); 6] = [(1, "Shape Dynamics"), (2, "Scattering"), (3, "Texture"), (4, "Dual Brush"), (5, "Color Dynamics"), (6, "Transfer")];
+/// The dynamics sections the panel lists: Brush Settings section index, title and icon.
+const SECTIONS: [(usize, &str, &str); 8] = [
+    (1, "Shape Dynamics", "maximize-2"),
+    (2, "Scattering", "sparkles"),
+    (3, "Texture", "grid-3x3"),
+    (4, "Dual Brush", "layers"),
+    (5, "Color Dynamics", "palette"),
+    (6, "Transfer", "gauge"),
+    (8, "Noise", "circle-dashed"),
+    (9, "Wet Edges", "droplet"),
+];
 
 pub(super) fn show(app: &mut PhotocraftApp, ui: &mut Ui, rect: Rect, lib: &Library, pal: &PanelPal) {
     let t = Tokens::get(ui.ctx());
@@ -30,8 +39,17 @@ pub(super) fn show(app: &mut PhotocraftApp, ui: &mut Ui, rect: Rect, lib: &Libra
         // Breadcrumb: category › family.
         let head = ui.allocate_exact_size(vec2(inner.width(), 30.0), egui::Sense::hover()).0;
         ui.painter().line_segment([head.left_top(), head.left_bottom()], Stroke::new(3.0, pal.bright));
-        let crumb = entry.as_ref().map_or_else(|| tl!("Brush in hand").to_string(), |e| format!("{}  ›  {}", e.category, e.family));
-        ui.painter().text(head.left_center() + vec2(12.0, 0.0), Align2::LEFT_CENTER, crumb, FontId::proportional(14.5), t.text);
+        let font = FontId::proportional(14.5);
+        match &entry {
+            Some(e) => {
+                let cat = ui.painter().text(head.left_center() + vec2(14.0, 0.0), Align2::LEFT_CENTER, tl!(e.category), font.clone(), t.text);
+                let sep = ui.painter().text(cat.right_center() + vec2(10.0, 0.0), Align2::LEFT_CENTER, "›", font.clone(), pal.dim);
+                ui.painter().text(sep.right_center() + vec2(10.0, 0.0), Align2::LEFT_CENTER, &e.family, font, pal.bright);
+            }
+            None => {
+                ui.painter().text(head.left_center() + vec2(14.0, 0.0), Align2::LEFT_CENTER, tl!("Brush in hand"), font, t.text);
+            }
+        }
         ui.add_space(6.0);
 
         // The live stroke preview, rendered by the brush engine.
@@ -82,11 +100,11 @@ pub(super) fn show(app: &mut PhotocraftApp, ui: &mut Ui, rect: Rect, lib: &Libra
                 }
                 let on: Vec<&str> = SECTIONS
                     .iter()
-                    .filter(|(i, _)| {
+                    .filter(|(i, _, _)| {
                         let mut c = b.clone();
                         crate::brush_panel::section_flag(&mut c, *i).is_some_and(|f| *f)
                     })
-                    .map(|(_, n)| *n)
+                    .map(|(_, n, _)| *n)
                     .collect();
                 if !on.is_empty() {
                     ui.add_space(4.0);
@@ -132,28 +150,39 @@ pub(super) fn show(app: &mut PhotocraftApp, ui: &mut Ui, rect: Rect, lib: &Libra
                         if widgets::slider_row(ui, "Hardness", &mut hard, 0.0..=100.0, " %", None).changed() {
                             b.hardness = hard / 100.0;
                         }
-                        ui.horizontal(|ui| {
-                            widgets::checkbox(ui, &mut b.wet_edges, tl!("Wet Edges"));
-                            widgets::checkbox(ui, &mut b.noise, tl!("Noise"));
-                        });
                     },
                 );
-                for (i, title) in SECTIONS {
-                    ui.add_space(2.0);
-                    ui.horizontal(|ui| {
-                        if let Some(flag) = crate::brush_panel::section_flag(&mut b, i) {
-                            widgets::checkbox(ui, flag, "");
+                // The dynamics sections: one quiet row each (icon, title, its on/off switch and a
+                // chevron); a click opens the section's controls under its row.
+                ui.add_space(6.0);
+                for (i, title, icon) in SECTIONS {
+                    let id = egui::Id::new(("brush-hud-section", i));
+                    let open = ui.ctx().data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
+                    let (row, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 30.0), egui::Sense::click());
+                    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::CollapsingHeader, true, open, tl!(title)));
+                    let p = ui.painter();
+                    if resp.hovered() {
+                        p.rect_filled(row, t.radius_sm, t.hover);
+                    }
+                    p.line_segment([row.left_bottom(), row.right_bottom()], Stroke::new(1.0, pal.ring.gamma_multiply(0.5)));
+                    crate::icons::paint(ui, Rect::from_center_size(pos2(row.left() + 12.0, row.center().y), vec2(16.0, 16.0)), icon, 15.0, pal.dim);
+                    p.text(pos2(row.left() + 30.0, row.center().y), Align2::LEFT_CENTER, tl!(title), FontId::proportional(13.0), t.text);
+                    let chevron = if open { "chevron-down" } else { "chevron-right" };
+                    crate::icons::paint(ui, Rect::from_center_size(pos2(row.right() - 12.0, row.center().y), vec2(16.0, 16.0)), chevron, 15.0, pal.dim);
+                    if let Some(flag) = crate::brush_panel::section_flag(&mut b, i) {
+                        let at = Rect::from_center_size(pos2(row.right() - 38.0, row.center().y), vec2(18.0, 18.0));
+                        ui.put(at, |ui: &mut Ui| widgets::checkbox(ui, flag, ""));
+                    }
+                    if resp.clicked() {
+                        ui.ctx().data_mut(|d| d.insert_temp(id, !open));
+                    }
+                    if open {
+                        ui.add_space(4.0);
+                        if let Some(name) = crate::brush_sections::section_body(ui, &mut b, i, presets, current) {
+                            ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("brush-hud-set-current"), name));
                         }
-                        egui::CollapsingHeader::new(RichText::new(tl!(title)).color(t.text)).id_salt(("brush-hud-section", i)).default_open(false).show(
-                            ui,
-                            |ui| {
-                                ui.set_width(inner.width() - 40.0);
-                                if let Some(name) = crate::brush_sections::section_body(ui, &mut b, i, presets, current) {
-                                    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("brush-hud-set-current"), name));
-                                }
-                            },
-                        );
-                    });
+                        ui.add_space(6.0);
+                    }
                 }
             });
         crate::brush_panel::commit_gesture(app, ui.ctx(), &before, &b);
@@ -161,13 +190,10 @@ pub(super) fn show(app: &mut PhotocraftApp, ui: &mut Ui, rect: Rect, lib: &Libra
             crate::brush_panel::run_or_status(app, "brush.presets.setCurrent", serde_json::json!({ "name": name }));
         }
 
-        // Footer: Brush Settings and favourite.
+        // Footer: favourite.
         let foot = Rect::from_min_max(pos2(inner.left(), inner.bottom() - 40.0), inner.max);
         ui.scope_builder(UiBuilder::new().max_rect(foot), |ui| {
             ui.horizontal(|ui| {
-                if widgets::secondary_button(ui, tl!("Brush Settings"), 0.0).clicked() {
-                    crate::brush_picker::open_settings(app, ui.ctx());
-                }
                 if let Some(name) = app.session.tools.current_preset.clone() {
                     let fav = app.ui.brush_hud.favorites.contains(&name);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

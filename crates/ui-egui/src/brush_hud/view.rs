@@ -1,5 +1,7 @@
-//! Brush HUD drawing and interaction: the overlay chrome (top bar, footer), the 3-tier
-//! wheel, Edit HUD drag and drop with the bin, the search tracer and hub pulses. The parameter
+//! Brush HUD drawing and interaction: a floating modal overlay centred on the image canvas
+//! (PhotoCraft's menus, toolbar and panels stay in view around it) with its floating toolbar,
+//! the wheel (master hub, hub orbit, the family orbit and the open family's variations on the
+//! outer orbit), Edit HUD drag and drop with the bin, the search tracer and hub pulses. The parameter
 //! panel is [`super::panel`]. Every change is collected as an [`Act`] while the frame paints and
 //! applied afterwards, so painting only ever reads the app.
 
@@ -7,7 +9,7 @@ use egui::{Align2, Color32, FontId, Id, Order, Pos2, Rect, Sense, Shape, Stroke,
 use photocraft_engine::paint::BrushPreset;
 
 use super::Ring;
-use super::geometry::{self as g, LabelSide};
+use super::geometry as g;
 use super::model::{self, Library, fam_scope, var_scope};
 use crate::PhotocraftApp;
 use crate::theme::{self, Tokens};
@@ -34,7 +36,6 @@ struct Node {
     r: f32,
     /// The order scope a drag can reorder it in.
     scope: Option<String>,
-    side: Option<LabelSide>,
 }
 
 impl Node {
@@ -52,6 +53,7 @@ impl Node {
 enum Act {
     Category(String),
     Family(String),
+    Back,
     Pick(String),
     Hide(Kind, String),
     Move { scope: String, id: String, target: String },
@@ -65,25 +67,13 @@ enum Act {
     Restore,
     Ring,
     Search,
-    Settings,
     Import,
 }
 
-/// Footer workflow stages and the hub each jumps to.
-const STAGES: [(&str, &str); 3] = [("CREATE", "Sketch"), ("PAINT", "Paint"), ("EXPRESS", "Flora")];
-
-fn stage_of(category: &str) -> &'static str {
-    match category {
-        "Sketch" => "CREATE",
-        "Paint" | "Surface" => "PAINT",
-        _ => "EXPRESS",
-    }
-}
-
-/// HUD colours: PhotoCraft's panel colours (card, field, borders) with the accent only on what
-/// is active, hovered or picked, like the panels.
+/// HUD colours, all derived from the theme tokens.
 #[derive(Clone, Copy)]
 struct Pal {
+    bg: Color32,
     disc: Color32,
     disc_hi: Color32,
     ring: Color32,
@@ -103,12 +93,14 @@ fn mix(a: Color32, b: Color32, t: f32) -> Color32 {
 }
 
 fn palette(t: &Tokens) -> Pal {
+    let night = mix(t.chrome, Color32::BLACK, 0.55);
     Pal {
-        disc: t.card,
-        disc_hi: t.field,
-        ring: t.field_border,
-        ring_dim: t.card_border,
-        bright: t.accent,
+        bg: mix(night, t.accent, 0.04),
+        disc: mix(night, t.accent, 0.08),
+        disc_hi: mix(night, t.accent, 0.16),
+        ring: t.accent,
+        ring_dim: mix(night, t.accent, 0.32),
+        bright: mix(t.accent, Color32::WHITE, 0.35),
         glow: t.accent.gamma_multiply(0.22),
         text: t.text,
         dim: t.text_dim,
@@ -187,9 +179,9 @@ fn page<T: Clone>(list: &[T], index: usize, max: usize) -> (Vec<T>, usize, usize
     (items, more, pages, p)
 }
 
-/// The wheel's diameter in a stage: room is left around it for the spine's labels.
+/// The wheel's diameter in its square stage: the outer ring encloses every label.
 fn wheel_size(stage: Rect) -> f32 {
-    (stage.width() * 0.9).min(stage.height() * 0.9).max(260.0)
+    stage.width().min(stage.height()).max(240.0)
 }
 
 /// Where the Edit HUD bin was drawn last frame (screen points).
@@ -205,35 +197,66 @@ fn hud_id() -> Id {
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let lib = super::library(ctx, &app.session.tools.presets);
     let screen = ctx.content_rect();
+    // The HUD floats over the image canvas, not the whole window.
+    let canvas = app.last_canvas_rect.intersect(screen);
+    let view = if canvas.width() >= 320.0 && canvas.height() >= 320.0 { canvas } else { screen };
     let t = Tokens::get(ctx);
     let pal = palette(&t);
     let now = ctx.input(|i| i.time);
     let mut acts: Vec<Act> = Vec::new();
     egui::Area::new(hud_id()).order(Order::Foreground).fixed_pos(screen.min).show(ctx, |ui| {
         ui.set_min_size(screen.size());
-        // The scrim takes every click outside the HUD card: a click there closes the HUD.
+        // Layout inside the canvas: a floating toolbar, the wheel, and the parameter card beside
+        // it, centred as a group.
+        let area = view.shrink(if view.width() > 700.0 { 16.0 } else { 8.0 });
+        let bar_h = 40.0;
+        let hint_h = 20.0;
+        let content = Rect::from_min_max(pos2(area.left(), area.top() + bar_h + 10.0), pos2(area.right(), area.bottom() - hint_h));
+        let gap = 18.0;
+        let mut panel_w = if content.width() >= 760.0 { (content.width() * 0.3).clamp(290.0, 360.0) } else { 0.0 };
+        let mut ws = content.height().min(content.width() - if panel_w > 0.0 { panel_w + gap } else { 0.0 });
+        if panel_w > 0.0 && ws < 300.0 {
+            panel_w = 0.0;
+            ws = content.height().min(content.width());
+        }
+        // The wheel takes 80% of the room it has.
+        let ws = (ws * 0.8).max(240.0);
+        let group_w = ws + if panel_w > 0.0 { gap + panel_w } else { 0.0 };
+        let left = content.center().x - group_w / 2.0;
+        let stage = Rect::from_min_size(pos2(left, content.center().y - ws / 2.0), Vec2::splat(ws));
+        let panel_h = content.height().min(ws.max(560.0));
+        let panel = Rect::from_min_size(pos2(stage.right() + gap, content.center().y - panel_h / 2.0), vec2(panel_w, panel_h));
+        let bar = Rect::from_min_max(pos2(left, area.top()), pos2(left + group_w, area.top() + bar_h));
+
+        // Modal: the window outside the HUD takes no input while it is open, and a click there
+        // dismisses it. Only the canvas is dimmed; the rest of PhotoCraft stays as it is.
         let scrim = ui.interact(screen, hud_id().with("scrim"), Sense::click());
-        let card = screen.shrink(if screen.width() > 900.0 { 18.0 } else { 6.0 });
-        let card_resp = ui.interact(card, hud_id().with("card"), Sense::click());
-        if scrim.clicked() && !card_resp.hovered() {
+        ui.painter().rect_filled(view, 0.0, t.scrim.gamma_multiply(0.9));
+        let wheel_r = ws / 2.0;
+        let on_hud = |p: Pos2| bar.contains(p) || (panel_w > 0.0 && panel.contains(p)) || (p - stage.center()).length() <= wheel_r;
+        if (scrim.clicked() || scrim.secondary_clicked()) && scrim.interact_pointer_pos().is_none_or(|p| !on_hud(p)) {
             acts.push(Act::Close);
         }
+        // The wheel's own translucent disc, the canvas faintly showing through.
+        ui.painter().circle_filled(stage.center(), wheel_r, pal.bg.gamma_multiply(0.9));
 
-        let top = Rect::from_min_size(card.min, vec2(card.width(), 52.0));
-        let footer = Rect::from_min_max(pos2(card.left(), card.bottom() - 30.0), card.max);
-        let panel_w = if card.width() < 760.0 { 0.0 } else { (card.width() * 0.28).clamp(300.0, 400.0) };
-        let panel = Rect::from_min_max(pos2(card.right() - panel_w, top.bottom()), pos2(card.right(), footer.top()));
-        let stage = Rect::from_min_max(pos2(card.left(), top.bottom()), pos2(panel.left(), footer.top()));
-
-        let search_rect = top_bar(app, ui, top, &lib, &pal, &t, &mut acts);
+        let search_rect = top_bar(app, ui, bar, stage.center().x, &lib, &pal, &t, &mut acts);
         let nodes = wheel(app, ui, stage, &lib, &pal, &t, now, &mut acts);
         if panel_w > 0.0 {
-            super::panel::show(app, ui, panel.shrink2(vec2(10.0, 10.0)), &lib, &pal_panel(&pal));
+            super::panel::show(app, ui, panel, &lib, &pal_panel(&pal));
         }
-        footer_bar(app, ui, footer, &pal, &mut acts);
+        if app.ui.brush_hud.edit {
+            ui.painter().text(
+                pos2(stage.center().x, content.bottom() + hint_h / 2.0),
+                Align2::CENTER_CENTER,
+                tl!("●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE"),
+                FontId::proportional(10.5),
+                pal.danger,
+            );
+        }
         tracer(app, ui, search_rect, &nodes, stage, &pal, now);
     });
-    apply(app, ctx, &lib, acts, now);
+    apply(app, &lib, acts, now);
 }
 
 /// The few colours the panel shares with the wheel.
@@ -245,26 +268,23 @@ pub(super) struct PanelPal {
 }
 
 fn pal_panel(p: &Pal) -> PanelPal {
-    PanelPal { card: p.disc, ring: p.ring_dim, bright: p.bright, dim: p.dim }
+    PanelPal { card: p.bg.gamma_multiply(0.92), ring: mix(p.ring_dim, p.ring, 0.6), bright: p.bright, dim: p.dim }
 }
 
 // ------------------------------------------------------------------ top bar
 
-fn top_bar(app: &mut PhotocraftApp, ui: &mut Ui, r: Rect, lib: &Library, pal: &Pal, t: &Tokens, acts: &mut Vec<Act>) -> Rect {
+#[allow(clippy::too_many_arguments)]
+fn top_bar(app: &mut PhotocraftApp, ui: &mut Ui, r: Rect, wheel_x: f32, lib: &Library, pal: &Pal, t: &Tokens, acts: &mut Vec<Act>) -> Rect {
     let p = ui.painter().clone();
-    // Brand.
-    let logo = pos2(r.left() + 30.0, r.center().y);
-    let s = 11.0;
-    p.add(Shape::closed_line(vec![logo + vec2(0.0, -s), logo + vec2(s, s), logo + vec2(-s, s)], Stroke::new(2.0, pal.bright)));
-    p.line_segment([logo + vec2(-s * 0.45, s * 0.35), logo + vec2(s * 0.45, s * 0.35)], Stroke::new(2.0, pal.bright));
-    let name = p.text(pos2(r.left() + 50.0, r.center().y), Align2::LEFT_CENTER, "ArtForge", theme::semibold(18.0), pal.text);
-    p.text(pos2(name.right() + 12.0, r.center().y + 1.0), Align2::LEFT_CENTER, tl!("Brush HUD"), FontId::proportional(13.0), pal.dim);
-
     // Search field with its breadcrumb chip.
-    let sw = (r.width() * 0.3).clamp(220.0, 360.0);
-    let search = Rect::from_center_size(pos2(r.center().x, r.center().y), vec2(sw, 32.0));
-    p.rect_filled(search, 16.0, pal.disc);
-    p.rect_stroke(search, 16.0, Stroke::new(1.2, pal.ring), egui::StrokeKind::Inside);
+    // The search field centred over the wheel, the Edit HUD switch and the icon buttons on the
+    // right.
+    let controls_left = r.right() - (146.0 + 6.0 * 34.0 + 10.0) - 12.0;
+    let half = (controls_left - wheel_x).min(wheel_x - r.left()).clamp(90.0, 220.0);
+    let search = Rect::from_min_max(pos2(wheel_x - half, r.center().y - 17.0), pos2((wheel_x + half).min(controls_left), r.center().y + 17.0));
+    p.rect_filled(search, 17.0, pal.bg.gamma_multiply(0.92));
+    p.rect_filled(search, 17.0, pal.disc);
+    p.rect_stroke(search, 17.0, Stroke::new(1.2, pal.ring), egui::StrokeKind::Inside);
     crate::icons::paint(ui, Rect::from_center_size(pos2(search.left() + 18.0, search.center().y), Vec2::splat(16.0)), "search", 16.0, pal.text);
     let crumb = {
         let st = &app.ui.brush_hud;
@@ -318,8 +338,11 @@ fn top_bar(app: &mut PhotocraftApp, ui: &mut Ui, r: Rect, lib: &Library, pal: &P
             });
         }
     }
-    // Right side: Edit HUD switch, undo/redo, ring mode, Brush Settings, close.
-    let mut x = r.right() - 14.0;
+    // Right side: Edit HUD switch, then restore, undo/redo, ring mode, Import Brushes and close
+    // on one floating strip.
+    let strip = Rect::from_min_max(pos2(r.right() - 6.0 * 34.0 - 10.0, r.center().y - 18.0), pos2(r.right(), r.center().y + 18.0));
+    p.rect(strip, 18.0, pal.bg.gamma_multiply(0.92), Stroke::new(1.0, pal.ring_dim), egui::StrokeKind::Inside);
+    let mut x = r.right() - 6.0;
     let mut button = |ui: &mut Ui, icon: &str, tip: &str, on: bool, enabled: bool| -> bool {
         let rect = Rect::from_center_size(pos2(x - 15.0, r.center().y), Vec2::splat(30.0));
         x -= 34.0;
@@ -334,10 +357,7 @@ fn top_bar(app: &mut PhotocraftApp, ui: &mut Ui, r: Rect, lib: &Library, pal: &P
     if button(ui, "x", "Close (Esc)", false, true) {
         acts.push(Act::Close);
     }
-    if button(ui, "sliders-horizontal", "Brush Settings (F5)", false, true) {
-        acts.push(Act::Settings);
-    }
-    if button(ui, "folder-open", "Import Brushes…", false, true) {
+    if button(ui, "folder-open", "Import Brushes… (.abr)", false, true) {
         acts.push(Act::Import);
     }
     if button(ui, if st.ring == Ring::Favorites { "star-filled" } else { "clock" }, "Recent / favorite brushes", st.ring == Ring::Favorites, true) {
@@ -349,13 +369,16 @@ fn top_bar(app: &mut PhotocraftApp, ui: &mut Ui, r: Rect, lib: &Library, pal: &P
     if button(ui, "undo-2", "Undo layout change (Ctrl+Z)", false, !st.undo.is_empty()) {
         acts.push(Act::Undo);
     }
+    if button(ui, "rotate-cw", "Put every removed brush back on the HUD", false, !st.layout.hidden.is_empty()) {
+        acts.push(Act::Restore);
+    }
     // Edit HUD: a pill with a switch.
-    let pill = Rect::from_min_max(pos2(x - 122.0, r.center().y - 16.0), pos2(x - 4.0, r.center().y + 16.0));
+    let pill = Rect::from_min_max(pos2(x - 146.0, r.center().y - 17.0), pos2(x - 14.0, r.center().y + 17.0));
     let pr =
         ui.interact(pill, hud_id().with("edit"), Sense::click()).on_hover_text(tl!("Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)"));
     pr.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, st.edit, tl!("Edit HUD")));
-    p.rect_filled(pill, 16.0, if pr.hovered() { pal.disc_hi } else { pal.disc });
-    p.rect_stroke(pill, 16.0, Stroke::new(1.2, pal.ring), egui::StrokeKind::Inside);
+    p.rect_filled(pill, 17.0, if pr.hovered() { pal.disc_hi } else { pal.disc });
+    p.rect_stroke(pill, 17.0, Stroke::new(1.2, pal.ring), egui::StrokeKind::Inside);
     crate::icons::paint(ui, Rect::from_center_size(pos2(pill.left() + 16.0, pill.center().y), Vec2::splat(16.0)), "move", 16.0, pal.text);
     p.text(pos2(pill.left() + 30.0, pill.center().y), Align2::LEFT_CENTER, tl!("Edit HUD"), FontId::proportional(12.5), pal.text);
     let sw_r = Rect::from_center_size(pos2(pill.right() - 22.0, pill.center().y), vec2(28.0, 15.0));
@@ -366,46 +389,6 @@ fn top_bar(app: &mut PhotocraftApp, ui: &mut Ui, r: Rect, lib: &Library, pal: &P
         acts.push(Act::Edit);
     }
     search
-}
-
-// ------------------------------------------------------------------ footer
-
-fn footer_bar(app: &PhotocraftApp, ui: &mut Ui, r: Rect, pal: &Pal, acts: &mut Vec<Act>) {
-    let p = ui.painter().clone();
-    let st = &app.ui.brush_hud;
-    let mut x = r.left() + 24.0;
-    let current = stage_of(&st.category);
-    for (i, (label, cat)) in STAGES.iter().enumerate() {
-        if i > 0 {
-            let sep = p.text(pos2(x, r.center().y), Align2::LEFT_CENTER, "/", FontId::proportional(11.0), pal.faint);
-            x = sep.right() + 10.0;
-        }
-        let galley = p.layout_no_wrap(tl!(label).to_string(), FontId::proportional(11.5), if *label == current { pal.bright } else { pal.dim });
-        let rect = Rect::from_min_size(pos2(x, r.center().y - galley.size().y / 2.0), galley.size());
-        let resp = ui.interact(rect.expand(4.0), hud_id().with(("stage", *label)), Sense::click());
-        p.galley(rect.min, galley, pal.text);
-        if resp.clicked() {
-            acts.push(Act::Category(cat.to_string()));
-        }
-        x = rect.right() + 10.0;
-    }
-    let hint = if st.edit {
-        tl!("●  EDIT MODE · DRAG TO REARRANGE · DRAG TO BIN OR RIGHT-CLICK TO REMOVE").to_string()
-    } else {
-        tl!("HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE").to_string()
-    };
-    p.text(pos2(x + 30.0, r.center().y), Align2::LEFT_CENTER, hint, FontId::proportional(10.5), if st.edit { pal.danger } else { pal.faint });
-    let removed = st.layout.hidden.len();
-    if removed > 0 {
-        let label = tl!("Restore All").to_string();
-        let galley = p.layout_no_wrap(label, FontId::proportional(11.0), pal.bright);
-        let rect = Rect::from_min_size(pos2(r.right() - 20.0 - galley.size().x, r.center().y - galley.size().y / 2.0), galley.size());
-        let resp = ui.interact(rect.expand(4.0), hud_id().with("restore"), Sense::click()).on_hover_text(tl!("Put every removed brush back on the HUD"));
-        p.galley(rect.min, galley, pal.text);
-        if resp.clicked() {
-            acts.push(Act::Restore);
-        }
-    }
 }
 
 // ------------------------------------------------------------------ the wheel
@@ -437,19 +420,9 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut Ui, stage: Rect, lib: &Library, pal: 
     let angles = g::hub_angles(cats.len());
     let active = cats.iter().position(|(n, _)| *n == st.category).unwrap_or(0);
     let active_cat = cats.get(active).map_or("Paint", |(n, _)| n.as_str()).to_string();
-    let center_deg = angles.get(active).copied().unwrap_or(0.0);
     let fams = lib.families(&active_cat, &st.layout);
-    let (fams_shown, fam_more, fam_pages, fam_page) = page(&fams, st.fam_page, g::FAM_MAX);
-    let (fan, fan_a0, fan_a1) = g::family_fan(center_deg, fams_shown.len() + usize::from(fam_more > 0));
-    let fam_idx = st.family.as_ref().and_then(|id| fams_shown.iter().position(|f| &f.id == id));
-    let mut spine = None;
-    if let Some(fi) = fam_idx
-        && let (Some(f), Some(slot)) = (fams_shown.get(fi), fan.get(fi))
-    {
-        let (vars, more, pages, pg) = page(&f.members, st.var_page, g::VAR_MAX);
-        let (nodes, a0, a1) = g::spine(slot.deg, vars.len() + usize::from(more > 0));
-        spine = Some((f.clone(), *slot, vars, more, pages, pg, nodes, a0, a1));
-    }
+    // The outer orbit holds the active hub's families, or the open family's variations.
+    let open_fam = st.family.as_ref().and_then(|id| fams.iter().find(|f| &f.id == id)).cloned();
     let ring_names: &Vec<String> = if st.ring == Ring::Favorites { &st.favorites } else { &st.recent };
     let ring: Vec<String> = ring_names
         .iter()
@@ -461,45 +434,43 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut Ui, stage: Rect, lib: &Library, pal: 
     let mut nodes: Vec<Node> = Vec::new();
     for (i, (name, _)) in cats.iter().enumerate() {
         let deg = angles.get(i).copied().unwrap_or(0.0);
-        nodes.push(Node { kind: Kind::Hub, id: name.clone(), center: at(deg, g::R_HUB), r: g::HUB_R * s, scope: Some("cat".into()), side: None });
+        nodes.push(Node { kind: Kind::Hub, id: name.clone(), center: at(deg, g::R_HUB), r: g::HUB_R * s, scope: Some("cat".into()) });
     }
-    nodes.push(Node { kind: Kind::Center, id: "center".into(), center: c, r: g::R_CENTER * s, scope: None, side: None });
+    nodes.push(Node { kind: Kind::Center, id: "center".into(), center: c, r: g::R_CENTER * s, scope: None });
     for (n, slot) in ring.iter().zip(g::recent_arc(ring.len())) {
-        nodes.push(Node { kind: Kind::Recent, id: n.clone(), center: c + slot.offset() * s, r: g::RECENT_R * s, scope: None, side: None });
+        nodes.push(Node { kind: Kind::Recent, id: n.clone(), center: c + slot.offset() * s, r: g::RECENT_R * s, scope: None });
     }
-    for (f, slot) in fams_shown.iter().zip(&fan) {
-        nodes.push(Node {
-            kind: Kind::Family,
-            id: f.id.clone(),
-            center: c + slot.offset() * s,
-            r: g::FAM_R * s,
-            scope: Some(fam_scope(&active_cat)),
-            side: None,
-        });
+    let node_r = g::NODE_R * s;
+    // The families of the active hub on their orbit, and the open family's variations on the
+    // outer orbit.
+    // Each orbit gathers by what it belongs to: the families by their hub, the variations by
+    // their family.
+    let hub_deg = angles.get(active).copied().unwrap_or(0.0);
+    let (shown, fam_more, _, _) = page(&fams, st.fam_page, g::FAM_MAX);
+    let slots = g::orbit(shown.len() + usize::from(fam_more > 0), g::R_FAM, hub_deg);
+    let fam_head = g::header_deg(&slots, hub_deg);
+    let fam_deg = open_fam.as_ref().and_then(|o| shown.iter().position(|f| f.id == o.id)).and_then(|i| slots.get(i)).map_or(hub_deg, |s| s.deg);
+    for (f, slot) in shown.iter().zip(&slots) {
+        nodes.push(Node { kind: Kind::Family, id: f.id.clone(), center: c + slot.offset() * s, r: node_r, scope: Some(fam_scope(&active_cat)) });
     }
-    if fam_more > 0
-        && let Some(slot) = fan.get(fams_shown.len())
-    {
-        nodes.push(Node { kind: Kind::MoreFam, id: "more:fam".into(), center: c + slot.offset() * s, r: g::FAM_R * s, scope: None, side: None });
+    if let (true, Some(slot)) = (fam_more > 0, slots.get(shown.len())) {
+        nodes.push(Node { kind: Kind::MoreFam, id: "more:fam".into(), center: c + slot.offset() * s, r: node_r, scope: None });
     }
-    if let Some((f, _, vars, more, _, _, sn, _, _)) = &spine {
-        for (&m, (slot, side)) in vars.iter().zip(sn) {
+    let mut var_more = 0;
+    let mut var_head = fam_deg;
+    if let Some(f) = &open_fam {
+        let (vars, more, _, _) = page(&f.members, st.var_page, g::VAR_MAX);
+        let slots = g::orbit(vars.len() + usize::from(more > 0), g::R_VAR, fam_deg);
+        var_head = g::header_deg(&slots, fam_deg);
+        for (&m, slot) in vars.iter().zip(&slots) {
             if let Some(e) = lib.entries.get(m) {
-                nodes.push(Node {
-                    kind: Kind::Var,
-                    id: e.name.clone(),
-                    center: c + slot.offset() * s,
-                    r: g::VAR_R * s,
-                    scope: Some(var_scope(&f.id)),
-                    side: Some(*side),
-                });
+                nodes.push(Node { kind: Kind::Var, id: e.name.clone(), center: c + slot.offset() * s, r: node_r, scope: Some(var_scope(&f.id)) });
             }
         }
-        if *more > 0
-            && let Some((slot, side)) = sn.get(vars.len())
-        {
-            nodes.push(Node { kind: Kind::MoreVar, id: "more:var".into(), center: c + slot.offset() * s, r: g::VAR_R * s, scope: None, side: Some(*side) });
+        if let (true, Some(slot)) = (more > 0, slots.get(vars.len())) {
+            nodes.push(Node { kind: Kind::MoreVar, id: "more:var".into(), center: c + slot.offset() * s, r: node_r, scope: None });
         }
+        var_more = more;
     }
 
     // ---------------------------------------------------------- interaction
@@ -558,10 +529,6 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut Ui, stage: Rect, lib: &Library, pal: 
                 Kind::MoreVar => acts.push(Act::PageVar(1)),
             }
         }
-        // A double-click picks the brush (its first click already did) and closes the HUD.
-        if resp.double_clicked() && !st.edit && matches!(n.kind, Kind::Var | Kind::Recent) {
-            acts.push(Act::Close);
-        }
         if resp.secondary_clicked() {
             if st.edit && draggable(n.kind) && n.kind != Kind::Hub {
                 acts.push(Act::Hide(n.kind, n.id.clone()));
@@ -598,135 +565,42 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut Ui, stage: Rect, lib: &Library, pal: 
             Kind::Family => lib.family(&n.id, &st.layout).and_then(|f| f.members.first().and_then(|&m| lib.entries.get(m)).map(|e| e.name.clone())),
             _ => None,
         };
-        // Hover intent: a family's spine opens after a short dwell.
-        if n.kind == Kind::Family && st.family.as_deref() != Some(n.id.as_str()) {
-            let since = ctx.data_mut(|d| {
-                let e = d.get_temp_mut_or_insert_with(hud_id().with("fam-hover"), || (n.id.clone(), now));
-                if e.0 != n.id {
-                    *e = (n.id.clone(), now);
-                }
-                e.1
-            });
-            if now - since >= 0.17 {
-                acts.push(Act::Family(n.id.clone()));
-            } else {
-                ctx.request_repaint_after(std::time::Duration::from_millis(60));
-            }
-        }
     }
 
     // ---------------------------------------------------------- paint
-    // Labels may run past the stage into the card's margins, never past the card.
+    // Concentric bands divided by glowing rings: the centre, the hub orbit, the outer orbit and
+    // the frame. Each band is shaded a step lighter outwards; the nodes' tracks are faint.
     let p = ui.painter().clone();
-    // Every line of the wheel glows, so it stands out over the canvas: a wide accent haze under
-    // the line itself.
-    let haze = |w: f32| Stroke::new(w * s.max(0.6), pal.glow);
-    let ring_at = |r: f32, w: f32, col: Color32| {
-        p.circle_stroke(c, r * s, haze(10.0));
-        p.circle_stroke(c, r * s, Stroke::new(w, col));
+    let ring_at = |r: f32, w: f32, col: Color32| p.circle_stroke(c, r * s, Stroke::new(w, col));
+    // A glowing line: a soft halo of widening, fading strokes under a bright core.
+    let glow_ring = |r: f32, strength: f32| {
+        for (w, a) in [(22.0, 0.05), (13.0, 0.09), (7.0, 0.16), (3.5, 0.32)] {
+            ring_at(r, w * s.max(0.55), pal.ring.gamma_multiply(a * strength));
+        }
+        ring_at(r, 1.6, mix(pal.ring, Color32::WHITE, 0.25 * strength).gamma_multiply(0.95));
     };
-    // The wedge of the open family's fan and spine, in wheel units.
-    let fan_wedge = (!fan.is_empty()).then(|| {
-        let (w0, w1) = match &spine {
-            Some((.., a0, a1)) => (fan_a0.min(*a0 - 6.0), fan_a1.max(*a1 + 6.0)),
-            None => (fan_a0, fan_a1),
-        };
-        let r1 = if spine.is_some() { g::R_SPINE + 34.0 } else { g::RING_MID - 4.0 };
-        (g::RING_HUB_OUT + 6.0, r1, w0, w1)
-    });
-    // The section under the mouse or pen: a see-through tint with a glowing edge.
-    if drag_node.is_none()
-        && let Some(ptr) = ctx.pointer_hover_pos()
-        && let Some((r0, r1, a0, a1)) = section_at((ptr - c) / s, fan_wedge, &angles)
-    {
-        let inner = g::arc_points(r0, a0, a1);
-        let outer = g::arc_points(r1, a0, a1);
-        for k in 0..inner.len().saturating_sub(1) {
-            if let (Some(a), Some(b), Some(cc), Some(d)) = (inner.get(k), inner.get(k + 1), outer.get(k + 1), outer.get(k)) {
-                p.add(Shape::convex_polygon(vec![c + *a * s, c + *b * s, c + *cc * s, c + *d * s], pal.bright.gamma_multiply(0.1), Stroke::NONE));
-            }
+    p.circle_filled(c, g::RING_OUTER * s, pal.disc.gamma_multiply(0.55));
+    p.circle_filled(c, g::RING_FAM * s, mix(pal.bg, pal.ring, 0.07).gamma_multiply(0.9));
+    p.circle_filled(c, g::RING_MID * s, mix(pal.bg, pal.ring, 0.035).gamma_multiply(0.92));
+    p.circle_filled(c, g::RING_INNER * s, pal.bg.gamma_multiply(0.95));
+    ring_at(g::R_VAR, 1.0, pal.ring_dim.gamma_multiply(0.8));
+    ring_at(g::R_FAM, 1.0, pal.ring_dim.gamma_multiply(0.8));
+    ring_at(g::R_HUB, 1.0, pal.ring_dim.gamma_multiply(0.8));
+    glow_ring(g::RING_INNER, 0.8);
+    glow_ring(g::RING_MID, 1.0);
+    glow_ring(g::RING_FAM, 1.0);
+    glow_ring(g::RING_OUTER, 1.25);
+    // Markers on the frame: diamonds at the quarters, small dots between.
+    for k in 0..16 {
+        let a = k as f32 * 22.5;
+        let m = at(a, g::RING_OUTER);
+        if k % 4 == 0 {
+            let d = 4.5;
+            p.add(Shape::convex_polygon(vec![m + vec2(0.0, -d), m + vec2(d, 0.0), m + vec2(0.0, d), m + vec2(-d, 0.0)], pal.target, Stroke::NONE));
+            p.circle_filled(m, 9.0, pal.ring.gamma_multiply(0.18));
+        } else {
+            p.circle_filled(m, 1.8, pal.bright.gamma_multiply(0.7));
         }
-        let full = a1 - a0 >= 360.0;
-        for (r, from, to) in [(r0, a0, a1), (r1, a0, a1)] {
-            if r > 0.0 {
-                let arc: Vec<Pos2> = g::arc_points(r, from, to).into_iter().map(|v| c + v * s).collect();
-                p.add(Shape::line(arc.clone(), haze(14.0)));
-                p.add(Shape::line(arc, Stroke::new(1.5, pal.bright)));
-            }
-        }
-        if !full {
-            for a in [a0, a1] {
-                let edge = [at(a, r0), at(a, r1)];
-                p.line_segment(edge, haze(14.0));
-                p.line_segment(edge, Stroke::new(1.5, pal.bright));
-            }
-        }
-    }
-    // Rings and ticks.
-    ring_at(g::RING_OUTER, 1.5, pal.ring_dim);
-    for k in 0..24 {
-        let a = k as f32 * 15.0;
-        let big = k % 3 == 0;
-        p.circle_filled(at(a, g::RING_OUTER), if big { 2.6 } else { 1.5 }, pal.ring.gamma_multiply(if big { 0.9 } else { 0.5 }));
-    }
-    for a in [-58.0f32, -40.0, -22.0, 22.0, 40.0, 58.0] {
-        let dir = a.signum();
-        let pts = vec![at(a - dir * 2.6, g::RING_OUTER - 9.0), at(a, g::RING_OUTER), at(a - dir * 2.6, g::RING_OUTER + 9.0)];
-        p.add(Shape::line(pts.clone(), haze(8.0)));
-        p.add(Shape::line(pts, Stroke::new(2.0, pal.ring)));
-    }
-    ring_at(g::RING_MID, 2.5, pal.ring);
-    ring_at(g::RING_HUB_OUT, 1.5, pal.ring_dim);
-    ring_at(g::RING_INNER, 1.5, pal.ring_dim);
-    if cats.len() > 1 {
-        for a in &angles {
-            let mid = a + 180.0 / cats.len() as f32;
-            let line = [at(mid, g::RING_INNER), at(mid, g::RING_MID)];
-            p.line_segment(line, haze(8.0));
-            p.line_segment(line, Stroke::new(1.2, pal.ring_dim));
-        }
-    }
-    // Tier 2 wedge and the links from the hub.
-    if let Some((r0, r1, w0, w1)) = fan_wedge {
-        let outline: Vec<Pos2> = g::wedge(r0, r1, w0, w1).into_iter().map(|v| c + v * s).collect();
-        p.add(Shape::closed_line(outline.clone(), haze(8.0)));
-        p.add(Shape::closed_line(outline, Stroke::new(1.0, pal.ring)));
-        let hub_edge = at(center_deg, g::R_HUB + g::HUB_R);
-        for slot in &fan {
-            let link = [hub_edge, c + slot.offset() * s];
-            p.line_segment(link, haze(5.0));
-            p.extend(Shape::dashed_line(&link, Stroke::new(1.0, pal.ring), 3.0, 6.0));
-        }
-    }
-    // Tier 3 spine.
-    if let Some((f, fslot, _, _, _, _, sn, a0, a1)) = &spine
-        && !sn.is_empty()
-    {
-        let pts: Vec<Pos2> = g::arc_points(g::R_SPINE, a0 - 4.0, a1 + 4.0).into_iter().map(|v| c + v * s).collect();
-        p.add(Shape::line(pts.clone(), Stroke::new(12.0, pal.glow)));
-        p.add(Shape::line(pts, Stroke::new(2.5, pal.bright)));
-        for a in [a0 - 4.0, a1 + 4.0] {
-            p.circle_filled(at(a, g::R_SPINE), 4.5, pal.bright);
-        }
-        let joint = at(fslot.deg.clamp(*a0, *a1), g::R_SPINE);
-        p.line_segment([c + fslot.offset() * s, joint], Stroke::new(2.0, pal.bright));
-        p.circle_filled(joint, 7.0, pal.bright.gamma_multiply(0.35));
-        p.circle_filled(joint, 3.5, Color32::WHITE);
-        // Header past the start of the spine, along the ring's tangent and away from the spine:
-        // the variations' labels run radially, so it never crosses them.
-        let header = crate::i18n::fmt(
-            if f.members.len() == 1 { tl!("{family} · {count} VARIATION") } else { tl!("{family} · {count} VARIATIONS") },
-            &[("family", &f.name.to_uppercase()), ("count", &f.members.len().to_string())],
-        );
-        let galley = p.layout_no_wrap(header, theme::semibold(10.5), pal.bright);
-        let (w, h) = (galley.size().x, galley.size().y);
-        let start = a0 - 6.0;
-        let anchor = at(start, g::R_SPINE);
-        let rad = start.to_radians();
-        let away = vec2(-rad.cos(), -rad.sin());
-        let (dir, from) = if away.x >= 0.0 { (away, anchor) } else { (-away, anchor + away * w) };
-        let across = vec2(-dir.y, dir.x);
-        p.add(egui::epaint::TextShape::new(from - across * (h / 2.0), galley, pal.bright).with_angle(dir.y.atan2(dir.x)));
     }
 
     // Nodes.
@@ -737,11 +611,20 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut Ui, stage: Rect, lib: &Library, pal: 
         lib.search(&st.query, presets, &st.layout, 200).into_iter().filter_map(|i| lib.entries.get(i).map(|e| e.category)).collect()
     };
     let target_cat = st.target.as_ref().and_then(|n| lib.entry(n)).map(|e| e.category);
+    let label_font = FontId::proportional(11.0 * (s / 0.52).clamp(0.9, 1.15));
+    // The brush in hand pings: a ring that grows out of its node and fades, every 1.5 s (by
+    // `spread` of the node's radius).
+    let ping = |center: Pos2, r: f32, spread: f32| {
+        let k = 1.0 + spread * pulse;
+        let fade = 1.0 - pulse;
+        p.circle_stroke(center, r * k, Stroke::new(12.0 * s.max(0.6), pal.ring.gamma_multiply(0.35 * fade)));
+        p.circle_stroke(center, r * k, Stroke::new(3.0, mix(pal.target, Color32::WHITE, 0.4).gamma_multiply(fade)));
+        ctx.request_repaint();
+    };
     for (i, n) in nodes.iter().enumerate() {
         let hot = hovered == Some(i) && drag_node.is_none();
         let is_drag = drag_node == Some(i);
         let is_drop = drop_target == Some(i);
-        let fp = |name: &str| preset(name);
         if is_drag {
             p.extend(Shape::dashed_line(
                 &g::arc_points(n.r / s, 0.0, 360.0).into_iter().map(|v| n.center + v * s).collect::<Vec<_>>(),
@@ -761,111 +644,91 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut Ui, stage: Rect, lib: &Library, pal: 
                     p.circle_stroke(n.center, n.r * k, Stroke::new(3.0, pal.target.gamma_multiply((if strong { 0.9 } else { 0.5 }) * (1.0 - pulse))));
                     ctx.request_repaint();
                 }
-                p.circle_stroke(
-                    n.center,
-                    n.r + 9.0 * s,
-                    Stroke::new(if active { 16.0 } else { 11.0 } * s.max(0.5), pal.glow.gamma_multiply(if active || matched || hot { 1.6 } else { 0.6 })),
-                );
-                p.circle(n.center, n.r, pal.disc, Stroke::new(if active { 4.0 } else { 2.5 }, if active || hot { pal.bright } else { pal.ring }));
-                p.circle(n.center, n.r - 9.0 * s, pal.disc_hi, Stroke::new(1.0, pal.ring_dim));
+                let strength = if active {
+                    1.6
+                } else if hot {
+                    1.2
+                } else {
+                    0.7
+                };
+                for (w, a) in [(16.0, 0.08), (8.0, 0.16), (4.0, 0.3)] {
+                    p.circle_stroke(n.center, n.r, Stroke::new(w * s.max(0.6), pal.ring.gamma_multiply(a * strength)));
+                }
+                let edge = if active || hot { mix(pal.ring, Color32::WHITE, 0.35) } else { pal.ring };
+                p.circle(n.center, n.r, if active { pal.disc_hi } else { pal.disc }, Stroke::new(if active { 3.0 } else { 2.0 }, edge));
                 if is_drop {
                     p.circle_stroke(n.center, n.r + 4.0, Stroke::new(3.0, t.warning));
                 }
-                glyph(ui, n.center - vec2(0.0, n.r * 0.22), n.r * 0.62, &n.id, if active { pal.bright } else { pal.text });
-                p.text(
-                    n.center + vec2(0.0, n.r * 0.36),
-                    Align2::CENTER_CENTER,
-                    tl!(n.id.as_str()),
-                    theme::semibold((n.r * 0.27).clamp(10.0, 18.0)),
-                    pal.text,
-                );
-                let count = cats.iter().find(|(c2, _)| *c2 == n.id).map_or(0, |(_, k)| *k);
-                let bc = n.center + vec2(n.r * 0.72, -n.r * 0.72);
-                p.circle(bc, 10.0, pal.disc_hi, Stroke::new(1.0, pal.ring));
-                p.text(bc, Align2::CENTER_CENTER, count.to_string(), FontId::proportional(9.5), pal.text);
+                let ink = if active || hot { Color32::WHITE } else { pal.text };
+                glyph(ui, n.center - vec2(0.0, n.r * 0.2), n.r * 0.5, &n.id, ink);
+                p.text(n.center + vec2(0.0, n.r * 0.36), Align2::CENTER_CENTER, tl!(n.id.as_str()), theme::semibold((n.r * 0.26).clamp(10.0, 17.0)), ink);
             }
             Kind::Center => {
-                p.circle_stroke(c, n.r + 20.0 * s, Stroke::new(1.5, pal.ring_dim));
-                p.circle_stroke(c, n.r + 6.0 * s, Stroke::new(9.0 * s.max(0.6), pal.glow.gamma_multiply(1.4)));
-                p.circle(c, n.r, pal.disc, Stroke::new(if hot { 4.0 } else { 3.0 }, if hot { pal.bright } else { pal.ring }));
-                p.circle_filled(c, n.r - 12.0 * s, pal.disc_hi);
+                for (w, a) in [(30.0, 0.07), (18.0, 0.14), (9.0, 0.26), (4.5, 0.45)] {
+                    p.circle_stroke(c, n.r, Stroke::new(w * s.max(0.6), pal.ring.gamma_multiply(a)));
+                }
+                p.circle(c, n.r, pal.disc_hi, Stroke::new(3.0, if hot { Color32::WHITE } else { mix(pal.ring, Color32::WHITE, 0.45) }));
+                // The master hub is the brush in hand, preset or not: its ping rides over its glow.
+                ping(c, n.r, 0.4);
                 let cur = current.and_then(|name| lib.entry(name));
-                glyph(ui, c - vec2(0.0, n.r * 0.3), n.r * 0.42, cur.map_or("Paint", |e| e.category), pal.text);
+                glyph(ui, c - vec2(0.0, n.r * 0.32), n.r * 0.36, cur.map_or("Paint", |e| e.category), Color32::WHITE);
                 let label = current.unwrap_or("Brush");
-                let font = theme::semibold((n.r * 0.2).clamp(10.0, 17.0));
-                let galley = p.layout(label.to_string(), font, pal.text, n.r * 1.6);
-                p.galley(c + vec2(-galley.size().x / 2.0, n.r * 0.02), galley, pal.text);
-                p.text(c + vec2(0.0, n.r * 0.55), Align2::CENTER_CENTER, tl!("Master Tool"), FontId::proportional((n.r * 0.13).clamp(9.0, 12.0)), pal.dim);
+                let font = theme::semibold((n.r * 0.19).clamp(10.0, 16.0));
+                let galley = p.layout(label.to_string(), font, Color32::WHITE, n.r * 1.6);
+                p.galley(c + vec2(-galley.size().x / 2.0, -n.r * 0.02), galley, Color32::WHITE);
+                p.text(c + vec2(0.0, n.r * 0.5), Align2::CENTER_CENTER, tl!("Master Tool"), FontId::proportional((n.r * 0.14).clamp(9.0, 12.0)), pal.dim);
             }
             Kind::Recent => {
-                p.circle_stroke(n.center, n.r + 4.0 * s.max(0.6), Stroke::new(7.0 * s.max(0.6), pal.glow.gamma_multiply(if hot { 1.8 } else { 0.7 })));
-                p.circle(n.center, n.r, pal.disc_hi, Stroke::new(if hot { 2.5 } else { 1.5 }, if hot { pal.bright } else { pal.ring_dim }));
-                if let Some(pr) = fp(&n.id) {
+                if current == Some(n.id.as_str()) {
+                    ping(n.center, n.r, 0.45);
+                }
+                p.circle(n.center, n.r, pal.disc_hi, Stroke::new(if hot { 2.0 } else { 1.2 }, if hot { pal.bright } else { pal.ring_dim }));
+                if let Some(pr) = preset(&n.id) {
                     tip(ui, pr, Rect::from_center_size(n.center, Vec2::splat(n.r * 1.5)), pal.text);
                 }
             }
             Kind::Family | Kind::Var => {
-                let open = n.kind == Kind::Family && st.family.as_deref() == Some(n.id.as_str());
                 let selected = n.kind == Kind::Var && current == Some(n.id.as_str());
                 let targeted = (n.kind == Kind::Var && st.target.as_deref() == Some(n.id.as_str()))
                     || (n.kind == Kind::Family && st.target.as_ref().and_then(|t2| lib.entry(t2)).is_some_and(|e| e.family_id == n.id));
-                let lit = open || hot || selected || targeted;
-                p.circle_stroke(
-                    n.center,
-                    n.r + 6.0 * s.max(0.6),
-                    Stroke::new(
-                        10.0 * s.max(0.6),
-                        if targeted {
-                            pal.target.gamma_multiply(0.45)
-                        } else {
-                            pal.glow.gamma_multiply(if lit { 1.8 } else { 0.7 })
-                        },
-                    ),
-                );
-                let edge = if selected || hot || open {
+                let opened = n.kind == Kind::Family && st.family.as_deref() == Some(n.id.as_str());
+                let lit = hot || selected || targeted || opened;
+                if selected {
+                    ping(n.center, n.r, 0.45);
+                }
+                if lit {
+                    p.circle_stroke(
+                        n.center,
+                        n.r + 4.0 * s.max(0.6),
+                        Stroke::new(10.0 * s.max(0.6), if targeted && !hot { pal.target.gamma_multiply(0.45) } else { pal.glow.gamma_multiply(1.8) }),
+                    );
+                }
+                let edge = if selected || opened {
+                    Color32::WHITE
+                } else if hot {
                     pal.bright
                 } else if targeted {
                     pal.target
                 } else {
-                    pal.ring
+                    pal.ring.gamma_multiply(0.7)
                 };
-                p.circle(n.center, n.r, pal.disc, Stroke::new(if hot || selected || open { 3.0 } else { 2.0 }, edge));
+                p.circle(n.center, n.r, pal.disc, Stroke::new(if lit { 2.5 } else { 1.5 }, edge));
                 if is_drop {
                     p.circle_stroke(n.center, n.r + 4.0, Stroke::new(3.0, t.warning));
                 }
                 let rep = if n.kind == Kind::Var {
-                    fp(&n.id)
+                    preset(&n.id)
                 } else {
                     lib.family(&n.id, &st.layout).and_then(|f| f.members.first().and_then(|&m| lib.entries.get(m)).and_then(|e| presets.get(e.index)))
                 };
                 if let Some(pr) = rep {
-                    tip(ui, pr, Rect::from_center_size(n.center, Vec2::splat(n.r * 1.45)), pal.text);
+                    tip(ui, pr, Rect::from_center_size(n.center, Vec2::splat(n.r * 1.4)), pal.text);
                 }
-                let font = FontId::proportional(if n.kind == Kind::Var { 11.5 } else { 11.0 } * (s / 0.62).clamp(0.85, 1.15));
-                let name = if n.kind == Kind::Family { lib.family(&n.id, &st.layout).map(|f| (f.name, f.members.len())) } else { None };
-                let text = name.as_ref().map_or(n.id.as_str(), |(nm, _)| nm.as_str()).to_string();
-                let col = if hot || selected || open || targeted { pal.bright } else { pal.text };
-                let gap = 5.0;
-                let text = elide(&text, 22);
-                match n.side {
-                    Some(LabelSide::Left) => {
-                        p.text(n.center - vec2(n.r + gap, 0.0), Align2::RIGHT_CENTER, text, font, col);
-                    }
-                    Some(LabelSide::Right) => {
-                        p.text(n.center + vec2(n.r + gap, 0.0), Align2::LEFT_CENTER, text, font, col);
-                    }
-                    // Near 12 and 6 o'clock neighbours sit side by side: labels run radially
-                    // outward there, so they never overlap.
-                    Some(LabelSide::Above | LabelSide::Below) => radial_label(&p, c, n, text, font, col, gap),
-                    None => {
-                        p.text(n.center + vec2(0.0, n.r + gap - 1.0), Align2::CENTER_TOP, text, font, col);
-                    }
-                }
-                if let Some((_, k)) = name.filter(|(_, k)| *k > 1) {
-                    let bc = n.center + vec2(n.r * 0.78, n.r * 0.7);
-                    p.circle(bc, 8.0, pal.disc_hi, Stroke::new(1.0, pal.ring));
-                    p.text(bc, Align2::CENTER_CENTER, k.to_string(), FontId::proportional(8.5), pal.text);
-                }
+                let text = if n.kind == Kind::Family { lib.family(&n.id, &st.layout).map_or_else(|| n.id.clone(), |f| f.name) } else { n.id.clone() };
+                let col = if lit { Color32::WHITE } else { pal.text };
+                let max = if n.kind == Kind::Family { 14 } else { 18 };
+                let (at_label, align) = label_spot(n, c);
+                p.text(at_label, align, elide(&text, max), label_font.clone(), col);
                 if st.edit {
                     let bc = n.center + vec2(n.r * 0.72, -n.r * 0.72);
                     let br = (n.r * 0.55).clamp(12.0, 18.0) / 2.0;
@@ -876,34 +739,47 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut Ui, stage: Rect, lib: &Library, pal: 
                 }
             }
             Kind::MoreFam | Kind::MoreVar => {
-                p.extend(Shape::dashed_line(
-                    &g::arc_points(n.r / s, 0.0, 360.0).into_iter().map(|v| n.center + v * s).collect::<Vec<_>>(),
-                    Stroke::new(1.5, pal.ring),
-                    4.0,
-                    4.0,
-                ));
-                let (more, pg, pages) =
-                    if n.kind == Kind::MoreFam { (fam_more, fam_page, fam_pages) } else { spine.as_ref().map_or((0, 0, 1), |sp| (sp.3, sp.5, sp.4)) };
-                p.text(n.center, Align2::CENTER_CENTER, format!("+{more}"), theme::semibold(11.0), pal.bright);
-                p.text(
-                    n.center + vec2(0.0, n.r + 4.0),
-                    Align2::CENTER_TOP,
-                    crate::i18n::fmt(tl!("Page {page}/{pages}"), &[("page", &(pg + 1).to_string()), ("pages", &pages.to_string())]),
-                    FontId::proportional(10.0),
-                    pal.dim,
-                );
+                p.circle(n.center, n.r, pal.disc, Stroke::new(if hot { 2.5 } else { 1.5 }, if hot { pal.bright } else { pal.ring.gamma_multiply(0.7) }));
+                let more = if n.kind == Kind::MoreFam { fam_more } else { var_more };
+                p.text(n.center, Align2::CENTER_CENTER, format!("+{more}"), theme::semibold(12.0), pal.bright);
+                let (at_label, align) = label_spot(n, c);
+                p.text(at_label, align, tl!("More"), label_font.clone(), pal.dim);
             }
         }
     }
+
+    // The orbits' headers in their gaps beside their groups: the hub's name by its families, and
+    // the open family by its variations, which closes them.
+    let galley = p.layout_no_wrap(tl!(active_cat.as_str()).to_uppercase(), theme::semibold(10.5), pal.bright);
+    let rect = Rect::from_center_size(at(fam_head, g::R_FAM), galley.size() + vec2(18.0, 10.0));
+    p.rect_filled(rect, rect.height() / 2.0, pal.bg);
+    p.galley(rect.center() - galley.size() / 2.0, galley, pal.bright);
+    if let Some(f) = &open_fam {
+        let header = crate::i18n::fmt(
+            if f.members.len() == 1 { tl!("{family} · {count} VARIATION") } else { tl!("{family} · {count} VARIATIONS") },
+            &[("family", &f.name.to_uppercase()), ("count", &f.members.len().to_string())],
+        );
+        let text = format!("‹  {header}");
+        let galley = p.layout_no_wrap(text.clone(), theme::semibold(10.5), pal.bright);
+        let rect = Rect::from_center_size(at(var_head, g::R_VAR), galley.size() + vec2(18.0, 10.0));
+        let resp = ui.interact(rect, hud_id().with("back"), Sense::click()).on_hover_text(tl!(active_cat.as_str()));
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &text));
+        p.rect(rect, rect.height() / 2.0, if resp.hovered() { pal.disc_hi } else { pal.bg }, Stroke::new(1.0, pal.ring), egui::StrokeKind::Inside);
+        p.galley(rect.center() - galley.size() / 2.0, galley, pal.bright);
+        if resp.clicked() {
+            acts.push(Act::Back);
+        }
+    }
+
     // Recent / favourites label, which toggles between the two.
-    let label_pos = at(0.0, g::R_RECENT - 40.0);
+    let label_pos = at(g::RECENT_LABEL_DEG, g::R_RECENT_LABEL);
     let label = match (st.ring, ring.is_empty()) {
         (Ring::Recent, false) => tl!("Recent Brushes").to_string(),
         (Ring::Recent, true) => tl!("Recent Brushes · none yet").to_string(),
         (Ring::Favorites, false) => tl!("Favorite Brushes").to_string(),
         (Ring::Favorites, true) => tl!("Favorite Brushes · none yet").to_string(),
     };
-    let lr = p.text(label_pos, Align2::CENTER_CENTER, label, FontId::proportional(11.5 * (s / 0.62).clamp(0.85, 1.1)), pal.text);
+    let lr = p.text(label_pos, Align2::CENTER_CENTER, label, FontId::proportional(11.5 * (s / 0.52).clamp(0.9, 1.1)), pal.text);
     if ui.interact(lr.expand(3.0), hud_id().with("ring-label"), Sense::click()).on_hover_text(tl!("Switch between recent and favorite brushes")).clicked() {
         acts.push(Act::Ring);
     }
@@ -935,30 +811,10 @@ fn wheel(app: &mut PhotocraftApp, ui: &mut Ui, stage: Rect, lib: &Library, pal: 
     nodes
 }
 
-/// The wheel section at offset `v` from the centre (wheel units), as (inner radius, outer radius,
-/// start angle, end angle): the open family's wedge, a hub's sector between the dividers, the
-/// inner disc, or the outer band. `None` outside the wheel.
-fn section_at(v: Vec2, wedge: Option<(f32, f32, f32, f32)>, hubs: &[f32]) -> Option<(f32, f32, f32, f32)> {
-    let r = v.length();
-    let a = g::angle_of(v);
-    if let Some((r0, r1, a0, a1)) = wedge
-        && (r0..=r1).contains(&r)
-        && g::norm(a - a0) <= a1 - a0
-    {
-        return Some((r0, r1, a0, a1));
-    }
-    if r < g::RING_INNER {
-        return Some((0.0, g::RING_INNER, 0.0, 360.0));
-    }
-    if r < g::RING_MID {
-        if hubs.len() < 2 {
-            return Some((g::RING_INNER, g::RING_MID, 0.0, 360.0));
-        }
-        let half = 180.0 / hubs.len() as f32;
-        let hub = hubs.iter().copied().find(|h| g::delta(*h, a).abs() <= half)?;
-        return Some((g::RING_INNER, g::RING_MID, hub - half, hub + half));
-    }
-    (r < g::RING_OUTER).then_some((g::RING_MID, g::RING_OUTER, 0.0, 360.0))
+/// Where an orbit node's name goes: on the side away from the wheel's centre `c` (under nodes
+/// in the lower half, over those in the upper half), so it never reaches into the ring inside.
+fn label_spot(n: &Node, c: Pos2) -> (Pos2, Align2) {
+    if n.center.y < c.y { (n.center - vec2(0.0, n.r + 5.0), Align2::CENTER_BOTTOM) } else { (n.center + vec2(0.0, n.r + 5.0), Align2::CENTER_TOP) }
 }
 
 /// `text` cut to `max` characters with an ellipsis.
@@ -969,20 +825,6 @@ fn elide(text: &str, max: usize) -> String {
     let mut s: String = text.chars().take(max.saturating_sub(1)).collect();
     s.push('…');
     s
-}
-
-/// A label running outward along the radius through node `n` (wheel centre `c`), reading left to
-/// right on either half of the wheel.
-fn radial_label(p: &egui::Painter, c: Pos2, n: &Node, text: String, font: FontId, color: Color32, gap: f32) {
-    let out = (n.center - c).normalized();
-    let galley = p.layout_no_wrap(text, font, color);
-    let (w, h) = (galley.size().x, galley.size().y);
-    let near = n.center + out * (n.r + gap);
-    // Text runs along `dir`; its top edge is offset by half its height across the line.
-    let (dir, start) = if out.x >= 0.0 { (out, near) } else { (-out, near + out * w) };
-    let across = vec2(-dir.y, dir.x);
-    let pos = start - across * (h / 2.0);
-    p.add(egui::epaint::TextShape::new(pos, galley, color).with_angle(dir.y.atan2(dir.x)));
 }
 
 /// The preset a node shows (its own, or its family's first).
@@ -1070,12 +912,20 @@ fn tracer(app: &PhotocraftApp, ui: &Ui, search: Rect, nodes: &[Node], stage: Rec
 
 // ------------------------------------------------------------------ applying changes
 
-fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, lib: &Library, acts: Vec<Act>, now: f64) {
+fn apply(app: &mut PhotocraftApp, lib: &Library, acts: Vec<Act>, now: f64) {
     for act in acts {
         let st = &mut app.ui.brush_hud;
         match act {
             Act::Category(c) => {
+                // The active hub leads back from a family's variations to its families.
+                if st.category == c {
+                    st.family = None;
+                }
                 super::set_category(st, &c);
+            }
+            Act::Back => {
+                st.family = None;
+                st.var_page = 0;
             }
             Act::Family(id) => {
                 if st.family.as_deref() != Some(id.as_str()) {
@@ -1116,7 +966,6 @@ fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, lib: &Library, acts: Vec<
             }
             Act::PageFam(d) => {
                 st.fam_page = (st.fam_page as i64 + i64::from(d)).max(0) as usize;
-                st.family = None;
             }
             Act::PageVar(d) => {
                 st.var_page = (st.var_page as i64 + i64::from(d)).max(0) as usize;
@@ -1146,11 +995,9 @@ fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, lib: &Library, acts: Vec<
                     super::run_search(st, lib, &app.session.tools.presets, now);
                 }
             }
-            Act::Settings => {
-                crate::brush_picker::open_settings(app, ctx);
-            }
-            // The HUD stays open: imported brushes appear on it once the file is read.
             Act::Import => {
+                // The same Open dialog as the Brushes panel's import button: an .abr lands in the
+                // library, and the wheel picks the new brushes up.
                 let _ = app.open_dialog_file();
             }
         }
@@ -1169,24 +1016,5 @@ fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, lib: &Library, acts: Vec<
         } else {
             st.var_page = 0;
         }
-    }
-}
-
-#[cfg(test)]
-mod section_tests {
-    use super::*;
-
-    #[test]
-    fn the_section_under_the_pointer() {
-        let hubs = g::hub_angles(6);
-        let at = |deg: f32, r: f32| g::polar(deg, r);
-        assert_eq!(section_at(at(10.0, 100.0), None, &hubs), Some((0.0, g::RING_INNER, 0.0, 360.0)), "inner disc");
-        assert_eq!(section_at(at(62.0, 300.0), None, &hubs), Some((g::RING_INNER, g::RING_MID, 30.0, 90.0)), "the second hub's sector");
-        assert_eq!(section_at(at(-20.0, 300.0), None, &hubs), Some((g::RING_INNER, g::RING_MID, -30.0, 30.0)), "across 12 o'clock");
-        assert_eq!(section_at(at(200.0, 600.0), None, &hubs), Some((g::RING_MID, g::RING_OUTER, 0.0, 360.0)), "outer band");
-        assert_eq!(section_at(at(0.0, 700.0), None, &hubs), None, "outside the wheel");
-        let wedge = Some((376.0, 624.0, -40.0, 40.0));
-        assert_eq!(section_at(at(-35.0, 600.0), wedge, &hubs), wedge, "the open family's wedge wins");
-        assert_eq!(section_at(at(45.0, 600.0), wedge, &hubs).map(|s| s.0), Some(g::RING_MID), "beside the wedge");
     }
 }

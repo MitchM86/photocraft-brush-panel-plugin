@@ -2,9 +2,9 @@
 //!
 //! - **Tier 1** (inner ring): category hubs (Sketch, Paint, Surface, Flora, Atmosphere, and
 //!   Custom when some names match no keyword), routed by [`categorize::categorize_brush`].
-//! - **Tier 2** (middle band): the active hub's families, fanned out in a wedge.
-//! - **Tier 3** (outer spine): hovering or clicking a family opens its variations along a curved
-//!   spine on the outer ring.
+//! - **Tier 2** (middle orbit): the active hub's families.
+//! - **Tier 3** (outer orbit): clicking a family opens its variations on the outer ring; the
+//!   families stay in place.
 //!
 //! Hovering any brush node previews its stroke in the right-hand panel (rendered by the real
 //! brush engine, [`crate::brush_preview`]); a click picks it with `tools.setBrush {preset}`. The
@@ -75,8 +75,12 @@ pub struct HudState {
     pub recent: Vec<String>,
     pub favorites: Vec<String>,
     pub layout: HudLayout,
-    /// Close the HUD after a pick.
+    /// Close the HUD after a pick, back to painting (the default). Not remembered: an early HUD
+    /// saved `false` with no way to change it back.
     pub close_on_pick: bool,
+    /// Open the HUD this frame: set by buttons that only reach the UI state (the options bar).
+    #[serde(skip)]
+    pub open_requested: bool,
     #[serde(skip)]
     pub undo: Vec<HudLayout>,
     #[serde(skip)]
@@ -105,7 +109,8 @@ impl Default for HudState {
             recent: Vec::new(),
             favorites: Vec::new(),
             layout: HudLayout::default(),
-            close_on_pick: false,
+            close_on_pick: true,
+            open_requested: false,
             undo: Vec::new(),
             redo: Vec::new(),
             target_since: 0.0,
@@ -277,6 +282,9 @@ pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
             ctx.memory_mut(|m| m.request_focus(egui::Id::NULL));
         } else if st.edit {
             st.edit = false;
+        } else if st.family.is_some() {
+            st.family = None;
+            st.var_page = 0;
         } else {
             close(app);
         }
@@ -470,7 +478,6 @@ fn saved(st: &HudState) -> Value {
         "recent": st.recent,
         "favorites": st.favorites,
         "ring": st.ring,
-        "closeOnPick": st.close_on_pick,
         "category": st.category,
     })
 }
@@ -506,16 +513,39 @@ pub fn restore(app: &mut PhotocraftApp) {
     if let Some(r) = v.get("ring").and_then(|r| serde_json::from_value::<Ring>(r.clone()).ok()) {
         st.ring = r;
     }
-    if let Some(b) = v.get("closeOnPick").and_then(Value::as_bool) {
-        st.close_on_pick = b;
-    }
     if let Some(c) = v.get("category").and_then(Value::as_str).filter(|c| c.len() < 64) {
         st.category = c.to_string();
     }
 }
 
+/// The options-bar button beside the brush chip: opens the HUD over the canvas.
+pub fn options_button(ui: &mut egui::Ui, state: &mut crate::state::UiState) {
+    let t = crate::theme::Tokens::get(ui.ctx());
+    let (r, _) = ui.allocate_exact_size(egui::vec2(30.0, 30.0), egui::Sense::hover());
+    let resp = ui.interact(r, egui::Id::new("brush-hud-options-button"), egui::Sense::click());
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Brush HUD")));
+    if resp.hovered() || state.brush_hud.open {
+        ui.painter().rect_filled(r, t.radius_sm, t.hover);
+    }
+    // A small radial glyph: the master hub ringed by its hubs.
+    let c = r.center();
+    let ink = if resp.hovered() { t.text } else { t.icon };
+    ui.painter().circle_stroke(c, 8.5, egui::Stroke::new(1.3, ink));
+    ui.painter().circle_filled(c, 2.6, ink);
+    for k in 0..5 {
+        let a = (k as f32 * 72.0).to_radians();
+        ui.painter().circle_filled(c + egui::vec2(a.sin(), -a.cos()) * 8.5, 1.9, ink);
+    }
+    if resp.on_hover_text(tl!("Brush HUD")).clicked() {
+        state.brush_hud.open_requested = true;
+    }
+}
+
 /// Draw the HUD when it is open. Called once a frame (after the canvas).
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    if std::mem::take(&mut app.ui.brush_hud.open_requested) {
+        open(app, ctx);
+    }
     if app.ui.brush_hud.open {
         view::show(app, ctx);
     }

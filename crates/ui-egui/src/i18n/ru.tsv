@@ -988,6 +988,7 @@
 	Rename Brush…	Переименовать кисть…
 	Delete Brush	Удалить кисть
 	Import Brushes…	Импортировать кисти…
+	Import Brushes… (.abr)	Импортировать кисти… (.abr)
 	Brush Name	Имя кисти
 	Brush Stroke	Мазок кисти
 	New Brush Preset…	Новый набор параметров кисти…
@@ -2805,12 +2806,10 @@ fontWeight	Italic	Курсив
 	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	Изменить HUD: перетащите для изменения порядка, бросьте в корзину или щёлкните правой кнопкой, чтобы убрать (E)
 	Favorite Brushes	Избранные кисти
 	Favorite Brushes · none yet	Избранные кисти · пока нет
-	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	НАВЕДИТЕ ДЛЯ ПРЕДПРОСМОТРА · ЩЁЛКНИТЕ ДЛЯ ВЫБОРА · ДВОЙНОЙ ЩЕЛЧОК — РИСОВАТЬ · ПРАВЫЙ ЩЕЛЧОК — В ИЗБРАННОЕ · ESC — ЗАКРЫТЬ
 	Master Tool	Основной инструмент
 	More	Ещё
 	No match	Нет совпадений
 	PREVIEW · CLICK TO SELECT	ПРЕДПРОСМОТР · ЩЁЛКНИТЕ ДЛЯ ВЫБОРА
-	Page {page}/{pages}	Страница {page}/{pages}
 	Put every removed brush back on the HUD	Вернуть все убранные кисти в HUD
 	Recent Brushes	Недавние кисти
 	Recent Brushes · none yet	Недавние кисти · пока нет

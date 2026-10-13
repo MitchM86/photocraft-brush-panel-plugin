@@ -3540,12 +3540,10 @@ fontWeight	Italic	斜体
 	Edit HUD: drag to reorder, drop on the bin or right-click to remove (E)	HUDを編集：ドラッグで並べ替え、ゴミ箱へのドロップまたは右クリックで削除 (E)
 	Favorite Brushes	お気に入りのブラシ
 	Favorite Brushes · none yet	お気に入りのブラシ · まだありません
-	HOVER TO PREVIEW · CLICK TO SELECT · DOUBLE-CLICK TO PAINT · RIGHT-CLICK TO FAVORITE · ESC TO CLOSE	ホバーでプレビュー · クリックで選択 · ダブルクリックで描画 · 右クリックでお気に入り · Escで閉じる
 	Master Tool	マスターツール
 	More	その他
 	No match	一致なし
 	PREVIEW · CLICK TO SELECT	プレビュー · クリックで選択
-	Page {page}/{pages}	ページ {page}/{pages}
 	Put every removed brush back on the HUD	削除したすべてのブラシをHUDに戻します
 	Recent Brushes	最近使用したブラシ
 	Recent Brushes · none yet	最近使用したブラシ · まだありません

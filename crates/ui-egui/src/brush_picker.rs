@@ -184,6 +184,8 @@ pub fn settings_toggle(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     {
         app.ui.status = e;
     }
+    // Beside it, the radial Brush HUD over the canvas.
+    crate::brush_hud::options_button(ui, &mut app.ui);
 }
 
 /// An icon button's accessible name (icon buttons have only a tooltip).

@@ -126,19 +126,6 @@ fn hovering_previews_and_clicking_picks() {
     click(&mut h, soft, PointerButton::Primary);
     assert_eq!(h.state().session.tools.current_preset.as_deref(), Some("Soft Round"));
     assert_eq!(h.state().ui.brush_hud.recent.first().map(String::as_str), Some("Soft Round"));
-    assert!(h.state().ui.brush_hud.open, "a single click keeps the HUD open");
-}
-
-#[test]
-fn double_clicking_a_brush_picks_it_and_closes_the_hud() {
-    let mut h = harness();
-    invoke(&mut h, COMMAND);
-    control(&mut h, json!({"category": "Paint", "family": "fam:Paint/Round"}));
-    let soft = center_of(&h, "Soft Round");
-    click(&mut h, soft, PointerButton::Primary);
-    click(&mut h, soft, PointerButton::Primary);
-    assert_eq!(h.state().session.tools.current_preset.as_deref(), Some("Soft Round"));
-    assert!(!h.state().ui.brush_hud.open, "ready to paint");
 }
 
 #[test]
@@ -154,6 +141,57 @@ fn hubs_switch_category_and_families_open_their_spine() {
     let at = center_of(&h, &first.name);
     click(&mut h, at, PointerButton::Primary);
     assert_eq!(h.state().ui.brush_hud.family.as_deref(), Some(first.id.as_str()));
+}
+
+#[test]
+fn a_family_opens_its_variations_on_the_outer_orbit_and_esc_header_or_hub_close_them() {
+    let mut h = harness();
+    invoke(&mut h, COMMAND);
+    control(&mut h, json!({"category": "Paint", "family": "fam:Paint/Round"}));
+    assert!(h.query_all_by_label("Soft Round").next().is_some(), "the variations are on the outer orbit");
+    assert!(h.query_all_by_label("Round").next().is_some(), "and the families stay on theirs");
+    let fam = center_of(&h, "Round");
+    let var = center_of(&h, "Soft Round");
+    let wheel = center_of(&h, "Master Tool");
+    assert!((var - wheel).length() > (fam - wheel).length() + 40.0, "variations ring the families");
+    key(&mut h, egui::Key::Escape, Modifiers::NONE);
+    assert!(h.state().ui.brush_hud.open, "Esc steps back out of the family first");
+    assert_eq!(h.state().ui.brush_hud.family, None);
+    assert!(h.query_all_by_label("Soft Round").next().is_none());
+    let round = center_of(&h, "Round");
+    click(&mut h, round, PointerButton::Primary);
+    assert_eq!(h.state().ui.brush_hud.family.as_deref(), Some("fam:Paint/Round"));
+    let header = h.get_all_by_label_contains("ROUND").next().expect("the family's header").rect().center();
+    click(&mut h, header, PointerButton::Primary);
+    assert_eq!(h.state().ui.brush_hud.family, None, "the header leads back");
+    click(&mut h, round, PointerButton::Primary);
+    let paint = center_of(&h, "Paint");
+    click(&mut h, paint, PointerButton::Primary);
+    assert_eq!(h.state().ui.brush_hud.family, None, "and so does the active hub");
+    assert_eq!(h.state().ui.brush_hud.category, "Paint");
+}
+
+#[test]
+fn the_hud_floats_over_the_canvas_and_a_pick_or_a_click_outside_returns_to_painting() {
+    let mut h = harness();
+    // The options-bar button only reaches the UI state: it asks, and the HUD opens.
+    h.state_mut().ui.brush_hud.open_requested = true;
+    h.run_steps(3);
+    assert!(h.state().ui.brush_hud.open);
+    let canvas = h.state().last_canvas_rect;
+    for hub in ["Sketch", "Paint", "Flora"] {
+        assert!(canvas.contains(center_of(&h, hub)), "{hub} sits over the canvas");
+    }
+    // A click on the canvas outside the HUD dismisses it.
+    click(&mut h, canvas.left_bottom() + vec2(6.0, -6.0), PointerButton::Primary);
+    assert!(!h.state().ui.brush_hud.open);
+    // Picking a brush does too.
+    invoke(&mut h, COMMAND);
+    control(&mut h, json!({"category": "Paint", "family": "fam:Paint/Round"}));
+    let soft = center_of(&h, "Soft Round");
+    click(&mut h, soft, PointerButton::Primary);
+    assert_eq!(h.state().session.tools.current_preset.as_deref(), Some("Soft Round"));
+    assert!(!h.state().ui.brush_hud.open, "back to painting");
 }
 
 #[test]
@@ -233,6 +271,12 @@ fn layout_recents_and_favorites_survive_a_restart() {
     assert_eq!(st.recent, ["Hard Round"]);
     assert_eq!(st.favorites, ["Charcoal"]);
     assert_eq!(st.ring, Ring::Favorites);
+    // An early HUD saved `closeOnPick: false`; a pick still closes the HUD.
+    let mut old = fresh.session.prefs().brush_hud.clone();
+    old["closeOnPick"] = json!(false);
+    fresh.session.prefs.edit(|p| p.brush_hud = old);
+    restore(&mut fresh);
+    assert!(fresh.ui.brush_hud.close_on_pick);
     // A damaged entry keeps the defaults instead of failing.
     let mut broken = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     broken.session.prefs.edit(|p| p.brush_hud = json!({"layout": 7, "recent": "x", "ring": "sideways", "category": 3}));

@@ -1,38 +1,63 @@
 //! Brush HUD wheel geometry, in "wheel units": the wheel is `U` units across, centred on the
 //! origin; the view scales units to points. Angles are degrees, 0° at 12 o'clock, clockwise.
 //!
-//! | radius            | holds                                   |
-//! |-------------------|-----------------------------------------|
-//! | `R_CENTER`        | the master hub (the brush in hand)      |
-//! | `R_RECENT`        | the recent / favourite brushes arc      |
-//! | `R_HUB`           | Tier 1 category hubs                    |
-//! | `R_FAM_IN/OUT`    | Tier 2 families, staggered in a fan     |
-//! | `R_SPINE`         | Tier 3 variations along the outer spine |
+//! The wheel is three orbits around the master hub:
+//!
+//! | radius       | holds                                                              |
+//! |--------------|--------------------------------------------------------------------|
+//! | `R_CENTER`   | the master hub (the brush in hand)                                 |
+//! | `R_RECENT`   | the recent / favourite brushes arc over the master hub, its label  |
+//! |              | under the hub at `RECENT_LABEL_DEG`                                |
+//! | `R_HUB`      | Tier 1 category hubs, evenly spaced on one ring                    |
+//! | `R_FAM`      | Tier 2 families of the active hub, its name in the gap at 12       |
+//! | `R_VAR`      | Tier 3 variations of the open family, its header in the gap at 12  |
+//! | `RING_OUTER` | the outer frame ring (and the search tracer's path)                |
 
 use egui::{Vec2, vec2};
 
 pub const U: f32 = 1400.0;
-pub const R_CENTER: f32 = 92.0;
-pub const R_RECENT: f32 = 176.0;
-pub const RECENT_R: f32 = 19.0;
-pub const R_HUB: f32 = 286.0;
-pub const HUB_R: f32 = 74.0;
-pub const RING_INNER: f32 = 214.0;
-pub const RING_HUB_OUT: f32 = 370.0;
-pub const R_FAM_IN: f32 = 414.0;
-pub const R_FAM_OUT: f32 = 478.0;
-pub const FAM_R: f32 = 36.0;
-pub const RING_MID: f32 = 530.0;
-pub const R_SPINE: f32 = 590.0;
-pub const VAR_R: f32 = 23.0;
-pub const RING_OUTER: f32 = 664.0;
-// The tiers never overlap.
-const _: () = assert!(R_SPINE > RING_MID && RING_MID > R_FAM_OUT && R_FAM_IN > RING_HUB_OUT && RING_INNER > R_RECENT);
+pub const R_CENTER: f32 = 100.0;
+pub const R_RECENT: f32 = 146.0;
+pub const RECENT_R: f32 = 32.0;
+/// The recent arc's label sits on the arc's radius, under the master hub (the arc fills the
+/// room above it).
+pub const R_RECENT_LABEL: f32 = R_RECENT;
+pub const RECENT_LABEL_DEG: f32 = 180.0;
+/// The step between recent brushes along their arc.
+pub const RECENT_STEP: f32 = 28.0;
+pub const R_HUB: f32 = 272.0;
+pub const HUB_R: f32 = 70.0;
+pub const R_FAM: f32 = 414.0;
+pub const R_VAR: f32 = 570.0;
+/// Family and variation nodes.
+pub const NODE_R: f32 = 41.0;
+pub const RING_OUTER: f32 = 676.0;
+/// The glowing divider between the centre (master hub, recent arc) and the hub orbit.
+pub const RING_INNER: f32 = 192.0;
+/// The glowing divider between the hub orbit and the family orbit.
+pub const RING_MID: f32 = 356.0;
+/// The glowing divider between the family orbit and the variation orbit.
+pub const RING_FAM: f32 = 506.0;
+/// The arc left free at 12 o'clock on the outer orbits, for their headers.
+pub const ORBIT_GAP: f32 = 44.0;
+/// The widest step between orbit nodes, so a few nodes gather at the bottom instead of
+/// scattering around the ring.
+pub const ORBIT_STEP_MAX: f32 = 34.0;
+// The tiers never overlap: the recent label clears the hubs, the hubs clear the families, the
+// families clear the variations, and the variations' labels stay inside the frame.
+const _: () = assert!(R_HUB - HUB_R > R_RECENT + RECENT_R + 20.0 && R_RECENT > R_CENTER + RECENT_R + 12.0);
+const _: () = assert!(R_FAM - NODE_R > R_HUB + HUB_R + 28.0 && R_VAR - NODE_R > R_FAM + NODE_R + 70.0 && R_VAR + NODE_R + 60.0 < RING_OUTER);
+// The dividers run in the gaps between the tiers, touching no node.
+const _: () = assert!(RING_INNER > R_RECENT + RECENT_R + 12.0 && RING_INNER < R_HUB - HUB_R - 4.0);
+const _: () = assert!(RING_MID > R_HUB + HUB_R + 12.0 && RING_MID < R_FAM - NODE_R - 12.0);
+const _: () = assert!(RING_FAM > R_FAM + NODE_R + 40.0 && RING_FAM < R_VAR - NODE_R - 12.0);
 
-/// Most families shown at once; more page behind a `+N` node.
-pub const FAM_MAX: usize = 16;
-/// Most variations shown at once on the spine.
-pub const VAR_MAX: usize = 22;
+/// Most nodes on an orbit at once; more page behind a `+N` node.
+pub const ORBIT_MAX: usize = 16;
+/// Most families shown at once (fewer than variations: their orbit is shorter).
+pub const FAM_MAX: usize = 12;
+/// Most variations shown at once.
+pub const VAR_MAX: usize = ORBIT_MAX;
 /// Most brushes on the recent / favourites arc.
 pub const RECENT_MAX: usize = 7;
 
@@ -75,61 +100,27 @@ impl Slot {
     }
 }
 
-/// Tier 2: a fan of `m` families centred on the active hub, on alternating radii.
-pub fn family_fan(center: f32, m: usize) -> (Vec<Slot>, f32, f32) {
-    if m == 0 {
-        return (Vec::new(), center, center);
-    }
-    let step = if m > 1 { (168.0 / (m - 1) as f32).min(12.5) } else { 0.0 };
-    let span = step * (m.saturating_sub(1)) as f32;
-    let slots = (0..m)
-        .map(|i| {
-            let r = if m > 3 { if i % 2 == 1 { R_FAM_OUT } else { R_FAM_IN } } else { (R_FAM_IN + R_FAM_OUT) / 2.0 };
-            Slot { deg: center - span / 2.0 + i as f32 * step, r }
-        })
-        .collect();
-    (slots, center - span / 2.0 - 8.0, center + span / 2.0 + 8.0)
-}
-
-/// Where a variation's label goes relative to its node.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LabelSide {
-    Left,
-    Right,
-    Above,
-    Below,
-}
-
-/// Tier 3: `n` variations along the outer spine, centred on the family's angle. Near 12 and 6
-/// o'clock, side labels would collide with the neighbours, so labels go above/below there,
-/// alternating between the outer and inner side of the spine.
-pub fn spine(center: f32, n: usize) -> (Vec<(Slot, LabelSide)>, f32, f32) {
+/// An orbit of radius `r`: `n` nodes evenly spaced around the ring and centred on `center`
+/// degrees (the hub or family they belong to), leaving a gap of at least `ORBIT_GAP` for the
+/// header, which sits just before the first node (see [`header_deg`]).
+pub fn orbit(n: usize, r: f32, center: f32) -> Vec<Slot> {
     if n == 0 {
-        return (Vec::new(), center, center);
+        return Vec::new();
     }
-    let step = if n > 1 { (200.0 / (n - 1) as f32).min(8.6) } else { 0.0 };
-    let span = step * (n.saturating_sub(1)) as f32;
-    let nodes = (0..n)
-        .map(|i| {
-            let deg = center - span / 2.0 + i as f32 * step;
-            let c = deg.to_radians().cos();
-            let (outward, inward) = if c > 0.0 { (LabelSide::Above, LabelSide::Below) } else { (LabelSide::Below, LabelSide::Above) };
-            let side = if c.abs() > 0.6 {
-                if i % 2 == 1 { inward } else { outward }
-            } else if norm(deg) > 180.0 {
-                LabelSide::Left
-            } else {
-                LabelSide::Right
-            };
-            (Slot { deg, r: R_SPINE }, side)
-        })
-        .collect();
-    (nodes, center - span / 2.0, center + span / 2.0)
+    let step = if n > 1 { ((360.0 - ORBIT_GAP) / (n - 1) as f32).min(ORBIT_STEP_MAX) } else { 0.0 };
+    let span = step * (n - 1) as f32;
+    (0..n).map(|i| Slot { deg: norm(center - span / 2.0 + i as f32 * step), r }).collect()
+}
+
+/// Where an orbit's header goes: in the gap just before its first node (or at `center` when
+/// the orbit is empty). On a full orbit that is the middle of the gap.
+pub fn header_deg(slots: &[Slot], center: f32) -> f32 {
+    slots.first().map_or(center, |s| norm(s.deg - ORBIT_GAP / 2.0))
 }
 
 /// The recent / favourites arc above the master hub.
 pub fn recent_arc(n: usize) -> Vec<Slot> {
-    let step = 17.0;
+    let step = RECENT_STEP;
     let span = step * n.saturating_sub(1) as f32;
     (0..n).map(|i| Slot { deg: -span / 2.0 + i as f32 * step, r: R_RECENT }).collect()
 }
@@ -138,13 +129,6 @@ pub fn recent_arc(n: usize) -> Vec<Slot> {
 pub fn arc_points(r: f32, a0: f32, a1: f32) -> Vec<Vec2> {
     let segs = (((a1 - a0).abs() / 3.0).ceil() as usize).clamp(2, 240);
     (0..=segs).map(|i| polar(a0 + (a1 - a0) * i as f32 / segs as f32, r)).collect()
-}
-
-/// An annular wedge between radii `r0..r1` and angles `a0..a1`, as a closed polygon.
-pub fn wedge(r0: f32, r1: f32, a0: f32, a1: f32) -> Vec<Vec2> {
-    let mut pts = arc_points(r1, a0, a1);
-    pts.extend(arc_points(r0, a1, a0));
-    pts
 }
 
 /// The search tracer: from `start` (outside the wheel) to the ring of radius `r`, around the
@@ -208,26 +192,53 @@ mod tests {
     }
 
     #[test]
-    fn fans_and_spines_centre_on_their_anchor() {
-        let (f, a0, a1) = family_fan(90.0, 5);
-        assert_eq!(f.len(), 5);
-        assert!((f[2].deg - 90.0).abs() < 1e-4);
-        assert!(a0 < 90.0 && a1 > 90.0);
-        let (s, b0, b1) = spine(270.0, 11);
-        assert_eq!(s.len(), 11);
-        assert!(((b0 + b1) / 2.0 - 270.0).abs() < 1e-3);
-        let (side, _, _) = spine(270.0, 3);
-        assert!(side.iter().all(|(_, l)| *l == LabelSide::Left), "the left side reads leftwards");
-        let (bottom, _, _) = spine(180.0, 6);
-        assert_eq!(bottom[0].1, LabelSide::Below);
-        assert_eq!(bottom[1].1, LabelSide::Above, "alternates to the inner side");
-        assert!(family_fan(0.0, 0).0.is_empty() && spine(0.0, 0).0.is_empty());
+    fn the_orbit_spreads_evenly_and_keeps_its_header_gap_free() {
+        assert!(orbit(0, R_VAR, 0.0).is_empty());
+        assert_eq!(orbit(1, R_VAR, 180.0)[0].deg, 180.0);
+        let full = orbit(VAR_MAX, R_VAR, 180.0);
+        assert_eq!(full.len(), VAR_MAX);
+        assert!(full.iter().all(|s| s.deg >= ORBIT_GAP / 2.0 - 1e-3 && s.deg <= 360.0 - ORBIT_GAP / 2.0 + 1e-3), "{full:?}");
+        let steps: Vec<f32> = full.windows(2).map(|w| w[1].deg - w[0].deg).collect();
+        assert!(steps.iter().all(|d| (d - steps[0]).abs() < 1e-3), "evenly spaced");
+        // Neighbours never touch, with room for a label between them.
+        let gap = (full[1].offset() - full[0].offset()).length();
+        assert!(gap > NODE_R * 4.5, "{gap}");
+        let fams = orbit(FAM_MAX, R_FAM, 180.0);
+        let gap = (fams[1].offset() - fams[0].offset()).length();
+        assert!(gap > NODE_R * 4.5, "{gap}");
+        let few = orbit(3, R_VAR, 180.0);
+        assert!(((few[0].deg + few[2].deg) / 2.0 - 180.0).abs() < 1e-3 && few[1].deg - few[0].deg <= ORBIT_STEP_MAX);
+    }
+
+    #[test]
+    fn an_orbit_gathers_by_its_hub_and_its_header_sits_in_the_free_gap() {
+        // A few families of the hub at 12 o'clock gather at the top, around 0°.
+        let few = orbit(3, R_FAM, 0.0);
+        assert!(few.iter().all(|s| delta(0.0, s.deg).abs() <= ORBIT_STEP_MAX + 1e-3), "{few:?}");
+        assert!((delta(0.0, few[1].deg)).abs() < 1e-3);
+        // The header is next to the group, clear of every node.
+        let h = header_deg(&few, 0.0);
+        assert!(few.iter().all(|s| delta(h, s.deg).abs() >= ORBIT_GAP / 2.0 - 1e-3), "{h}");
+        // A full orbit around the hub at 3 o'clock leaves its gap opposite, at 9 o'clock.
+        let full = orbit(FAM_MAX, R_FAM, 90.0);
+        let h = header_deg(&full, 90.0);
+        assert!(delta(h, 270.0).abs() < 1e-2, "{h}");
+        assert!(full.iter().all(|s| delta(h, s.deg).abs() >= ORBIT_GAP / 2.0 - 1e-3));
+    }
+
+    #[test]
+    fn recent_brushes_never_touch_each_other_or_their_label() {
+        let arc = recent_arc(RECENT_MAX);
+        let gap = (arc[1].offset() - arc[0].offset()).length();
+        assert!(gap > RECENT_R * 2.0 + 4.0, "{gap}");
+        let label = polar(RECENT_LABEL_DEG, R_RECENT_LABEL);
+        assert!(arc.iter().all(|s| (s.offset() - label).length() > RECENT_R + 40.0));
     }
 
     #[test]
     fn tracer_runs_around_the_ring_into_the_target() {
         let start = vec2(500.0, -900.0);
-        let target = polar(200.0, R_SPINE);
+        let target = polar(200.0, R_VAR);
         let pts = tracer(start, target, RING_OUTER, 10.0);
         assert_eq!(pts[0], start);
         assert!((pts[1].length() - RING_OUTER).abs() < 1e-2);
