@@ -2143,6 +2143,9 @@ pub fn mode_label(doc: &Document) -> &'static str {
 fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = crate::theme::Tokens::get(ui.ctx());
     let area = ui.available_rect_before_wrap();
+    // With no document the start screen holds the canvas's place: overlays laid out over the
+    // canvas (the Brush HUD) use it instead of a stale or startup-sized rect.
+    app.last_canvas_rect = area;
     paint_dots(ui, area);
     // File › Open Recent, newest first (on the web there are no paths to reopen).
     let recent: Vec<String> = if cfg!(target_arch = "wasm32") { Vec::new() } else { app.ui.recent_files.iter().take(HOME_RECENT).cloned().collect() };
