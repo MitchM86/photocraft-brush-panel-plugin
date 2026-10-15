@@ -469,6 +469,10 @@ pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context) {
             return;
         }
     }
+    // Perspective Crop: ↵ straightens the frame, Esc drops it.
+    if crate::perspective_crop_ui::keys(app, ctx) {
+        return;
+    }
     if !app.ui.polygon.is_empty() || app.ui.crop_rect.is_some() {
         if pressed(Key::Enter) {
             if !app.ui.polygon.is_empty() {

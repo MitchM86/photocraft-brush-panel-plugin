@@ -593,7 +593,7 @@ fn show_only(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 /// Pixels of a fill or smart-object layer's content alone (no mask, effects or opacity).
-fn content_pixels(doc: &Document, l: &Layer) -> photocraft_raster::Surface {
+pub(crate) fn content_pixels(doc: &Document, l: &Layer) -> photocraft_raster::Surface {
     let mut tmp = l.clone();
     tmp.mask = None;
     tmp.vector_mask = None;

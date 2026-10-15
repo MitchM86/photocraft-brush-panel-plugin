@@ -2971,3 +2971,23 @@ fontWeight	Italic	Italique
 	Loose Curl	Boucle lâche
 	Tight Curl Long	Boucle serrée longue
 	Loose Curl Long	Boucle lâche longue
+	Perspective Crop Tool	Outil Recadrage en perspective
+	Show Grid	Afficher la grille
+	Drag the corners onto the edges of the object, then press Enter	Faites glisser les coins sur les bords de l'objet, puis appuyez sur Entrée
+	Drag a frame, or click the four corners of the object	Tracez un cadre ou cliquez sur les quatre coins de l'objet
+	Click the next corner	Cliquez sur le coin suivant
+	The corners must make a convex shape: move them so no two sides cross	Les coins doivent former une forme convexe : déplacez-les pour qu'aucun côté n'en croise un autre
+	Artboard Tool	Outil Plan de travail
+	Frame Tool	Outil Cadre
+	New Frame	Nouveau cadre
+	There is no room for an artboard on that side	Pas de place pour un plan de travail de ce côté
+	W:	L :
+	H:	H :
+	Make Portrait	Portrait
+	Make Landscape	Paysage
+	Add New Artboard	Ajouter un nouveau plan de travail
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Faites glisser à l'intérieur pour déplacer · faites glisser une poignée pour redimensionner · cliquez sur + pour ajouter un plan à côté
+	Drag to draw an artboard · click one to select it	Faites glisser pour tracer un plan de travail · cliquez sur l'un d'eux pour le sélectionner
+	Create a new rectangular frame	Créer un cadre rectangulaire
+	Create a new elliptical frame	Créer un cadre elliptique
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Tracez un cadre · sur une image sélectionnée, il la découpe · Importer incorporé ou déposer un fichier remplit le cadre sélectionné

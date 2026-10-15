@@ -3726,3 +3726,22 @@ cameraRaw	Whites	Witten
 	Loose Curl	Losse krul
 	Tight Curl Long	Strakke lange krul
 	Loose Curl Long	Losse lange krul
+	Perspective Crop Tool	Gereedschap Perspectief bijsnijden
+	Drag the corners onto the edges of the object, then press Enter	Sleep de hoeken naar de randen van het object en druk op Enter
+	Drag a frame, or click the four corners of the object	Sleep een kader of klik op de vier hoeken van het object
+	Click the next corner	Klik op de volgende hoek
+	The corners must make a convex shape: move them so no two sides cross	De hoeken moeten een convexe vorm maken: verplaats ze zodat geen twee zijden elkaar kruisen
+	Artboard Tool	Tekengebied
+	Frame Tool	Kader
+	New Frame	Nieuw kader
+	There is no room for an artboard on that side	Aan die kant is geen ruimte voor een tekengebied
+	W:	B:
+	H:	H:
+	Make Portrait	Staand
+	Make Landscape	Liggend
+	Add New Artboard	Nieuw tekengebied toevoegen
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Sleep binnenin om te verplaatsen · sleep een greep om de grootte te wijzigen · klik op + voor een tekengebied ernaast
+	Drag to draw an artboard · click one to select it	Sleep om een tekengebied te tekenen · klik erop om het te selecteren
+	Create a new rectangular frame	Nieuw rechthoekig kader maken
+	Create a new elliptical frame	Nieuw elliptisch kader maken
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Sleep een kader · boven een geselecteerde afbeelding knipt het die bij · Ingesloten plaatsen of een bestand neerzetten vult het geselecteerde kader

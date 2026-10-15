@@ -2958,3 +2958,23 @@ fontWeight	Italic	Miring
 	Loose Curl	Ikal Longgar
 	Tight Curl Long	Ikal Rapat Panjang
 	Loose Curl Long	Ikal Longgar Panjang
+	Perspective Crop Tool	Alat Crop Perspektif
+	Show Grid	Tampilkan Kisi
+	Drag the corners onto the edges of the object, then press Enter	Seret sudut ke tepi objek, lalu tekan Enter
+	Drag a frame, or click the four corners of the object	Seret bingkai, atau klik empat sudut objek
+	Click the next corner	Klik sudut berikutnya
+	The corners must make a convex shape: move them so no two sides cross	Sudut harus membentuk bangun cembung: pindahkan agar tidak ada dua sisi yang bersilangan
+	Artboard Tool	Alat Artboard
+	Frame Tool	Alat Bingkai
+	New Frame	Bingkai Baru
+	There is no room for an artboard on that side	Tidak ada ruang untuk artboard di sisi itu
+	W:	L:
+	H:	T:
+	Make Portrait	Potret
+	Make Landscape	Lanskap
+	Add New Artboard	Tambah Artboard Baru
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Seret di dalam untuk memindah · seret pegangan untuk mengubah ukuran · klik + untuk menambah artboard di sampingnya
+	Drag to draw an artboard · click one to select it	Seret untuk menggambar artboard · klik untuk memilihnya
+	Create a new rectangular frame	Buat bingkai persegi baru
+	Create a new elliptical frame	Buat bingkai elips baru
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Seret bingkai · di atas gambar terpilih akan memangkasnya · Tempatkan Tersemat atau jatuhkan berkas untuk mengisi bingkai terpilih

@@ -2594,3 +2594,24 @@ fontWeight	Italic	Kursiv
 	Loose Curl	Locker gelockt
 	Tight Curl Long	Eng gelockt lang
 	Loose Curl Long	Locker gelockt lang
+	Perspective Crop Tool	Perspektivisches Freistellungswerkzeug
+	Perspective Crop	Perspektivisches Freistellen
+	Show Grid	Raster einblenden
+	Drag the corners onto the edges of the object, then press Enter	Ziehen Sie die Ecken auf die Kanten des Objekts und drücken Sie dann die Eingabetaste
+	Drag a frame, or click the four corners of the object	Ziehen Sie einen Rahmen auf oder klicken Sie auf die vier Ecken des Objekts
+	Click the next corner	Klicken Sie auf die nächste Ecke
+	The corners must make a convex shape: move them so no two sides cross	Die Ecken müssen eine konvexe Form bilden: Verschieben Sie sie so, dass sich keine zwei Seiten kreuzen
+	Artboard Tool	Zeichenflächen-Werkzeug
+	Frame Tool	Rahmenwerkzeug
+	New Frame	Neuer Rahmen
+	There is no room for an artboard on that side	Auf dieser Seite ist kein Platz für eine Zeichenfläche
+	W:	B:
+	H:	H:
+	Make Portrait	Hochformat
+	Make Landscape	Querformat
+	Add New Artboard	Neue Zeichenfläche hinzufügen
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Innen ziehen zum Verschieben · an einem Griff ziehen zum Skalieren · + klicken für eine Zeichenfläche daneben
+	Drag to draw an artboard · click one to select it	Ziehen, um eine Zeichenfläche aufzuziehen · klicken, um eine auszuwählen
+	Create a new rectangular frame	Neuen rechteckigen Rahmen erstellen
+	Create a new elliptical frame	Neuen elliptischen Rahmen erstellen
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Rahmen aufziehen · über einem ausgewählten Bild schneidet er es zu · Eingebettet platzieren oder eine Datei ablegen füllt den ausgewählten Rahmen

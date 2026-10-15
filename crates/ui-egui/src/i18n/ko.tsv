@@ -3134,3 +3134,24 @@ fontWeight	Italic	기울임
 	Loose Curl	느슨하게 말기
 	Tight Curl Long	조밀하게 길게 말기
 	Loose Curl Long	느슨하게 길게 말기
+	Perspective Crop Tool	원근 자르기 도구
+	Perspective Crop	원근 자르기
+	Show Grid	격자 표시
+	Drag the corners onto the edges of the object, then press Enter	모서리를 개체의 가장자리로 드래그한 다음 Enter 키를 누르십시오
+	Drag a frame, or click the four corners of the object	프레임을 드래그하거나 개체의 네 모서리를 클릭하십시오
+	Click the next corner	다음 모서리를 클릭하십시오
+	The corners must make a convex shape: move them so no two sides cross	모서리는 볼록한 모양을 이루어야 합니다: 두 변이 교차하지 않도록 옮기십시오
+	Artboard Tool	대지 도구
+	Frame Tool	프레임 도구
+	New Frame	새 프레임
+	There is no room for an artboard on that side	그쪽에는 대지를 둘 공간이 없습니다
+	W:	폭:
+	H:	높이:
+	Make Portrait	세로
+	Make Landscape	가로
+	Add New Artboard	새 대지 추가
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	안쪽을 드래그하여 이동 · 핸들을 드래그하여 크기 조정 · +를 클릭하여 옆에 대지 추가
+	Drag to draw an artboard · click one to select it	드래그하여 대지 그리기 · 클릭하여 선택
+	Create a new rectangular frame	새 사각형 프레임 만들기
+	Create a new elliptical frame	새 타원 프레임 만들기
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	프레임을 드래그 · 선택한 이미지 위에서는 이미지를 자름 · 포함 가져오기 또는 파일을 놓으면 선택한 프레임을 채움

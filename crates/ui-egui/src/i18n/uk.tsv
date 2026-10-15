@@ -3659,3 +3659,23 @@ cameraRaw	Masking	Маскування
 	Loose Curl	Вільний завиток
 	Tight Curl Long	Щільний довгий завиток
 	Loose Curl Long	Вільний довгий завиток
+	Perspective Crop Tool	Інструмент «Перспективне кадрування»
+	Show Grid	Показати сітку
+	Drag the corners onto the edges of the object, then press Enter	Перетягніть кути на краї об'єкта й натисніть Enter
+	Drag a frame, or click the four corners of the object	Намалюйте рамку або клацніть чотири кути об'єкта
+	Click the next corner	Клацніть наступний кут
+	The corners must make a convex shape: move them so no two sides cross	Кути мають утворювати опуклу фігуру: перемістіть їх так, щоб сторони не перетиналися
+	Artboard Tool	Інструмент «Монтажна область»
+	Frame Tool	Інструмент «Рамка»
+	New Frame	Нова рамка
+	There is no room for an artboard on that side	З цього боку немає місця для монтажної області
+	W:	Ш:
+	H:	В:
+	Make Portrait	Книжкова
+	Make Landscape	Альбомна
+	Add New Artboard	Додати монтажну область
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Перетягніть усередині, щоб перемістити · перетягніть маркер, щоб змінити розмір · клацніть +, щоб додати область поруч
+	Drag to draw an artboard · click one to select it	Перетягніть, щоб намалювати монтажну область · клацніть, щоб вибрати
+	Create a new rectangular frame	Створити прямокутну рамку
+	Create a new elliptical frame	Створити еліптичну рамку
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Намалюйте рамку · над вибраним зображенням вона його обрізає · «Помістити вбудоване» або перетягування файлу заповнює вибрану рамку

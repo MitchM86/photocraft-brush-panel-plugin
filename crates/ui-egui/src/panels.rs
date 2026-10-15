@@ -15,12 +15,13 @@ use crate::{PhotocraftApp, icons, widgets};
 /// Photoshop toolbar: divider-separated sections of slots; each slot is a flyout group whose button
 /// shows the group's last-used tool.
 const TOOL_SECTIONS: &[&[&[Tool]]] = &[
-    &[&[Tool::Move]],
+    &[&[Tool::Move, Tool::Artboard]],
     &[
         &[Tool::RectMarquee, Tool::EllipseMarquee, Tool::SingleRowMarquee, Tool::SingleColumnMarquee],
         &[Tool::Lasso, Tool::PolygonLasso, Tool::MagneticLasso],
         &[Tool::ObjectSelection, Tool::QuickSelection, Tool::MagicWand],
-        &[Tool::Crop, Tool::Slice, Tool::SliceSelect],
+        &[Tool::Crop, Tool::PerspectiveCrop, Tool::Slice, Tool::SliceSelect],
+        &[Tool::Frame],
         &[Tool::Eyedropper, Tool::ColorSampler, Tool::Ruler, Tool::Note, Tool::Count],
     ],
     &[
@@ -1117,6 +1118,9 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         // Live mode: the options also change a selected gradient fill layer.
                         crate::gradient_ui::options_changed(app, &before);
                     }
+                    Tool::PerspectiveCrop => crate::perspective_crop_ui::options_bar(app, ui),
+                    Tool::Artboard => crate::artboard_tool_ui::options_bar(app, ui),
+                    Tool::Frame => crate::frame_tool_ui::options_bar(app, ui),
                     Tool::Crop if t.pro => {
                         let presets = crate::crop_size::dropdown_options();
                         if widgets::dropdown(ui, "crop-ratio", &mut app.ui.tool_options.crop_ratio, &presets, 140.0) {
@@ -4270,14 +4274,14 @@ mod toolbar_hidden_tests {
 
     #[test]
     fn a_slot_keeps_only_its_visible_tools_and_its_index() {
-        let sections = visible_sections(&["Sponge".to_string(), "Move".to_string()]);
+        let sections = visible_sections(&["Sponge".to_string(), "Move".to_string(), "Artboard".to_string()]);
         assert_eq!(sections.len(), TOOL_SECTIONS.len() - 1, "the Move section has no tools left");
         let index = TOOL_SECTIONS.iter().flat_map(|section| section.iter()).position(|slot| slot.contains(&Tool::Sponge)).unwrap();
         let slot = sections.iter().flatten().find(|(i, _)| *i == index).map(|(_, tools)| tools.clone());
         assert_eq!(slot, Some(vec![Tool::Dodge, Tool::Burn]));
         assert!(sections.iter().flatten().all(|(_, tools)| !tools.contains(&Tool::Move) && !tools.contains(&Tool::Sponge)));
         assert_eq!(visible_sections(&[]).iter().map(Vec::len).sum::<usize>(), TOOL_SECTIONS.iter().map(|section| section.len()).sum::<usize>());
-        let by_command = visible_sections(&["sponge".to_string(), "move".to_string()]);
+        let by_command = visible_sections(&["sponge".to_string(), "move".to_string(), "artboard".to_string()]);
         assert_eq!(by_command, sections, "edit.toolbar names are read like `ui.set {{tool}}` names");
     }
 }

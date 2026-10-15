@@ -2979,3 +2979,23 @@ fontWeight	Italic	Itálico
 	Loose Curl	Cacho solto
 	Tight Curl Long	Cacho firme longo
 	Loose Curl Long	Cacho solto longo
+	Perspective Crop Tool	Ferramenta Corte de perspectiva
+	Show Grid	Mostrar grade
+	Drag the corners onto the edges of the object, then press Enter	Arraste os cantos até as bordas do objeto e pressione Enter
+	Drag a frame, or click the four corners of the object	Arraste um quadro ou clique nos quatro cantos do objeto
+	Click the next corner	Clique no próximo canto
+	The corners must make a convex shape: move them so no two sides cross	Os cantos precisam formar uma figura convexa: mova-os para que nenhum lado cruze outro
+	Artboard Tool	Ferramenta Prancheta
+	Frame Tool	Ferramenta Quadro
+	New Frame	Novo quadro
+	There is no room for an artboard on that side	Não há espaço para uma prancheta desse lado
+	W:	L:
+	H:	A:
+	Make Portrait	Retrato
+	Make Landscape	Paisagem
+	Add New Artboard	Adicionar nova prancheta
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Arraste dentro para mover · arraste uma alça para redimensionar · clique em + para adicionar uma prancheta ao lado
+	Drag to draw an artboard · click one to select it	Arraste para desenhar uma prancheta · clique para selecioná-la
+	Create a new rectangular frame	Criar um novo quadro retangular
+	Create a new elliptical frame	Criar um novo quadro elíptico
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Arraste um quadro · sobre uma imagem selecionada ele a recorta · Inserir incorporado ou soltar um arquivo preenche o quadro selecionado

@@ -2625,3 +2625,24 @@ fontWeight	Italic	Corsivo
 	Loose Curl	Ricciolo largo
 	Tight Curl Long	Ricciolo stretto lungo
 	Loose Curl Long	Ricciolo largo lungo
+	Perspective Crop Tool	Strumento Taglierina prospettica
+	Perspective Crop	Taglierina prospettica
+	Show Grid	Mostra griglia
+	Drag the corners onto the edges of the object, then press Enter	Trascina gli angoli sui bordi dell'oggetto, poi premi Invio
+	Drag a frame, or click the four corners of the object	Trascina una cornice o fai clic sui quattro angoli dell'oggetto
+	Click the next corner	Fai clic sull'angolo successivo
+	The corners must make a convex shape: move them so no two sides cross	Gli angoli devono formare una forma convessa: spostali in modo che nessun lato ne incroci un altro
+	Artboard Tool	Strumento Tavola da disegno
+	Frame Tool	Strumento Cornice
+	New Frame	Nuova cornice
+	There is no room for an artboard on that side	Non c'è spazio per una tavola da disegno su quel lato
+	W:	L:
+	H:	A:
+	Make Portrait	Verticale
+	Make Landscape	Orizzontale
+	Add New Artboard	Aggiungi nuova tavola da disegno
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Trascina all'interno per spostare · trascina una maniglia per ridimensionare · fai clic su + per aggiungere una tavola accanto
+	Drag to draw an artboard · click one to select it	Trascina per disegnare una tavola da disegno · fai clic per selezionarla
+	Create a new rectangular frame	Crea una nuova cornice rettangolare
+	Create a new elliptical frame	Crea una nuova cornice ellittica
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Disegna una cornice · su un'immagine selezionata la ritaglia · Inserisci incorporato o trascina un file per riempire la cornice selezionata

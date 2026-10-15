@@ -292,6 +292,17 @@ pub struct Group {
     pub expanded: bool,
     /// Set when this (top-level) group is an artboard: children are clipped to its rect.
     pub artboard: Option<Artboard>,
+    /// Set when this group is a frame (Frame tool): its vector mask is the frame's rectangle or
+    /// ellipse, and what is placed into it fills the frame.
+    pub frame: Option<FrameShape>,
+}
+
+/// A frame's shape (Frame tool).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FrameShape {
+    Rectangle,
+    Ellipse,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -657,7 +668,7 @@ impl Layer {
         Self::new(name, LayerContent::Raster(Surface::new(format)))
     }
     pub fn group(name: impl Into<String>, children: Vec<Layer>) -> Self {
-        let mut l = Self::new(name, LayerContent::Group(Group { children, expanded: true, artboard: None }));
+        let mut l = Self::new(name, LayerContent::Group(Group { children, expanded: true, artboard: None, frame: None }));
         l.blend = BlendMode::PassThrough;
         l
     }
@@ -1298,7 +1309,7 @@ mod tests {
         assert_eq!(LayerContent::Adjustment(Adjustment::Invert).article(), "an");
         assert_eq!(LayerContent::Adjustment(Adjustment::Invert).kind_name(), "Adjustment");
         assert_eq!(LayerContent::Raster(Surface::new(PixelFormat::RGBA8)).article(), "a");
-        assert_eq!(LayerContent::Group(Group { children: Vec::new(), expanded: true, artboard: None }).article(), "a");
+        assert_eq!(LayerContent::Group(Group { children: Vec::new(), expanded: true, artboard: None, frame: None }).article(), "a");
     }
 }
 

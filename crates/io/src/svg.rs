@@ -358,7 +358,7 @@ impl Conv {
                     }
                     return;
                 }
-                let mut l = Layer::new(self.name(g.id(), 1), LayerContent::Group(Group { children, expanded: false, artboard: None }));
+                let mut l = Layer::new(self.name(g.id(), 1), LayerContent::Group(Group { children, expanded: false, artboard: None, frame: None }));
                 l.opacity = g.opacity().get();
                 l.blend = blend(g.blend_mode());
                 out.push(l);
@@ -382,7 +382,7 @@ impl Conv {
                 } else {
                     t.id().to_string()
                 };
-                out.push(Layer::new(name, LayerContent::Group(Group { children, expanded: false, artboard: None })));
+                out.push(Layer::new(name, LayerContent::Group(Group { children, expanded: false, artboard: None, frame: None })));
             }
         }
     }

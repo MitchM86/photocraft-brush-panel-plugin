@@ -2635,3 +2635,24 @@ fontWeight	Italic	Cursiva
 	Loose Curl	Rizo suelto
 	Tight Curl Long	Rizo ajustado largo
 	Loose Curl Long	Rizo suelto largo
+	Perspective Crop Tool	Herramienta Recortar con perspectiva
+	Perspective Crop	Recortar con perspectiva
+	Show Grid	Mostrar cuadrícula
+	Drag the corners onto the edges of the object, then press Enter	Arrastre las esquinas hasta los bordes del objeto y pulse Intro
+	Drag a frame, or click the four corners of the object	Arrastre un marco o haga clic en las cuatro esquinas del objeto
+	Click the next corner	Haga clic en la siguiente esquina
+	The corners must make a convex shape: move them so no two sides cross	Las esquinas deben formar una figura convexa: muévalas para que no se crucen dos lados
+	Artboard Tool	Herramienta Mesa de trabajo
+	Frame Tool	Herramienta Marco
+	New Frame	Nuevo marco
+	There is no room for an artboard on that side	No hay espacio para una mesa de trabajo en ese lado
+	W:	An:
+	H:	Al:
+	Make Portrait	Vertical
+	Make Landscape	Horizontal
+	Add New Artboard	Añadir nueva mesa de trabajo
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Arrastre dentro para mover · arrastre un tirador para cambiar el tamaño · haga clic en + para añadir una mesa al lado
+	Drag to draw an artboard · click one to select it	Arrastre para dibujar una mesa de trabajo · haga clic en una para seleccionarla
+	Create a new rectangular frame	Crear un nuevo marco rectangular
+	Create a new elliptical frame	Crear un nuevo marco elíptico
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Dibuje un marco · sobre una imagen seleccionada la recorta · Colocar incrustado o soltar un archivo rellena el marco seleccionado

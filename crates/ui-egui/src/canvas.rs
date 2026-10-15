@@ -3020,6 +3020,9 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         if tool == Tool::Crop && response.double_clicked() && response.interact_pointer_pos().is_some_and(|p| crate::crop_ui::commits_at(app, xf.to_doc(p))) {
             commit_crop(app);
         }
+        if tool == Tool::PerspectiveCrop && response.double_clicked() && response.interact_pointer_pos().is_some_and(|p| crate::perspective_crop_ui::commits_at(app, xf.to_doc(p))) {
+            crate::perspective_crop_ui::commit(app);
+        }
         if tool == Tool::CurvaturePen
             && response.double_clicked()
             && let Some(p) = response.interact_pointer_pos()
@@ -3053,6 +3056,9 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             painter.rect_stroke(img_rect, 0.0, Stroke::new(1.0, Color32::from_gray(20)), egui::StrokeKind::Outside);
         }
         crate::type_tool::draw_overlay(app, &painter, &xf);
+        crate::perspective_crop_ui::draw(app, &painter, &xf);
+        crate::artboard_tool_ui::draw(app, &painter, &xf);
+        crate::frame_tool_ui::draw(app, &painter, &xf);
         crate::transform_tool::draw_overlay(app, &painter, &xf);
         crate::distort_ui::draw_overlay(app, &painter, &xf);
         crate::retouch_ui::draw_source_marker(app, &painter, &xf);
@@ -3081,6 +3087,12 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             crate::type_transform::cursor(app, &ctx, &xf, p, mods)
         }) {
             ui.ctx().set_cursor_icon(c);
+        } else if response.hover_pos().is_some() && tool == Tool::Frame {
+            ui.ctx().set_cursor_icon(crate::frame_tool_ui::cursor());
+        } else if let Some(p) = response.hover_pos().filter(|_| tool == Tool::Artboard) {
+            ui.ctx().set_cursor_icon(crate::artboard_tool_ui::cursor(app, xf.to_doc(p)));
+        } else if let Some(p) = response.hover_pos().filter(|_| tool == Tool::PerspectiveCrop) {
+            ui.ctx().set_cursor_icon(crate::perspective_crop_ui::cursor(app, xf.to_doc(p)));
         } else if let Some((p, c)) = response.hover_pos().filter(|_| tool == Tool::Crop).and_then(|p| Some((p, crate::crop_ui::cursor(app, xf.to_doc(p))?))) {
             ui.ctx().set_cursor_icon(c);
             let d = xf.to_doc(p);
@@ -4025,6 +4037,18 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
     }
     // Crop tool: draw, move and resize the frame.
     if crate::crop_ui::pointer(app, ev, mods) {
+        return;
+    }
+    // Perspective Crop tool: draw or click the frame, drag its corners.
+    if crate::perspective_crop_ui::pointer(app, ev, mods) {
+        return;
+    }
+    // Artboard tool: draw, select, move and resize boards.
+    if crate::artboard_tool_ui::pointer(app, ev, mods) {
+        return;
+    }
+    // Frame tool: draw frames.
+    if crate::frame_tool_ui::pointer(app, ev, mods) {
         return;
     }
     // Gradient tool, live mode: draw and edit Gradient Fill layers.

@@ -243,6 +243,9 @@ pub enum ContentM {
         /// Artboard (Layer › New › Artboard).
         #[serde(default)]
         artboard: Option<photocraft_doc::Artboard>,
+        /// Frame (Frame tool).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        frame: Option<photocraft_doc::FrameShape>,
     },
     Adjustment {
         adjustment: Adjustment,

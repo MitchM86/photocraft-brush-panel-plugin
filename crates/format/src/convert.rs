@@ -125,7 +125,7 @@ fn layer_m(l: &Layer, sink: &mut dyn Sink) -> LayerM {
     let content = match &l.content {
         LayerContent::Raster(s) => ContentM::Raster { surface: surface_m(s, sink) },
         LayerContent::Group(g) => {
-            ContentM::Group { children: g.children.iter().map(|c| layer_m(c, sink)).collect(), expanded: g.expanded, artboard: g.artboard.clone() }
+            ContentM::Group { children: g.children.iter().map(|c| layer_m(c, sink)).collect(), expanded: g.expanded, artboard: g.artboard.clone(), frame: g.frame }
         }
         LayerContent::Adjustment(a) => ContentM::Adjustment { adjustment: a.clone() },
         LayerContent::Fill(f) => ContentM::Fill { fill: f.clone() },
@@ -421,7 +421,7 @@ impl Loader<'_> {
     fn layer_with(&mut self, m: &LayerM, children: Vec<Layer>) -> Result<Layer> {
         let content = match &m.content {
             ContentM::Raster { surface } => LayerContent::Raster(self.surface(surface)?),
-            ContentM::Group { expanded, artboard, .. } => LayerContent::Group(Group { artboard: artboard.clone(), children, expanded: *expanded }),
+            ContentM::Group { expanded, artboard, frame, .. } => LayerContent::Group(Group { artboard: artboard.clone(), frame: *frame, children, expanded: *expanded }),
             ContentM::Adjustment { adjustment } => LayerContent::Adjustment(adjustment.clone()),
             ContentM::Fill { fill } => LayerContent::Fill(fill.clone()),
             ContentM::Text { text, font_family, size_pt, color, transform, cache, psd_raw, runs, paragraphs, shape, orientation, antialias, warp } => {

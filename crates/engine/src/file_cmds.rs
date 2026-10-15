@@ -418,12 +418,22 @@ pub fn place_bytes(s: &mut Session, name: &str, bytes: Vec<u8>, linked: Option<S
     }
     let src = imported.document;
     let (w, h) = (src.size.width as f64, src.size.height as f64);
+    // Into a frame: scaled to fill it and centred on it, replacing what was in it.
+    let frame = match p.get("frame").and_then(Value::as_u64).map(LayerId) {
+        Some(id) => {
+            let r = d.doc.layer(id).and_then(crate::frame_cmds::frame_rect).ok_or_else(|| EngineError::Other("`frame` is not a frame".into()))?;
+            Some((id, r))
+        }
+        None => None,
+    };
     let scale = match f64_param(p, "scale") {
+        _ if frame.is_some() => frame.map_or(1.0, |(_, r)| ((r[2] - r[0]) / w).max((r[3] - r[1]) / h)),
         Some(k) => (k / 100.0).max(1e-4),
         None if p.get("fit").and_then(Value::as_bool) != Some(false) && (w > cw || h > ch) => (cw / w).min(ch / h),
         None => 1.0,
     };
     let center = match p.get("center").and_then(Value::as_array) {
+        _ if frame.is_some() => frame.map_or((cw / 2.0, ch / 2.0), |(_, r)| ((r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0)),
         Some(c) if c.len() == 2 => (c[0].as_f64().unwrap_or(cw / 2.0), c[1].as_f64().unwrap_or(ch / 2.0)),
         _ => (cw / 2.0, ch / 2.0),
     };
@@ -445,8 +455,18 @@ pub fn place_bytes(s: &mut Session, name: &str, bytes: Vec<u8>, linked: Option<S
     let layer_name = stem(name);
     let label = if matches!(so.source, SmartSource::Linked { .. }) { "Place Linked" } else { PLACE_EMBEDDED };
     let id = s.edit(label, |doc, active| {
-        let id = doc.insert_above(*active, Layer::new(layer_name, LayerContent::Smart(so)));
-        *active = Some(id);
+        let layer = Layer::new(layer_name, LayerContent::Smart(so));
+        let id = layer.id;
+        match frame.and_then(|(f, _)| doc.layer_mut(f)) {
+            Some(Layer { content: LayerContent::Group(g), id: f, .. }) => {
+                g.children = vec![layer];
+                *active = Some(*f);
+            }
+            _ => {
+                doc.insert_above(*active, layer);
+                *active = Some(id);
+            }
+        }
         Ok(id)
     })?;
     Ok(json!({"layer": id.0, "scale": scale * 100.0, "bounds": [dx, dy, dx + w * scale, dy + h * scale]}))
@@ -1303,7 +1323,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Place Embedded…",
             &["File"],
             None,
-            r##"{"path":str,"scale":%? (default: fit when larger than the canvas),"fit":bool=true,"center":[x,y]?}"##,
+            r##"{"path":str,"scale":%? (default: fit when larger than the canvas),"fit":bool=true,"center":[x,y]?,"frame":id? (into that frame: fills it, centred, replacing its contents)}"##,
             native_doc,
             |s, p| place(s, p, false)
         ),

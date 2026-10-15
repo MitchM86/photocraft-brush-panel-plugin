@@ -663,3 +663,46 @@ fn reveal_in_finder_reveals_the_documents_saved_path() {
     assert_eq!(r["program"], json!(program));
     assert_eq!(r["args"], json!(args));
 }
+
+#[test]
+fn placing_into_a_frame_fills_it_centred_and_replaces_its_contents() {
+    let dir = tmp("frame-place");
+    let wide = png(&dir, "wide.png", 200, 100, "#ff0000");
+    let tall = png(&dir, "tall.png", 50, 100, "#0000ff");
+    let mut s = session(300, 300, 8);
+    let f = s.execute("layer.new.frame", json!({"rect": [50, 50, 100, 100], "shape": "ellipse"})).unwrap()["layer"].as_u64().unwrap();
+    let steps = s.active().unwrap().history.entries().len();
+    s.execute("file.placeEmbedded", json!({"path": wide, "frame": f})).unwrap();
+    assert_eq!(s.active().unwrap().history.entries().len(), steps + 1, "one step");
+    let frame = doc(&s).layer(LayerId(f)).unwrap().clone();
+    let LayerContent::Group(g) = &frame.content else { panic!("a frame is a group") };
+    assert_eq!(g.children.len(), 1);
+    // 200 x 100 fills 100 x 100 at scale 1 (the height decides), centred on the frame.
+    let b = crate::layer_multi_cmds::layer_bounds(&g.children[0]).unwrap();
+    assert_eq!([b.x0, b.y0, b.x1, b.y1], [0, 50, 200, 150]);
+    // Clipped to the ellipse: red at its centre, nothing in the corner of its box or outside it.
+    assert!(composite(&s, 100, 100)[0] > 0.9);
+    assert!(composite(&s, 52, 52)[0] > 0.9 && composite(&s, 52, 52)[1] > 0.9, "outside the ellipse: the white background");
+    assert!(composite(&s, 20, 100)[1] > 0.9, "outside the frame");
+    // Placing again replaces the contents.
+    s.execute("file.placeEmbedded", json!({"path": tall, "frame": f})).unwrap();
+    let LayerContent::Group(g) = &doc(&s).layer(LayerId(f)).unwrap().content else { panic!() };
+    assert_eq!(g.children.len(), 1);
+    assert!(composite(&s, 100, 100)[2] > 0.9, "blue now");
+    assert_eq!(s.active().unwrap().active_layer, Some(LayerId(f)), "the frame stays selected");
+}
+
+#[test]
+fn frames_survive_a_pcraft_round_trip() {
+    let dir = tmp("frame-pcraft");
+    let mut s = session(120, 80, 8);
+    let f = s.execute("layer.new.frame", json!({"rect": [10, 10, 40, 30], "shape": "ellipse"})).unwrap()["layer"].as_u64().unwrap();
+    let path = join(&dir, "frames.pcraft");
+    s.execute("file.saveACopy", json!({"path": path})).unwrap();
+    let mut t = Session::new();
+    t.execute("file.openAs", json!({"path": path})).unwrap();
+    let l = doc(&t).walk().into_iter().map(|(_, _, l)| l.clone()).find(|l| l.name == "Frame 1").unwrap();
+    assert!(matches!(&l.content, LayerContent::Group(g) if g.frame == Some(photocraft_doc::FrameShape::Ellipse)), "still an elliptical frame");
+    assert_eq!(crate::frame_cmds::frame_rect(&l), Some([10.0, 10.0, 50.0, 40.0]));
+    let _ = f;
+}

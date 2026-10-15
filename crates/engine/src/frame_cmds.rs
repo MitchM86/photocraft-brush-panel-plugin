@@ -1,10 +1,15 @@
-//! Layer › New › Frame from Layers. A frame clips its contents to a rectangle, so a template can
-//! hold an image (or placeholder) that is cropped to the frame. We build it from existing
-//! primitives: group the selected layers, then clip the group with a rectangular layer mask the
-//! size of their bounds — the same visual result Photoshop's Frame tool produces for this command.
-//! Headless and scriptable like every other command.
+//! Frames. The Frame tool's `layer.new.frame` makes a frame: a group marked as one
+//! ([`photocraft_doc::Group::frame`]) whose vector mask is the frame's rectangle or ellipse, so
+//! whatever is inside is clipped to it. Drawn over a selected image layer, that layer goes in;
+//! File › Place with a frame selected (`file.placeEmbedded` with `"frame"`) puts the image in,
+//! scaled to fill the frame and centred, replacing what was there. Saved to PSD a frame is a
+//! group with a vector mask, which looks the same.
+//!
+//! Layer › New › Frame from Layers groups the selected layers and clips the group with a
+//! rectangular layer mask the size of their bounds. Headless and scriptable like every other
+//! command.
 
-use photocraft_doc::{LayerId, LayerMask, PixelFormat};
+use photocraft_doc::{FrameShape, Layer, LayerContent, LayerId, LayerMask, PixelFormat, VectorMask};
 use photocraft_geom::Rect;
 use serde_json::{Value, json};
 
@@ -74,8 +79,97 @@ fn frame_group(s: &mut Session, grouped: &Value) -> Result<Value> {
     Ok(json!({"layer": gid.0, "frame": [rect.x0, rect.y0, rect.width(), rect.height()]}))
 }
 
+/// The frame's box (document px) when `l` is a frame: the bounds of its vector mask.
+pub fn frame_rect(l: &Layer) -> Option<[f64; 4]> {
+    let LayerContent::Group(g) = &l.content else { return None };
+    g.frame?;
+    let knots = l.vector_mask.as_ref()?.path.subpaths.iter().flat_map(|s| s.knots.iter());
+    let r = knots.fold([f64::MAX, f64::MAX, f64::MIN, f64::MIN], |r, k| [r[0].min(k.anchor.x), r[1].min(k.anchor.y), r[2].max(k.anchor.x), r[3].max(k.anchor.y)]);
+    (r[2] > r[0] && r[3] > r[1]).then_some(r)
+}
+
+/// The frame `id` is, or the frame it is directly inside.
+pub fn frame_of(doc: &photocraft_doc::Document, id: LayerId) -> Option<LayerId> {
+    if doc.layer(id).and_then(frame_rect).is_some() {
+        return Some(id);
+    }
+    let path = doc.path_of(id)?;
+    let parent = doc.layer_at(path.get(..path.len().checked_sub(1)?)?)?;
+    frame_rect(parent).map(|_| parent.id)
+}
+
+fn next_frame_name(doc: &photocraft_doc::Document) -> String {
+    let names: Vec<String> = doc.walk().into_iter().map(|(_, _, l)| l.name.clone()).collect();
+    (1..).map(|n| format!("Frame {n}")).find(|n| !names.contains(n)).unwrap_or_else(|| "Frame".into())
+}
+
+/// A layer that can go into a frame: an image (pixels or a smart object), not the Background.
+fn frameable(l: &Layer) -> bool {
+    matches!(l.content, LayerContent::Raster(_) | LayerContent::Smart(_)) && !crate::extra_cmds::is_background(l)
+}
+
+fn new_frame(s: &mut Session, p: &Value) -> Result<Value> {
+    const CMD: &str = "layer.new.frame";
+    let bad = |m: &str| EngineError::BadParams { cmd: CMD.into(), msg: m.into() };
+    let r: Vec<f64> = p.get("rect").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_f64).collect()).unwrap_or_default();
+    let [x, y, w, h] = <[f64; 4]>::try_from(r).map_err(|_| bad("`rect` must be [x, y, width, height]"))?;
+    if !(x.is_finite() && y.is_finite() && w.is_finite() && h.is_finite() && w >= 1.0 && h >= 1.0 && x.abs() < 1e7 && y.abs() < 1e7 && w < 1e7 && h < 1e7) {
+        return Err(bad("the frame needs a finite position and a size of at least 1 x 1 px"));
+    }
+    let shape = match p.get("shape").and_then(Value::as_str).unwrap_or("rectangle") {
+        "rectangle" => FrameShape::Rectangle,
+        "ellipse" => FrameShape::Ellipse,
+        other => return Err(bad(&format!("unknown shape `{other}` (rectangle or ellipse)"))),
+    };
+    let content = p.get("content").and_then(Value::as_u64).map(LayerId);
+    let name = p.get("name").and_then(Value::as_str).filter(|n| !n.is_empty()).map(str::to_string);
+    let id = s.edit("New Frame", |doc, active| {
+        let path = match shape {
+            FrameShape::Rectangle => photocraft_vector::shapes::rect(x, y, w, h),
+            FrameShape::Ellipse => photocraft_vector::shapes::ellipse(x, y, w, h),
+        };
+        let mut g = Layer::group(name.unwrap_or_else(|| next_frame_name(doc)), vec![]);
+        if let LayerContent::Group(gr) = &mut g.content {
+            gr.frame = Some(shape);
+        }
+        // Isolated, so the vector mask clips what is inside.
+        g.blend = photocraft_color::BlendMode::Normal;
+        g.vector_mask = Some(VectorMask::new(path));
+        let id = match content {
+            Some(c) => {
+                if !doc.layer(c).is_some_and(frameable) {
+                    return Err(EngineError::Other("only an image layer (pixels or a smart object, not the Background) can go into a frame".into()));
+                }
+                let id = doc.insert_above(Some(c), g);
+                let l = doc.remove(c).ok_or(EngineError::NoLayer(c))?;
+                if let Some(LayerContent::Group(gr)) = doc.layer_mut(id).map(|f| &mut f.content) {
+                    gr.children.push(l);
+                }
+                id
+            }
+            None => doc.insert_above(*active, g),
+        };
+        crate::layer_multi_cmds::check_group_depth(doc, "New Frame")?;
+        *active = Some(id);
+        Ok(id)
+    })?;
+    crate::layer_multi_cmds::set_selection(s, vec![id], Some(id), Some(id))?;
+    Ok(json!({"layer": id.0, "rect": [x, y, w, h]}))
+}
+
 pub fn specs() -> Vec<CommandSpec> {
-    vec![CommandSpec {
+    vec![
+        CommandSpec {
+            id: "layer.new.frame",
+            label: "New Frame",
+            menu: &[],
+            shortcut: None,
+            params: r#"{"rect":[x,y,w,h] (document px),"shape":"rectangle|ellipse"="rectangle","content":id? (an image layer to put in it),"name":str?} → {layer, rect} (Frame tool)"#,
+            enabled: |s| s.active().map(|_| ()).ok_or_else(|| "no document".into()),
+            journal: true,
+            run: new_frame,
+        },
+        CommandSpec {
         id: "layer.new.frameFromLayers",
         label: "Frame from Layers",
         menu: &["Layer", "New"],
@@ -84,7 +178,8 @@ pub fn specs() -> Vec<CommandSpec> {
         enabled: has_layer,
         journal: true,
         run: |s, p| frame_from_layers(s, p),
-    }]
+        },
+    ]
 }
 
 #[cfg(test)]
@@ -155,5 +250,35 @@ mod tests {
     fn needs_a_selected_layer() {
         let mut s = Session::new();
         assert!(s.execute("layer.new.frameFromLayers", json!({})).is_err());
+    }
+
+    fn pixel(s: &Session, x: i32, y: i32) -> [f32; 4] {
+        let st = s.active().unwrap();
+        photocraft_compose::render(&st.doc, Rect::new(x, y, x + 1, y + 1)).px[0]
+    }
+
+    #[test]
+    fn a_frame_drawn_over_an_image_layer_clips_it_and_is_one_step() {
+        let (mut s, a, _) = session();
+        let steps = s.active().unwrap().history.entries().len();
+        let r = s.execute("layer.new.frame", json!({"rect": [10, 10, 8, 8], "content": a.0})).unwrap();
+        let f = LayerId(r["layer"].as_u64().unwrap());
+        let st = s.active().unwrap();
+        assert_eq!(st.history.entries().len(), steps + 1);
+        assert_eq!(st.history.entries().last().map(String::as_str), Some("New Frame"));
+        assert_eq!(st.active_layer, Some(f));
+        let l = st.doc.layer(f).unwrap();
+        assert_eq!(l.name, "Frame 1");
+        assert_eq!(frame_rect(l), Some([10.0, 10.0, 18.0, 18.0]));
+        assert_eq!(frame_of(&st.doc, a), Some(f), "A is inside the frame");
+        // A's red square (4..24) shows only inside the frame (10..18).
+        assert!(pixel(&s, 12, 12)[0] > 0.9);
+        assert!(pixel(&s, 6, 6)[1] > 0.9, "clipped outside the frame: the background shows, not red");
+        // An empty ellipse frame, then refusals.
+        let e = s.execute("layer.new.frame", json!({"rect": [40, 5, 20, 10], "shape": "ellipse"})).unwrap();
+        assert_eq!(s.active().unwrap().doc.layer(LayerId(e["layer"].as_u64().unwrap())).unwrap().name, "Frame 2");
+        assert!(s.execute("layer.new.frame", json!({"rect": [0, 0, 0, 5]})).is_err());
+        assert!(s.execute("layer.new.frame", json!({"rect": [0, 0, 5, 5], "shape": "star"})).is_err());
+        assert!(s.execute("layer.new.frame", json!({"rect": [0, 0, 5, 5], "content": f.0})).is_err(), "a group can't go into a frame");
     }
 }

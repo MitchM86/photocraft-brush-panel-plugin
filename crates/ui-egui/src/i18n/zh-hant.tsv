@@ -2533,3 +2533,24 @@ fontWeight	Italic	斜體
 	Loose Curl	鬆散捲曲
 	Tight Curl Long	緊密捲曲長
 	Loose Curl Long	鬆散捲曲長
+	Perspective Crop Tool	透視裁切工具
+	Perspective Crop	透視裁切
+	Show Grid	顯示格點
+	Drag the corners onto the edges of the object, then press Enter	將各角拖曳到物件的邊緣，然後按 Enter 鍵
+	Drag a frame, or click the four corners of the object	拖曳出一個框，或按一下物件的四個角
+	Click the next corner	按一下下一個角
+	The corners must make a convex shape: move them so no two sides cross	各角必須構成凸形：移動它們，讓任兩邊不相交
+	Artboard Tool	工作區域工具
+	Frame Tool	框架工具
+	New Frame	新增框架
+	There is no room for an artboard on that side	該側沒有放置工作區域的空間
+	W:	寬:
+	H:	高:
+	Make Portrait	縱向
+	Make Landscape	橫向
+	Add New Artboard	新增工作區域
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	在內部拖曳以移動 · 拖曳控點以調整大小 · 按一下 + 在旁邊新增工作區域
+	Drag to draw an artboard · click one to select it	拖曳以繪製工作區域 · 按一下以選取
+	Create a new rectangular frame	建立新的矩形框架
+	Create a new elliptical frame	建立新的橢圓框架
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	拖曳出框架 · 在選取的影像上會裁切該影像 · 置入嵌入的物件或拖放檔案可填滿選取的框架

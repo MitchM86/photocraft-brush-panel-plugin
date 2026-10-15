@@ -3656,3 +3656,23 @@ fontWeight	Thin	Πολύ λεπτά
 	Loose Curl	Χαλαρή μπούκλα
 	Tight Curl Long	Σφιχτή μακριά μπούκλα
 	Loose Curl Long	Χαλαρή μακριά μπούκλα
+	Perspective Crop Tool	Περικοπή προοπτικής (Perspective Crop Tool)
+	Perspective Crop	Περικοπή προοπτικής (Perspective Crop)
+	Drag the corners onto the edges of the object, then press Enter	Σύρετε τις γωνίες στα άκρα του αντικειμένου και πατήστε Enter
+	Drag a frame, or click the four corners of the object	Σύρετε ένα πλαίσιο ή κάντε κλικ στις τέσσερις γωνίες του αντικειμένου
+	Click the next corner	Κάντε κλικ στην επόμενη γωνία
+	The corners must make a convex shape: move them so no two sides cross	Οι γωνίες πρέπει να σχηματίζουν κυρτό σχήμα: μετακινήστε τις ώστε να μη διασταυρώνονται πλευρές
+	Artboard Tool	Επιφάνεια σχεδίασης (Artboard Tool)
+	Frame Tool	Πλαίσιο (Frame Tool)
+	New Frame	Νέο πλαίσιο
+	There is no room for an artboard on that side	Δεν υπάρχει χώρος για επιφάνεια σχεδίασης σε αυτή την πλευρά
+	W:	Π:
+	H:	Υ:
+	Make Portrait	Κατακόρυφος προσανατολισμός
+	Make Landscape	Οριζόντιος προσανατολισμός
+	Add New Artboard	Προσθήκη νέας επιφάνειας σχεδίασης
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Σύρετε μέσα για μετακίνηση · σύρετε μια λαβή για αλλαγή μεγέθους · κάντε κλικ στο + για επιφάνεια δίπλα
+	Drag to draw an artboard · click one to select it	Σύρετε για να σχεδιάσετε επιφάνεια σχεδίασης · κάντε κλικ για να την επιλέξετε
+	Create a new rectangular frame	Δημιουργία νέου ορθογώνιου πλαισίου
+	Create a new elliptical frame	Δημιουργία νέου ελλειπτικού πλαισίου
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Σύρετε ένα πλαίσιο · πάνω από επιλεγμένη εικόνα την περικόπτει · Τοποθέτηση ή απόθεση αρχείου γεμίζει το επιλεγμένο πλαίσιο

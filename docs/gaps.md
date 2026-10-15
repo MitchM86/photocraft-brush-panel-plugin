@@ -1,6 +1,6 @@
 # Where PhotoCraft falls short of Photoshop
 
-> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-15 · **Change:** minor (G6: Type Masks and Art History Brush landed) · **Target:** Adobe Photoshop 2026
+> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-15 · **Change:** minor (G6 closed: every tool present) · **Target:** Adobe Photoshop 2026
 
 Every known shortfall against Photoshop 2026 (27.11.0), one entry each, ranked by user impact
 on the way to beta. This is the work list agents pick from: take the highest-ranked entry that
@@ -54,12 +54,13 @@ what an agent can't finish alone.
   scripted check there) is the only real oracle.
 
 ### G6. Missing tools
-- **Missing (3 of 68):** Artboard, Perspective Crop, Frame. The Pen slot is complete since 2026-10-12: Freeform
+- **Missing: none (68 of 68) since 2026-10-15.** The Pen slot is complete since 2026-10-12: Freeform
   Pen (Curve Fit, Magnetic), Curvature Pen (#1054), Add Anchor Point, Delete Anchor
   Point and Convert Point (`pen_tools.rs`, `path.addAnchor`, `path.deleteAnchor`); Single Row and
   Single Column Marquee, Color Replacement and Color Sampler (#1046) since the same day;
   Horizontal and Vertical Type Mask since 2026-10-15 (`type_mask_ui.rs`, `type.maskToSelection`), and
-  the Art History Brush the same day (`paint.artHistoryBrush`, `retouch_cmds/art_history.rs`).
+  the Art History Brush, Perspective Crop, Artboard and Frame tools the same day
+  (`paint.artHistoryBrush`, `image.perspectiveCrop`, `artboard_tool_ui.rs`, `layer.new.frame`).
 - **Evidence:** `Tool` enum (`crates/ui-egui/src/state.rs`) against the 67 `<tool>` entries of
   Photoshop's `Default Keyboard Shortcuts.kys` plus Remove, Triangle and Curvature Pen.
 - **Impact:** users look for them by name and shortcut; several are daily tools for designers.
@@ -213,7 +214,7 @@ what an agent can't finish alone.
 
 | Date | Change | Summary |
 |---|---|---|
-| 2026-10-15 | minor | G6: Horizontal and Vertical Type Mask landed (4 of 68 tools left); then Art History Brush (3 left) |
+| 2026-10-15 | minor | G6: Horizontal and Vertical Type Mask landed (4 of 68 tools left); then Art History Brush (3 left) Perspective Crop (2 left), Artboard and Frame (none left) |
 | 2026-10-12 | minor | G6: Freeform Pen, Curvature Pen, Add/Delete Anchor Point and Convert Point landed (10 of 68 tools left); then Single Row/Column Marquee (8 left) Color Replacement (7 left) and Color Sampler (6 left) |
 | 2026-10-10 | minor | Checked against the alpha gate (no alpha blockers); #2374 marked closed |
 | 2026-10-10 | major | First version, from the full re-measure against Photoshop 2026 27.11.0 and the open issues |

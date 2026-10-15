@@ -1,6 +1,6 @@
 # UI parity: tools, handles, modifiers and feel
 
-> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-15 · **Change:** minor (Art History Brush: tools 65/68) · **Target:** Adobe Photoshop 2026
+> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-15 · **Change:** minor (every tool present: 68/68) · **Target:** Adobe Photoshop 2026
 
 How PhotoCraft's direct manipulation compares with Photoshop 2026 (27.11.0): the toolbox, the
 handles and modifier keys of each gesture, nudging, snapping, numeric precision, navigation,
@@ -12,7 +12,7 @@ Status: **done** (behaves as in Photoshop, with a test), **partial** (exists, di
 **missing**. Evidence is a file under `crates/ui-egui/src/` unless another path is given, a
 scorecard id, or an issue. Modifier names are macOS first (⌘ ⌥ ⇧); Windows/Linux use Ctrl and Alt.
 
-**Summary (estimated, weights = how often the gesture is used):** ~40% ready. Tools 65/68
+**Summary (estimated, weights = how often the gesture is used):** ~40% ready. Tools 68/68
 present (91%, measured). Free Transform modifiers and Crop are close to Photoshop; the gaps are
 in the long tail of modifiers, in-transform UI, spring-loaded tools, panels and preferences.
 Remaining: 60–110 h for transforms and modifiers (gap G5), 60–100 h for tools (G6), 150–250 h
@@ -26,12 +26,12 @@ Triangle and Curvature Pen (minus legacy Rounded Rectangle and Targeted Adjustme
 
 | Group | Present | Missing |
 |---|---|---|
-| Move, artboard | Move | Artboard (commands `layer.new.artboard*` exist) |
+| Move, artboard | Move, Artboard | |
 | Marquee | Rectangular, Elliptical, Single Row, Single Column | |
 | Lasso | Lasso, Polygonal, Magnetic | |
 | Selection | Object Selection, Quick Selection, Magic Wand | |
-| Crop and slice | Crop, Slice, Slice Select | Perspective Crop |
-| Frame | | Frame (`layer.new.frameFromLayers` exists) |
+| Crop and slice | Crop, Perspective Crop, Slice, Slice Select | |
+| Frame | Frame | |
 | Eyedropper | Eyedropper, Color Sampler, Ruler, Note, Count | |
 | Retouch | Remove, Spot Healing, Healing, Patch, Content-Aware Move, Red Eye | |
 | Brush | Brush, Pencil, Color Replacement, Mixer Brush | |
@@ -203,6 +203,6 @@ Paragraph; the rest open as in-app floating windows.
 
 | Date | Change | Summary |
 |---|---|---|
-| 2026-10-15 | minor | Type slot complete: Horizontal and Vertical Type Mask (tools 64/68); then Art History Brush (65/68) |
+| 2026-10-15 | minor | Type slot complete: Horizontal and Vertical Type Mask (tools 64/68); then Art History Brush (65/68), Perspective Crop (66/68), Artboard and Frame (68/68) |
 | 2026-10-12 | minor | Pen slot complete: Freeform Pen, Curvature Pen, Add/Delete Anchor Point, Convert Point (tools 58/68) |
 | 2026-10-10 | major | First version, from a source audit against Photoshop 2026 27.11.0's shortcuts file and the open issues |

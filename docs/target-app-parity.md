@@ -1,6 +1,6 @@
 # PhotoCraft vs Adobe Photoshop: target-app parity
 
-> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-15 · **Change:** minor (toolbox 65/68: Type Masks, Art History Brush) · **Target:** Adobe Photoshop 2026
+> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-15 · **Change:** minor (toolbox 68/68: Type Masks, Art History Brush, Perspective Crop, Artboard, Frame) · **Target:** Adobe Photoshop 2026
 
 The authoritative answer to "how close is PhotoCraft to Photoshop, and how much work is left". The
 one-page summary is [`ROADMAP.md`](../ROADMAP.md); the ranked work list is [`gaps.md`](gaps.md);
@@ -61,7 +61,7 @@ architecture and the PSD writer are the serial parts.
 | Component | Weight | Ours / Photoshop | % | Kind |
 |---|---:|---|---:|---|
 | Menu commands | 30% | 628 / 628 catalog items dispatch a live command | 100% | measured (`cargo xtask parity`) |
-| Toolbox tools | 15% | 65 / 68 (Photoshop's 67 `.kys` tools plus Remove, Triangle, Curvature Pen; minus legacy Rounded Rectangle and Targeted Adjustment) | 96% | measured (`Tool` enum in `ui-egui/src/state.rs`, `TOOL_SECTIONS` in `panels.rs`) |
+| Toolbox tools | 15% | 68 / 68 (Photoshop's 67 `.kys` tools plus Remove, Triangle, Curvature Pen; minus legacy Rounded Rectangle and Targeted Adjustment) | 100% | measured (`Tool` enum in `ui-egui/src/state.rs`, `TOOL_SECTIONS` in `panels.rs`) |
 | Panels | 10% | 30 / 35 Window-menu panels | 86% | measured (`view_cmds.rs`, panel modules) |
 | Filters and adjustments | 10% | every Filter and Image › Adjustments item live; Filter Gallery 47 looks | 100% | measured (menu catalog) |
 | File formats (usage-weighted) | 15% | 13 of 31 Photoshop formats supported in Photoshop's directions, 4 partial; the common ones (PSD/PSB, TIFF, JPEG, PNG, WebP) all present | ~80% (48% by count) | measured list, estimated weights ([file-format-parity.md](file-format-parity.md)) |
@@ -527,7 +527,7 @@ See [method and results](octagonal-mask-performance.md).
 
 | Date | Change | Summary |
 |---|---|---|
-| 2026-10-15 | minor | Toolbox tools 62 → 65 of 68 (91% → 96%): Horizontal and Vertical Type Mask, Art History Brush |
+| 2026-10-15 | minor | Toolbox tools 62 → 68 of 68 (91% → 100%): Horizontal and Vertical Type Mask, Art History Brush, Perspective Crop, Artboard, Frame |
 | 2026-10-12 | minor | Undo, History: snapshots and the History Brush source |
 | 2026-10-12 | minor | Toolbox tools 53 → 58 of 68 (78% → 85%): Freeform Pen, Curvature Pen, Add/Delete Anchor Point, Convert Point |
 | 2026-10-10 | minor | Readiness-by-audience table: percent and hours for full, mainstream and essentials; full number confirmed as the additive weighted sum over dimensions (46%, reported ~45%) |

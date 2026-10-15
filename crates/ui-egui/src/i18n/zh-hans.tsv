@@ -2564,3 +2564,24 @@ fontWeight	Italic	斜体
 	Loose Curl	松散卷曲
 	Tight Curl Long	绷紧卷曲长
 	Loose Curl Long	松散卷曲长
+	Perspective Crop Tool	透视裁剪工具
+	Perspective Crop	透视裁剪
+	Show Grid	显示网格
+	Drag the corners onto the edges of the object, then press Enter	将各角拖到对象的边缘，然后按 Enter 键
+	Drag a frame, or click the four corners of the object	拖出一个框，或单击对象的四个角
+	Click the next corner	单击下一个角
+	The corners must make a convex shape: move them so no two sides cross	各角必须构成凸形：移动它们，使任意两条边不相交
+	Artboard Tool	画板工具
+	Frame Tool	图框工具
+	New Frame	新建图框
+	There is no room for an artboard on that side	那一侧没有放置画板的空间
+	W:	宽:
+	H:	高:
+	Make Portrait	纵向
+	Make Landscape	横向
+	Add New Artboard	添加新画板
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	在内部拖动以移动 · 拖动手柄以调整大小 · 单击 + 在旁边添加画板
+	Drag to draw an artboard · click one to select it	拖动以绘制画板 · 单击以选择
+	Create a new rectangular frame	创建新的矩形图框
+	Create a new elliptical frame	创建新的椭圆图框
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	拖出图框 · 在所选图像上会裁切该图像 · 置入嵌入对象或拖放文件可填充所选图框

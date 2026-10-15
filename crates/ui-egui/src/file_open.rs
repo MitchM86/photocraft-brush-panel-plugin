@@ -194,17 +194,28 @@ impl PhotocraftApp {
         Ok(self.run("document.move", serde_json::json!({"document": docs, "to": slot})).is_ok())
     }
 
+    /// Place params: into the selected frame (Frame tool), when the active layer is one or is in one.
+    pub(crate) fn place_params(&self) -> serde_json::Value {
+        let frame = self.session.active().and_then(|st| photocraft_engine::frame_cmds::frame_of(&st.doc, st.active_layer?));
+        frame.map_or_else(|| serde_json::json!({}), |f| serde_json::json!({"frame": f.0}))
+    }
+
     /// Place the next file dropped on the canvas and start Free Transform on it, once no other
     /// transform is in progress (so several files are placed and transformed one after another).
     pub(crate) fn place_next_dropped(&mut self, ctx: &egui::Context) {
         while self.ui.transform.is_none() {
             let Some(f) = self.drop_places.pop_front() else { return };
+            // Into a selected frame, the image fills it: nothing to transform.
+            let mut p = self.place_params();
+            let into_frame = p.get("frame").is_some();
             let placed = if f.path().is_absolute() {
-                self.run("file.placeEmbedded", serde_json::json!({"path": f.path().to_string_lossy()}))
+                p["path"] = serde_json::json!(f.path().to_string_lossy());
+                self.run("file.placeEmbedded", p)
             } else {
                 crate::read_dropped(&*f).and_then(|bytes| self.place_bytes(&dropped_name(&f), bytes, None))
             };
             match placed {
+                Ok(_) if into_frame => {}
                 Ok(_) => {
                     if let Err(e) = crate::transform_tool::begin_placed(self, ctx) {
                         self.ui.status = e;
@@ -218,7 +229,8 @@ impl PhotocraftApp {
     /// Place a file's bytes as a smart object layer (File › Place; `linked`: Place Linked, to that
     /// path), for files that weren't read from a path the command can read.
     pub(crate) fn place_bytes(&mut self, name: &str, bytes: Vec<u8>, linked: Option<String>) -> Result<serde_json::Value, String> {
-        let r = photocraft_engine::file_cmds::place_bytes(&mut self.session, name, bytes, linked, &serde_json::json!({})).map_err(|e| e.to_string());
+        let p = self.place_params();
+        let r = photocraft_engine::file_cmds::place_bytes(&mut self.session, name, bytes, linked, &p).map_err(|e| e.to_string());
         self.sync_views();
         r
     }

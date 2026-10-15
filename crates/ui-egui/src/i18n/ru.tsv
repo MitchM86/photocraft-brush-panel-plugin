@@ -2838,3 +2838,25 @@ fontWeight	Italic	Курсив
 	Loose Curl	Свободный завиток
 	Tight Curl Long	Плотный длинный завиток
 	Loose Curl Long	Свободный длинный завиток
+	Perspective Crop Tool	Инструмент «Рамка с перспективой»
+	Show Grid	Показать сетку
+	Drag the corners onto the edges of the object, then press Enter	Перетащите углы на края объекта и нажмите Enter
+	Drag a frame, or click the four corners of the object	Нарисуйте рамку или щёлкните четыре угла объекта
+	Click the next corner	Щёлкните следующий угол
+	The corners must make a convex shape: move them so no two sides cross	Углы должны образовывать выпуклую фигуру: переместите их так, чтобы стороны не пересекались
+	Cancel current crop operation  (Esc)	Отменить текущее кадрирование  (Esc)
+	Commit current crop operation  ({key})	Применить текущее кадрирование  ({key})
+	Artboard Tool	Монтажная область
+	Frame Tool	Кадр
+	New Frame	Новый кадр
+	There is no room for an artboard on that side	С этой стороны нет места для монтажной области
+	W:	Ш:
+	H:	В:
+	Make Portrait	Книжная
+	Make Landscape	Альбомная
+	Add New Artboard	Добавить монтажную область
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Перетащите внутри для перемещения · перетащите маркер для изменения размера · нажмите +, чтобы добавить область рядом
+	Drag to draw an artboard · click one to select it	Перетащите, чтобы нарисовать монтажную область · щёлкните, чтобы выбрать
+	Create a new rectangular frame	Создать прямоугольный кадр
+	Create a new elliptical frame	Создать эллиптический кадр
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Нарисуйте кадр · над выбранным изображением он обрезает его · «Поместить встроенные» или перетаскивание файла заполняет выбранный кадр

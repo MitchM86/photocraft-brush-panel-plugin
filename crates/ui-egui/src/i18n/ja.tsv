@@ -3572,3 +3572,23 @@ fontWeight	Italic	斜体
 	Loose Curl	ゆるくカール
 	Tight Curl Long	固く長いカール
 	Loose Curl Long	ゆるく長いカール
+	Perspective Crop Tool	遠近法の切り抜きツール
+	Show Grid	グリッドを表示
+	Drag the corners onto the edges of the object, then press Enter	角をオブジェクトの端までドラッグし、Enter キーを押します
+	Drag a frame, or click the four corners of the object	枠をドラッグするか、オブジェクトの 4 つの角をクリックします
+	Click the next corner	次の角をクリックします
+	The corners must make a convex shape: move them so no two sides cross	角は凸形を作る必要があります：辺が交差しないように移動してください
+	Artboard Tool	アートボードツール
+	Frame Tool	フレームツール
+	New Frame	新規フレーム
+	There is no room for an artboard on that side	その側にはアートボードを置く場所がありません
+	W:	幅:
+	H:	高さ:
+	Make Portrait	縦長
+	Make Landscape	横長
+	Add New Artboard	新規アートボードを追加
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	内側をドラッグで移動 · ハンドルをドラッグでサイズ変更 · + をクリックで隣にアートボードを追加
+	Drag to draw an artboard · click one to select it	ドラッグでアートボードを作成 · クリックで選択
+	Create a new rectangular frame	新しい長方形フレームを作成
+	Create a new elliptical frame	新しい楕円形フレームを作成
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	フレームをドラッグ · 選択した画像の上ではその画像を切り抜く · 埋め込みを配置またはファイルのドロップで選択したフレームを埋める

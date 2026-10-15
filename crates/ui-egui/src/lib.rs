@@ -173,6 +173,9 @@ pub mod tool_feedback;
 pub mod transform_tex;
 pub mod transform_tool;
 pub mod type_panels_ui;
+pub mod artboard_tool_ui;
+pub mod frame_tool_ui;
+pub mod perspective_crop_ui;
 pub mod type_mask_ui;
 pub mod type_tool;
 mod type_transform;
@@ -632,6 +635,12 @@ pub struct PhotocraftApp {
     pub(crate) guide_drag: Option<rulers::GuideDrag>,
     /// Crop tool gesture in progress (see `crop_ui`).
     pub(crate) crop: crop_ui::CropState,
+    /// The Perspective Crop tool's frame (`perspective_crop_ui`).
+    pub(crate) persp: perspective_crop_ui::State,
+    /// The Artboard tool's drag (`artboard_tool_ui`).
+    pub(crate) artboard_tool: artboard_tool_ui::State,
+    /// The Frame tool's drag (`frame_tool_ui`).
+    pub(crate) frame_tool: frame_tool_ui::State,
     /// Type tool layout cache: ((doc, revision, layer), layout).
     pub(crate) type_layout: Option<((u64, u64, u64), std::sync::Arc<photocraft_text::TextLayout>)>,
     pub(crate) type_transform_preview: Option<type_transform::Preview>,
@@ -749,6 +758,9 @@ impl PhotocraftApp {
             type_transform_preview: None,
             guide_drag: None,
             crop: Default::default(),
+            persp: Default::default(),
+            artboard_tool: Default::default(),
+            frame_tool: Default::default(),
             hover_doc: None,
             clone_preview: None,
             info_sample: None,
@@ -1424,6 +1436,7 @@ impl eframe::App for PhotocraftApp {
         self.drain_control(ctx);
         native_menu::run(self, ctx);
         type_tool::end_if_left(self);
+        perspective_crop_ui::end_if_left(self);
         if self.ui.pen.is_some() && self.ui.tool != state::Tool::Pen {
             vector_ui::pen_commit(self, false);
         }

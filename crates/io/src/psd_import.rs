@@ -449,7 +449,7 @@ impl Ctx<'_> {
                     let sd = rec.section_divider();
                     let expanded = sd.is_none_or(|s| s.kind != photocraft_psd::SectionType::ClosedFolder);
                     let artboard = crate::comps_map::ARTBOARD_KEYS.iter().find_map(|k| rec.block(k)).and_then(|b| crate::comps_map::parse_artboard(&b.data));
-                    let mut l = Layer::new(rec.name(), LayerContent::Group(Group { children, expanded, artboard }));
+                    let mut l = Layer::new(rec.name(), LayerContent::Group(Group { children, expanded, artboard, frame: None }));
                     l.psd_blocks = preserved_blocks(rec);
                     self.apply_common(&mut l, rec, sd.and_then(|s| s.blend_mode));
                     self.apply_vector_mask(&mut l, rec);

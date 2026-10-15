@@ -3572,3 +3572,23 @@ cameraRaw	Roughness	Chropowatość
 	Loose Curl	Luźny lok
 	Tight Curl Long	Ciasny długi lok
 	Loose Curl Long	Luźny długi lok
+	Perspective Crop Tool	Narzędzie Kadrowanie perspektywiczne
+	Show Grid	Pokaż siatkę
+	Drag the corners onto the edges of the object, then press Enter	Przeciągnij narożniki na krawędzie obiektu, a następnie naciśnij Enter
+	Drag a frame, or click the four corners of the object	Przeciągnij ramkę lub kliknij cztery narożniki obiektu
+	Click the next corner	Kliknij następny narożnik
+	The corners must make a convex shape: move them so no two sides cross	Narożniki muszą tworzyć kształt wypukły: przesuń je tak, by żadne dwa boki się nie przecinały
+	Artboard Tool	Narzędzie Obszar roboczy
+	Frame Tool	Narzędzie Ramka
+	New Frame	Nowa ramka
+	There is no room for an artboard on that side	Po tej stronie nie ma miejsca na obszar roboczy
+	W:	Szer.:
+	H:	Wys.:
+	Make Portrait	Pionowo
+	Make Landscape	Poziomo
+	Add New Artboard	Dodaj nowy obszar roboczy
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Przeciągnij wewnątrz, aby przesunąć · przeciągnij uchwyt, aby zmienić rozmiar · kliknij +, aby dodać obszar obok
+	Drag to draw an artboard · click one to select it	Przeciągnij, aby narysować obszar roboczy · kliknij, aby go zaznaczyć
+	Create a new rectangular frame	Utwórz nową ramkę prostokątną
+	Create a new elliptical frame	Utwórz nową ramkę eliptyczną
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Przeciągnij ramkę · nad zaznaczonym obrazem przycina go · Umieść osadzony lub upuść plik, aby wypełnić zaznaczoną ramkę

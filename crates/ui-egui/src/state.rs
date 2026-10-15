@@ -63,6 +63,7 @@ impl Default for CameraRawPreviewState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Tool {
     Move,
+    Artboard,
     RectMarquee,
     EllipseMarquee,
     SingleRowMarquee,
@@ -72,6 +73,8 @@ pub enum Tool {
     MagneticLasso,
     MagicWand,
     Crop,
+    PerspectiveCrop,
+    Frame,
     Eyedropper,
     ColorSampler,
     Ruler,
@@ -130,8 +133,9 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: [Tool; 65] = [
+    pub const ALL: [Tool; 68] = [
         Tool::Move,
+        Tool::Artboard,
         Tool::RectMarquee,
         Tool::EllipseMarquee,
         Tool::SingleRowMarquee,
@@ -141,6 +145,8 @@ impl Tool {
         Tool::MagneticLasso,
         Tool::MagicWand,
         Tool::Crop,
+        Tool::PerspectiveCrop,
+        Tool::Frame,
         Tool::Eyedropper,
         Tool::ColorSampler,
         Tool::Ruler,
@@ -201,6 +207,7 @@ impl Tool {
     pub fn label(self) -> &'static str {
         match self {
             Tool::Move => "Move Tool",
+            Tool::Artboard => "Artboard Tool",
             Tool::RectMarquee => "Rectangular Marquee Tool",
             Tool::EllipseMarquee => "Elliptical Marquee Tool",
             Tool::SingleRowMarquee => "Single Row Marquee Tool",
@@ -222,6 +229,8 @@ impl Tool {
             Tool::MagneticLasso => "Magnetic Lasso Tool",
             Tool::MagicWand => "Magic Wand Tool",
             Tool::Crop => "Crop Tool",
+            Tool::PerspectiveCrop => "Perspective Crop Tool",
+            Tool::Frame => "Frame Tool",
             Tool::Slice => "Slice Tool",
             Tool::SliceSelect => "Slice Select Tool",
             Tool::Gradient => "Gradient Tool",
@@ -307,7 +316,7 @@ impl Tool {
     /// Photoshop default single-key shortcut (`'\0'` = none, e.g. the Blur group).
     pub fn key(self) -> char {
         match self {
-            Tool::Move => 'V',
+            Tool::Move | Tool::Artboard => 'V',
             Tool::RectMarquee | Tool::EllipseMarquee => 'M',
             // Photoshop gives the single-pixel marquees no key of their own.
             Tool::SingleRowMarquee | Tool::SingleColumnMarquee => '\0',
@@ -316,7 +325,8 @@ impl Tool {
             Tool::Eyedropper | Tool::ColorSampler | Tool::Ruler | Tool::Note | Tool::Count => 'I',
             Tool::Lasso | Tool::PolygonLasso | Tool::MagneticLasso => 'L',
             Tool::MagicWand => 'W',
-            Tool::Crop | Tool::Slice | Tool::SliceSelect => 'C',
+            Tool::Crop | Tool::PerspectiveCrop | Tool::Slice | Tool::SliceSelect => 'C',
+            Tool::Frame => 'K',
             Tool::Gradient | Tool::PaintBucket => 'G',
             Tool::Type | Tool::VerticalType | Tool::HorizontalTypeMask | Tool::VerticalTypeMask => 'T',
             Tool::Hand => 'H',
@@ -598,6 +608,21 @@ pub struct ToolOptions {
     pub crop_resolution: String,
     #[serde(default = "default_crop_resolution_unit")]
     pub crop_resolution_unit: String,
+    /// Perspective Crop: W, H and Resolution (as the Crop tool's fields; empty W or H = the
+    /// frame's own size) and Show Grid.
+    #[serde(default)]
+    pub persp_width: String,
+    #[serde(default)]
+    pub persp_height: String,
+    #[serde(default)]
+    pub persp_resolution: String,
+    #[serde(default = "default_crop_resolution_unit")]
+    pub persp_resolution_unit: String,
+    #[serde(default = "yes_tool")]
+    pub persp_grid: bool,
+    /// Frame tool: `rectangle` or `ellipse`.
+    #[serde(default = "default_frame_shape")]
+    pub frame_shape: String,
     /// Crop overlay (#1919): the guide in the crop box, when it shows and its orientation
     /// (Photoshop's defaults: Rule of Thirds, Auto Show Overlay). See `crop_overlay`.
     #[serde(default)]
@@ -732,6 +757,14 @@ fn fifty() -> f32 {
     50.0
 }
 
+fn default_frame_shape() -> String {
+    "rectangle".into()
+}
+
+fn yes_tool() -> bool {
+    true
+}
+
 fn normal_mode() -> photocraft_color::BlendMode {
     photocraft_color::BlendMode::Normal
 }
@@ -815,6 +848,12 @@ impl Default for ToolOptions {
             crop_height: String::new(),
             crop_resolution: String::new(),
             crop_resolution_unit: default_crop_resolution_unit(),
+            persp_width: String::new(),
+            persp_height: String::new(),
+            persp_resolution: String::new(),
+            persp_resolution_unit: default_crop_resolution_unit(),
+            persp_grid: true,
+            frame_shape: default_frame_shape(),
             crop_overlay: Default::default(),
             crop_overlay_show: Default::default(),
             crop_overlay_orientation: 0,
@@ -1360,7 +1399,7 @@ mod tests {
         assert!(!Tool::RedEye.is_brushlike());
         assert_eq!(Tool::from_name("patternStamp"), Some(Tool::PatternStamp));
         assert_eq!(Tool::from_name("Pattern Stamp Tool"), Some(Tool::PatternStamp));
-        assert_eq!(Tool::ALL.len(), 65);
+        assert_eq!(Tool::ALL.len(), 68);
         assert_eq!(Tool::from_name("Remove Tool"), Some(Tool::Remove));
         assert_eq!(Tool::Remove.key(), 'J');
         assert!(Tool::Remove.is_brushlike());

@@ -2556,3 +2556,24 @@ fontWeight	Italic	Kurzíva
 	Loose Curl	Volná kudrlinka
 	Tight Curl Long	Těsná dlouhá kudrlinka
 	Loose Curl Long	Volná dlouhá kudrlinka
+	Perspective Crop Tool	Nástroj perspektivní oříznutí
+	Perspective Crop	Perspektivní oříznutí
+	Show Grid	Zobrazit mřížku
+	Drag the corners onto the edges of the object, then press Enter	Přetáhněte rohy na okraje objektu a stiskněte Enter
+	Drag a frame, or click the four corners of the object	Táhněte rámeček nebo klepněte na čtyři rohy objektu
+	Click the next corner	Klepněte na další roh
+	The corners must make a convex shape: move them so no two sides cross	Rohy musí tvořit konvexní tvar: posuňte je tak, aby se žádné dvě strany nekřížily
+	Artboard Tool	Nástroj kreslicí plátno
+	Frame Tool	Nástroj rámeček
+	New Frame	Nový rámeček
+	There is no room for an artboard on that side	Na této straně není pro kreslicí plátno místo
+	W:	Š:
+	H:	V:
+	Make Portrait	Na výšku
+	Make Landscape	Na šířku
+	Add New Artboard	Přidat nové kreslicí plátno
+	Drag inside to move · drag a handle to resize · click + to add a board beside it	Tažením uvnitř přesunete · tažením úchytu změníte velikost · klepnutím na + přidáte plátno vedle
+	Drag to draw an artboard · click one to select it	Tažením nakreslete kreslicí plátno · klepnutím je vyberete
+	Create a new rectangular frame	Vytvořit nový obdélníkový rámeček
+	Create a new elliptical frame	Vytvořit nový eliptický rámeček
+	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Táhněte rámeček · nad vybraným obrazem jej ořízne · Umístit vložené nebo přetažení souboru vyplní vybraný rámeček

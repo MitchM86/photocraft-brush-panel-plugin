@@ -127,8 +127,13 @@ pub fn normalize_resolution(typed: &str, previous: &str) -> String {
 
 /// The resolution field in pixels per inch, `None` when empty or not a positive number.
 pub fn resolution_ppi(o: &ToolOptions) -> Option<f64> {
-    let v = crate::widgets::parse_num(&o.crop_resolution.trim().replace(',', ".")).filter(|v| v.is_finite() && *v > 0.0)?;
-    Some(if o.crop_resolution_unit == PX_PER_CM { v * 2.54 } else { v })
+    resolution_ppi_of(&o.crop_resolution, &o.crop_resolution_unit)
+}
+
+/// A resolution field (`text`, in `unit`) in pixels per inch, `None` when empty or not positive.
+pub fn resolution_ppi_of(text: &str, unit: &str) -> Option<f64> {
+    let v = crate::widgets::parse_num(&text.trim().replace(',', ".")).filter(|v| v.is_finite() && *v > 0.0)?;
+    Some(if unit == PX_PER_CM { v * 2.54 } else { v })
 }
 
 /// W x H x Resolution's target: the size in pixels the crop is resampled to (unrounded) and the
@@ -138,14 +143,19 @@ pub fn target(o: &ToolOptions, doc_dpi: f64) -> Option<(f64, f64, Option<f64>)> 
     if o.crop_ratio != WHR {
         return None;
     }
-    let res = resolution_ppi(o);
+    target_of(&o.crop_width, &o.crop_height, &o.crop_resolution, &o.crop_resolution_unit, doc_dpi)
+}
+
+/// [`target`] for any W, H and resolution fields (the Perspective Crop tool has its own).
+pub fn target_of(width: &str, height: &str, resolution: &str, unit: &str, doc_dpi: f64) -> Option<(f64, f64, Option<f64>)> {
+    let res = resolution_ppi_of(resolution, unit);
     let dpi = res.unwrap_or(doc_dpi);
     let px = |text: &str| {
         let (v, u) = parse_length(text, Unit::Pixels)?;
         let px = u.to_px(v, dpi, 0.0, POINTS_PER_INCH);
         (px.is_finite() && px > 0.0).then_some(px)
     };
-    Some((px(&o.crop_width)?, px(&o.crop_height)?, res))
+    Some((px(width)?, px(height)?, res))
 }
 
 /// The ratio W x H x Resolution holds while the frame is drawn or resized (width / height).
@@ -234,7 +244,7 @@ pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
 
 /// A text field for a length or the resolution: what is typed is kept while it has focus and
 /// normalised into `value` (by `normalize(typed, previous)`) when it loses it. Returns true then.
-fn text_field(ui: &mut egui::Ui, id: &str, value: &mut String, hint: &str, width: f32, normalize: fn(&str, &str) -> String) -> bool {
+pub(crate) fn text_field(ui: &mut egui::Ui, id: &str, value: &mut String, hint: &str, width: f32, normalize: fn(&str, &str) -> String) -> bool {
     let t = Tokens::get(ui.ctx());
     let id = ui.id().with(id);
     let mut buf = ui.data(|d| d.get_temp::<String>(id)).unwrap_or_else(|| value.clone());
