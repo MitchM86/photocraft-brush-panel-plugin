@@ -173,6 +173,7 @@ pub mod tool_feedback;
 pub mod transform_tex;
 pub mod transform_tool;
 pub mod type_panels_ui;
+pub mod type_mask_ui;
 pub mod type_tool;
 mod type_transform;
 mod variables_ui;
@@ -1422,9 +1423,7 @@ impl eframe::App for PhotocraftApp {
         }
         self.drain_control(ctx);
         native_menu::run(self, ctx);
-        if self.ui.text_edit.is_some() && !self.ui.tool.is_type() {
-            type_tool::commit(self);
-        }
+        type_tool::end_if_left(self);
         if self.ui.pen.is_some() && self.ui.tool != state::Tool::Pen {
             vector_ui::pen_commit(self, false);
         }

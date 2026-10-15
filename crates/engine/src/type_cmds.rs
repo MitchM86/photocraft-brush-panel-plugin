@@ -615,7 +615,7 @@ pub fn specs() -> Vec<CommandSpec> {
             label: "New Type Layer",
             menu: &["Layer", "New"],
             shortcut: None,
-            params: r##"{"x":px,"y":px (baseline anchor of point text),"text":str,"box":[x,y,w,h]? (paragraph text),"name":str?,"align":"left|center|right|justify…"?,"orientation":"horizontal|vertical"="horizontal", …character keys: "font","size":pt=12,"color",…}"##,
+            params: r##"{"x":px,"y":px (baseline anchor of point text),"text":str,"box":[x,y,w,h]? (paragraph text),"name":str?,"align":"left|center|right|justify…"?,"orientation":"horizontal|vertical"="horizontal","mask":bool? (Type Mask tools: an invisible layer, see type.maskToSelection), …character keys: "font","size":pt=12,"color",…}"##,
             enabled: has_doc,
             journal: true,
             run: |s, p| {
@@ -656,9 +656,15 @@ pub fn specs() -> Vec<CommandSpec> {
                 };
                 t.sync_summary();
                 let name = p.get("name").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| layer_name(&t.text));
+                // The Type Mask tools type into an invisible layer (`type_mask_cmds`).
+                let mask = p.get("mask").and_then(Value::as_bool).unwrap_or(false);
                 let id = s.edit("New Type Layer", |doc, active| {
                     refresh(doc, &mut t);
-                    let id = doc.insert_above(*active, Layer::new(name, LayerContent::Text(t)));
+                    let mut layer = Layer::new(name, LayerContent::Text(t));
+                    if mask {
+                        layer.opacity = 0.0;
+                    }
+                    let id = doc.insert_above(*active, layer);
                     *active = Some(id);
                     Ok(id)
                 })?;

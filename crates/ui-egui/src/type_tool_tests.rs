@@ -284,6 +284,7 @@ fn size_applies_at_layer_and_selection_scope() {
             dragging: false,
             resize: None,
             preedit: None,
+            mask: None,
         });
         super::apply(&mut app, &ctx, json!({"size": 10.0}));
         assert_eq!((size_at(&app, id, 0), size_at(&app, id, 5), size_at(&app, id, 6), size_at(&app, id, 10)), (30.0, 30.0, 10.0, 10.0), "psd {psd}");
@@ -430,6 +431,7 @@ fn foreground_colour_recolours_only_selected_type() {
         dragging: false,
         resize: None,
         preedit: None,
+        mask: None,
     };
     app.ui.text_edit = Some(edit(3, 3));
     super::foreground_changed(&mut app);
@@ -500,6 +502,7 @@ fn text_color_dialog_edits_only_the_selected_range_and_cancel_is_inert() {
         dragging: false,
         resize: None,
         preedit: None,
+        mask: None,
     });
     let foreground = app.session.tools.foreground;
     let before = app.session.active().unwrap().history.entries().len();
@@ -548,7 +551,7 @@ fn empty_ime_events_never_delete_the_selection() {
     let mut app = new_app();
     let id = LayerId(app.run("type.create", json!({"text": "Hello", "size": 40, "x": 300, "y": 420})).unwrap()["layer"].as_u64().unwrap());
     app.ui.text_edit =
-        Some(crate::state::TextEdit { layer: id.0, caret: 5, anchor: 0, session: "s".into(), created: false, dragging: false, resize: None, preedit: None });
+        Some(crate::state::TextEdit { layer: id.0, caret: 5, anchor: 0, session: "s".into(), created: false, dragging: false, resize: None, preedit: None, mask: None });
     let mut h = harness(1.0, app);
     let ime = |h: &mut Harness<'static, PhotocraftApp>, e: egui::ImeEvent| {
         h.event(egui::Event::Ime(e));
@@ -1274,6 +1277,7 @@ mod multi_layer_formatting {
             dragging: false,
             resize: None,
             preedit: None,
+            mask: None,
         });
     }
 
@@ -1461,5 +1465,88 @@ mod multi_layer_formatting {
         for (id, expected) in ids.into_iter().zip(originals) {
             assert_eq!(style(h.state(), id, 0), expected);
         }
+    }
+}
+
+/// Click with `tool` at (`x`, `y`) through the canvas's tool events.
+fn type_click(app: &mut PhotocraftApp, tool: crate::state::Tool, x: f64, y: f64) {
+    use crate::canvas::{ToolEvent, tool_event};
+    app.ui.tool = tool;
+    tool_event(app, ToolEvent::Down { x, y, pressure: 1.0 }, Modifiers::NONE);
+    tool_event(app, ToolEvent::Up { x, y }, Modifiers::NONE);
+}
+
+#[test]
+fn type_masks_type_into_a_hidden_layer_and_commit_a_selection() {
+    use crate::state::Tool;
+    use photocraft_doc::text::Orientation;
+    for (tool, orientation) in [(Tool::HorizontalTypeMask, Orientation::Horizontal), (Tool::VerticalTypeMask, Orientation::Vertical)] {
+        let mut app = new_app();
+        let bg = app.session.active().unwrap().active_layer;
+        let (layers, steps) = {
+            let st = app.session.active().unwrap();
+            (st.doc.layers.len(), st.history.entries().len())
+        };
+        type_click(&mut app, tool, 300.0, 300.0);
+        let id = LayerId(app.ui.text_edit.as_ref().unwrap().layer);
+        assert_eq!(crate::type_mask_ui::hidden_layer(&app), Some(id), "{tool:?}: the Layers panel leaves the mask's layer out");
+        super::insert_typed(&mut app, "MASK");
+        {
+            let st = app.session.active().unwrap();
+            let l = st.doc.layer(id).unwrap();
+            assert_eq!(l.opacity, 0.0, "{tool:?}: the typed text paints nothing");
+            assert_eq!(text_layer(&st.doc, id).unwrap().orientation, orientation);
+        }
+        super::commit(&mut app);
+        let st = app.session.active().unwrap();
+        assert!(app.ui.text_edit.is_none());
+        assert_eq!(st.doc.layers.len(), layers, "{tool:?}: no layer is left behind");
+        assert_eq!(st.active_layer, bg, "{tool:?}: the layer active before is active again");
+        let b = st.doc.selection.as_ref().expect("the text became the selection").content_bounds();
+        assert!(b.x0 >= 250 && b.x1 <= 700 && b.y0 >= 0 && b.y1 <= 900 && !b.is_empty(), "{tool:?}: {b:?}");
+        let entries = st.history.entries();
+        assert_eq!(entries.len(), steps + 1, "{tool:?}: one step");
+        assert_eq!(entries.last().map(String::as_str), Some("Type Mask"));
+    }
+}
+
+#[test]
+fn type_masks_start_new_text_over_type_layers_and_empty_text_does_nothing() {
+    use crate::state::Tool;
+    let mut app = new_app();
+    type_click(&mut app, Tool::Type, 300.0, 300.0);
+    super::commit(&mut app);
+    let (layers, steps) = {
+        let st = app.session.active().unwrap();
+        (st.doc.layers.len(), st.history.entries().len())
+    };
+    // Over the existing type: a Type Mask still starts new text instead of editing it.
+    type_click(&mut app, Tool::HorizontalTypeMask, 310.0, 290.0);
+    let ed = app.ui.text_edit.clone().unwrap();
+    assert!(ed.mask.is_some() && ed.created);
+    // Emptied, it commits to nothing: no selection, no step, no layer.
+    super::insert_typed(&mut app, " ");
+    super::commit(&mut app);
+    let st = app.session.active().unwrap();
+    assert!(st.doc.selection.is_none());
+    assert_eq!((st.doc.layers.len(), st.history.entries().len()), (layers, steps));
+}
+
+#[test]
+fn switching_between_type_and_type_mask_commits_and_the_slot_holds_both_masks() {
+    use crate::state::Tool;
+    let mut app = new_app();
+    type_click(&mut app, Tool::HorizontalTypeMask, 300.0, 300.0);
+    super::end_if_left(&mut app);
+    assert!(app.ui.text_edit.is_some(), "still the same tool");
+    app.ui.tool = Tool::Type;
+    super::end_if_left(&mut app);
+    assert!(app.ui.text_edit.is_none(), "picking the Type tool ends the mask");
+    assert!(app.session.active().unwrap().doc.selection.is_some());
+    for t in [Tool::HorizontalTypeMask, Tool::VerticalTypeMask] {
+        assert_eq!(t.key(), 'T');
+        assert!(t.is_type() && t.is_type_mask());
+        assert!(crate::icons::exists(crate::icons::tool_icon(t)));
+        assert_eq!(Tool::from_name(t.label()), Some(t));
     }
 }

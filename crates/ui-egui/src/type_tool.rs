@@ -106,7 +106,7 @@ pub fn edit_active(app: &mut PhotocraftApp) -> Result<(), String> {
         commit(app);
         let key = session_key(app);
         begin_edit(app, id, &key)?;
-        app.ui.text_edit = Some(TextEdit { layer: id.0, caret: n, anchor: 0, session: key, created: false, dragging: false, resize: None, preedit: None });
+        app.ui.text_edit = Some(TextEdit { layer: id.0, caret: n, anchor: 0, session: key, created: false, dragging: false, resize: None, preedit: None, mask: None });
     } else if let Some(ed) = app.ui.text_edit.as_mut() {
         ed.anchor = 0;
         ed.caret = n;
@@ -219,6 +219,10 @@ pub fn pointer_down(app: &mut PhotocraftApp, x: f64, y: f64, shift: bool) -> boo
         commit(app);
         return true; // Photoshop: a click outside commits without starting new text
     }
+    // The Type Mask tools always start new text; they don't edit type layers.
+    if app.ui.tool.is_type_mask() {
+        return false;
+    }
     if let Some(id) = hit_layer(app, x, y) {
         let _ = app.session.select_layer(id);
         let key = session_key(app);
@@ -226,7 +230,7 @@ pub fn pointer_down(app: &mut PhotocraftApp, x: f64, y: f64, shift: bool) -> boo
             return true;
         }
         let off = hit_offset(app, id, x, y);
-        app.ui.text_edit = Some(TextEdit { layer: id.0, caret: off, anchor: off, session: key, created: false, dragging: true, resize: None, preedit: None });
+        app.ui.text_edit = Some(TextEdit { layer: id.0, caret: off, anchor: off, session: key, created: false, dragging: true, resize: None, preedit: None, mask: None });
         return true;
     }
     false
@@ -256,17 +260,22 @@ pub fn pointer_up(app: &mut PhotocraftApp, start: [f64; 2], end: [f64; 2]) {
     let (w, h) = ((end[0] - start[0]).abs(), (end[1] - start[1]).abs());
     let min = 4.0 / app.point_zoom().max(0.01) as f64;
     let o = app.ui.tool_options.clone();
+    let mask = app.ui.tool.is_type_mask();
+    let restore = app.session.active().and_then(|st| st.active_layer).map(|l| l.0);
     // Preferences ▸ Type: "Fill new type layers with placeholder text" (on by default).
     let text = if app.session.prefs().type_.fill_new_type_layers_with_placeholder { PLACEHOLDER } else { "" };
     let mut p = json!({
         "text": text,
-        "orientation": if app.ui.tool == crate::state::Tool::VerticalType { "vertical" } else { "horizontal" },
+        "orientation": if app.ui.tool.is_vertical_type() { "vertical" } else { "horizontal" },
         "font": o.type_font,
         "fontStyle": o.type_style,
         "size": o.type_size,
         "align": o.type_align,
         "color": hex(app.session.tools.foreground),
     });
+    if mask {
+        p["mask"] = json!(true);
+    }
     if w >= min && h >= min {
         p["box"] = json!([start[0].min(end[0]).round(), start[1].min(end[1]).round(), w.round(), h.round()]);
     } else {
@@ -283,7 +292,8 @@ pub fn pointer_up(app: &mut PhotocraftApp, start: [f64; 2], end: [f64; 2]) {
         }
         // Like Photoshop: the placeholder is selected, so typing replaces it.
         let n = text.chars().count();
-        app.ui.text_edit = Some(TextEdit { layer: id, caret: n, anchor: 0, session: key, created: true, dragging: false, resize: None, preedit: None });
+        let mask = mask.then_some(crate::state::TypeMaskEdit { restore });
+        app.ui.text_edit = Some(TextEdit { layer: id, caret: n, anchor: 0, session: key, created: true, dragging: false, resize: None, preedit: None, mask });
     }
 }
 
@@ -639,6 +649,7 @@ pub fn handle_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
 }
 
 /// End the editing session. A new layer left empty is deleted; a new layer is named after its text.
+/// A Type Mask's text becomes the selection instead (empty: nothing happened).
 pub fn commit(app: &mut PhotocraftApp) {
     if app.ui.tool.is_type() {
         crate::type_transform::finish(app);
@@ -646,6 +657,22 @@ pub fn commit(app: &mut PhotocraftApp) {
     crate::type_transform::reset(app);
     let Some(ed) = app.ui.text_edit.take() else { return };
     let Some(text) = current_text(app, LayerId(ed.layer)) else { return };
+    if let Some(m) = &ed.mask {
+        if text.trim().is_empty() {
+            app.ui.text_edit = Some(ed);
+            cancel(app);
+            return;
+        }
+        let r = app.run("type.maskToSelection", json!({"layer": ed.layer, "activate": m.restore, "coalesce": ed.session}));
+        if let Some(l) = m.restore {
+            let _ = app.session.select_layer(LayerId(l));
+        }
+        if let Err(e) = r {
+            app.ui.status = e;
+            app.ui.status_error = true;
+        }
+        return;
+    }
     if text.trim().is_empty() && ed.created {
         let _ = app.run("layer.delete", json!({"layer": ed.layer}));
     } else if ed.created {
@@ -654,10 +681,21 @@ pub fn commit(app: &mut PhotocraftApp) {
     }
 }
 
+/// Commit the editing session once another tool is picked, including a switch between the type
+/// and Type Mask tools.
+pub fn end_if_left(app: &mut PhotocraftApp) {
+    if app.ui.text_edit.as_ref().is_some_and(|ed| !app.ui.tool.is_type() || ed.mask.is_some() != app.ui.tool.is_type_mask()) {
+        commit(app);
+    }
+}
+
 /// Selection highlight, caret and text frame over the canvas.
 pub fn draw_overlay(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
     let Some(ed) = app.ui.text_edit.clone() else { return };
     let id = LayerId(ed.layer);
+    if ed.mask.is_some() {
+        crate::type_mask_ui::draw(app, painter, xf, id);
+    }
     let Some((l, aff, text)) = layout(app, id) else { return };
     let t = crate::theme::Tokens::get(painter.ctx());
     // Text space → screen.

@@ -88,6 +88,8 @@ pub enum Tool {
     PaintBucket,
     Type,
     VerticalType,
+    HorizontalTypeMask,
+    VerticalTypeMask,
     Hand,
     RotateView,
     Zoom,
@@ -127,7 +129,7 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: [Tool; 62] = [
+    pub const ALL: [Tool; 64] = [
         Tool::Move,
         Tool::RectMarquee,
         Tool::EllipseMarquee,
@@ -154,6 +156,8 @@ impl Tool {
         Tool::PaintBucket,
         Tool::Type,
         Tool::VerticalType,
+        Tool::HorizontalTypeMask,
+        Tool::VerticalTypeMask,
         Tool::Hand,
         Tool::RotateView,
         Tool::Zoom,
@@ -222,6 +226,8 @@ impl Tool {
             Tool::PaintBucket => "Paint Bucket Tool",
             Tool::Type => "Horizontal Type Tool",
             Tool::VerticalType => "Vertical Type Tool",
+            Tool::HorizontalTypeMask => "Horizontal Type Mask Tool",
+            Tool::VerticalTypeMask => "Vertical Type Mask Tool",
             Tool::Hand => "Hand Tool",
             Tool::RotateView => "Rotate View Tool",
             Tool::Zoom => "Zoom Tool",
@@ -258,8 +264,16 @@ impl Tool {
             Tool::CustomShape => "Custom Shape Tool",
         }
     }
+    /// The type tools, masks included: they all edit text in place on the canvas.
     pub fn is_type(self) -> bool {
-        matches!(self, Self::Type | Self::VerticalType)
+        matches!(self, Self::Type | Self::VerticalType | Self::HorizontalTypeMask | Self::VerticalTypeMask)
+    }
+    /// The Type Mask tools: the typed text becomes a selection, not a layer.
+    pub fn is_type_mask(self) -> bool {
+        matches!(self, Self::HorizontalTypeMask | Self::VerticalTypeMask)
+    }
+    pub fn is_vertical_type(self) -> bool {
+        matches!(self, Self::VerticalType | Self::VerticalTypeMask)
     }
 
     /// Retouching and painting tools that stroke with the brush (share the brush cursor and chip).
@@ -300,7 +314,7 @@ impl Tool {
             Tool::MagicWand => 'W',
             Tool::Crop | Tool::Slice | Tool::SliceSelect => 'C',
             Tool::Gradient | Tool::PaintBucket => 'G',
-            Tool::Type | Tool::VerticalType => 'T',
+            Tool::Type | Tool::VerticalType | Tool::HorizontalTypeMask | Tool::VerticalTypeMask => 'T',
             Tool::Hand => 'H',
             Tool::RotateView => 'R',
             Tool::Zoom => 'Z',
@@ -903,6 +917,16 @@ pub struct TextEdit {
     /// layer so it lays out like typed text; each IME update replaces it.
     #[serde(skip)]
     pub preedit: Option<(usize, usize)>,
+    /// Type Mask tools: the layer is their invisible type layer, a selection on commit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mask: Option<TypeMaskEdit>,
+}
+
+/// A Type Mask tool's editing session (`type_mask_cmds` in the engine).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TypeMaskEdit {
+    /// The layer that was active before the mask's type layer was made, active again after.
+    pub restore: Option<u64>,
 }
 
 /// Temporary Type-tool drag. The document is unchanged until release; this frame is view state.
@@ -1311,7 +1335,7 @@ mod tests {
         assert!(!Tool::RedEye.is_brushlike());
         assert_eq!(Tool::from_name("patternStamp"), Some(Tool::PatternStamp));
         assert_eq!(Tool::from_name("Pattern Stamp Tool"), Some(Tool::PatternStamp));
-        assert_eq!(Tool::ALL.len(), 62);
+        assert_eq!(Tool::ALL.len(), 64);
         assert_eq!(Tool::from_name("Remove Tool"), Some(Tool::Remove));
         assert_eq!(Tool::Remove.key(), 'J');
         assert!(Tool::Remove.is_brushlike());

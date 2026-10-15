@@ -50,6 +50,7 @@ pub mod group_view_cmds;
 pub mod hidden_target;
 pub mod history_cmds;
 pub mod sampler_cmds;
+pub mod type_mask_cmds;
 pub mod image_cmds;
 pub mod inspect;
 pub mod jobs;

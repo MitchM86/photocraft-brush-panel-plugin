@@ -147,6 +147,11 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
     if id == "ui.symmetryTransform" {
         return crate::symmetry_ui::begin(app).map(|_| Value::Null);
     }
+    // A Type Mask still being typed is an invisible type layer: commands that save, select or
+    // change the document see the selection it becomes instead.
+    if crate::type_mask_ui::hidden_layer(app).is_some() && ["file.", "image.", "layer.", "select.", "filter."].iter().any(|p| id.starts_with(p)) {
+        crate::type_tool::commit(app);
+    }
     // A pending Pen anchor is gesture state; Edit › Undo must match the keyboard.
     if id == "edit.undo" && (crate::vector_ui::pen_undo_last_point(app) || crate::pen_tools::curvature_remove_point(app)) {
         return Ok(Value::Null);

@@ -35,7 +35,7 @@ const TOOL_SECTIONS: &[&[&[Tool]]] = &[
     ],
     &[
         &[Tool::Pen, Tool::FreeformPen, Tool::CurvaturePen, Tool::AddAnchorPoint, Tool::DeleteAnchorPoint, Tool::ConvertPoint],
-        &[Tool::Type, Tool::VerticalType],
+        &[Tool::Type, Tool::VerticalType, Tool::VerticalTypeMask, Tool::HorizontalTypeMask],
         &[Tool::PathSelection, Tool::DirectSelection],
         &[Tool::Rectangle, Tool::EllipseShape, Tool::Triangle, Tool::Polygon, Tool::Line, Tool::CustomShape],
     ],
@@ -1172,7 +1172,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         });
                     }
                     // Every theme gets the font, style and size controls (#1387), as with Auto-Select (#1275).
-                    Tool::Type | Tool::VerticalType => crate::type_tool::options_bar(app, ui),
+                    t if t.is_type() => crate::type_tool::options_bar(app, ui),
                     Tool::Move if t.pro => {
                         let o = &mut app.ui.tool_options;
                         widgets::checkbox(ui, &mut o.move_auto_select, tl!("Auto-Select:"));
@@ -1890,7 +1890,13 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     };
     let doc = st.doc.clone();
     let active = st.active_layer;
-    let active_layer = active.and_then(|id| doc.layer(id));
+    // While a Type Mask is typed, its invisible layer is not a layer to the user: the blend,
+    // Opacity and Fill row shows the layer that was active before.
+    let shown = match (crate::type_mask_ui::hidden_layer(app), app.ui.text_edit.as_ref().and_then(|ed| ed.mask.as_ref())) {
+        (Some(hidden), Some(m)) if active == Some(hidden) => m.restore.map(LayerId),
+        _ => active,
+    };
+    let active_layer = shown.and_then(|id| doc.layer(id));
     let selection = st.selected_layers();
     let isolated = st.isolated_layers.clone();
     let mut actions: Vec<(String, Value)> = Vec::new();
@@ -2007,7 +2013,11 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
 
     // Top of the stack first, groups above their contents, closed groups' contents hidden (#126).
-    let rows = crate::layer_tree_ui::display_rows(&doc, !app.ui.layer_filter.is_empty());
+    let mut rows = crate::layer_tree_ui::display_rows(&doc, !app.ui.layer_filter.is_empty());
+    // The Type Mask tools' invisible type layer is not a layer to the user.
+    if let Some(hidden) = crate::type_mask_ui::hidden_layer(app) {
+        rows.retain(|(_, l)| l.id != hidden);
+    }
     let ctx = ui.ctx().clone();
     let footer = widgets::footer_height(ui) + ui.spacing().item_spacing.y;
     let fill = ui.available_height() > footer + 60.0;
@@ -4109,7 +4119,7 @@ mod swatch_type_tests {
         let fg = app.session.tools.foreground;
         app.ui.tool = Tool::Type;
         app.ui.text_edit =
-            Some(crate::state::TextEdit { layer: id, caret: 0, anchor: 5, session: "s".into(), created: false, dragging: false, resize: None, preedit: None });
+            Some(crate::state::TextEdit { layer: id, caret: 0, anchor: 5, session: "s".into(), created: false, dragging: false, resize: None, preedit: None, mask: None });
         let mut h = Harness::builder().with_size(vec2(300.0, 300.0)).build_ui_state(|ui, app: &mut PhotocraftApp| color_picker(app, ui), app);
         h.run_steps(4);
         assert_eq!(h.state().session.tools.foreground, fg);

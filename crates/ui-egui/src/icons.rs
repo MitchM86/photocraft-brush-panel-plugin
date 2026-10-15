@@ -119,6 +119,7 @@ pub fn tool_icon(t: Tool) -> &'static str {
         Tool::Gradient => "blend",
         Tool::PaintBucket => "paint-bucket",
         Tool::Type | Tool::VerticalType => "type",
+        Tool::HorizontalTypeMask | Tool::VerticalTypeMask => "type-mask",
         Tool::Hand => "hand",
         Tool::RotateView => "compass",
         Tool::Zoom => "zoom-in",

@@ -93,6 +93,14 @@ impl History {
         }
     }
 
+    /// Rename the step that produced the current document: a coalesced gesture that ends as
+    /// something else (the Type Mask tools' temporary type layer becomes a selection).
+    pub fn relabel_current(&mut self, label: impl Into<String>) {
+        if self.can_undo() {
+            self.current_label = label.into();
+        }
+    }
+
     pub fn can_undo(&self) -> bool {
         !self.undo.is_empty()
     }
