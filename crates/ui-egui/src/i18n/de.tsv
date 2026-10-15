@@ -2615,3 +2615,5 @@ fontWeight	Italic	Kursiv
 	Create a new rectangular frame	Neuen rechteckigen Rahmen erstellen
 	Create a new elliptical frame	Neuen elliptischen Rahmen erstellen
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Rahmen aufziehen · über einem ausgewählten Bild schneidet er es zu · Eingebettet platzieren oder eine Datei ablegen füllt den ausgewählten Rahmen
+	This command needs a file on disk; it isn't available in the browser	Dieser Befehl braucht eine Datei auf dem Datenträger; im Browser ist er nicht verfügbar
+	Layer name	Ebenenname

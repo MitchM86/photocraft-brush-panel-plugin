@@ -118,7 +118,6 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else { return };
     let (w, h, mode, depth, dpi) = (st.doc.size.width, st.doc.size.height, st.doc.mode, st.doc.depth, st.doc.resolution_dpi);
-    let has_bg = st.doc.layers.first().is_some_and(|l| is_background(&st.doc, l));
     let mut run: Vec<(String, Value)> = Vec::new();
     ui.horizontal(|ui| {
         let (r, _) = ui.allocate_exact_size(vec2(24.0, 24.0), Sense::hover());
@@ -198,16 +197,8 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 run.push(((*id).to_string(), Value::Null));
             }
         });
-        ui.horizontal(|ui| {
-            field_label(ui, tl!("Fill"), label_w);
-            let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
-            ui.painter().rect_stroke(r, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
-            // The canvas fill is only editable for documents without a Background layer.
-            ui.add_enabled_ui(!has_bg, |ui| {
-                let mut f = 0u8;
-                widgets::dropdown(ui, "doc-props-fill", &mut f, &[(0u8, tl!("Background Color"))], 124.0);
-            });
-        });
+        // Photoshop's canvas Fill isn't here yet: a row that did nothing was removed (the
+        // dead-button sweep, 2026-10-15).
         ui.add_space(4.0);
     }
     widgets::hairline(ui);

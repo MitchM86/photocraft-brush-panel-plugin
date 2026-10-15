@@ -620,6 +620,13 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
     if let Some(e) = crate::transform_tool::is_enabled(app, id) {
         return e;
     }
+    // Split Warp edits a warp: one being made, or a warped smart object's (greyed otherwise, as in
+    // Photoshop, rather than answering with an error).
+    if matches!(id, "edit.transform.splitWarpCrosswise" | "edit.transform.splitWarpHorizontally" | "edit.transform.splitWarpVertically" | "edit.transform.removeWarpSplit") {
+        let warping = app.ui.transform.as_ref().is_some_and(|t| t.warp.is_some());
+        let warped = app.session.active().and_then(|st| st.doc.layer(st.active_layer?)).is_some_and(|l| matches!(&l.content, photocraft_doc::LayerContent::Smart(sm) if sm.warp.is_some()));
+        return warping || warped;
+    }
     match id {
         "file.open" | "file.exit" | "file.clearRecent" | "file.removeRecent" | "help.about" | "help.systemInfo" | "edit.search" => true,
         i if i.starts_with("file.openRecent.") => true,

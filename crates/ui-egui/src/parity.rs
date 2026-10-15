@@ -6,8 +6,11 @@
 use crate::menu_catalog::CATALOG;
 use crate::menus::is_live;
 
-/// Minimum number of live catalog items. Raise it when parity grows; never lower it.
-pub const FLOOR: usize = 627;
+/// Minimum number of live catalog items. Raise it when parity grows; never lower it for a
+/// regression. Lowered once on 2026-10-15 (627 → 622): the dead-button sweep found six items that
+/// only moved their tick mark (Type › Language Options ×4, View › Pixel Aspect Ratio Correction,
+/// View › Pixel Art Preview); they show greyed until they do something.
+pub const FLOOR: usize = 622;
 
 /// One top-level menu's coverage.
 #[derive(Clone, Debug, serde::Serialize)]

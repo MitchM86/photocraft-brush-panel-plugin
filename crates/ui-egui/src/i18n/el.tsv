@@ -3676,3 +3676,5 @@ fontWeight	Thin	Πολύ λεπτά
 	Create a new rectangular frame	Δημιουργία νέου ορθογώνιου πλαισίου
 	Create a new elliptical frame	Δημιουργία νέου ελλειπτικού πλαισίου
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Σύρετε ένα πλαίσιο · πάνω από επιλεγμένη εικόνα την περικόπτει · Τοποθέτηση ή απόθεση αρχείου γεμίζει το επιλεγμένο πλαίσιο
+	This command needs a file on disk; it isn't available in the browser	Αυτή η εντολή χρειάζεται αρχείο στον δίσκο· δεν είναι διαθέσιμη στο πρόγραμμα περιήγησης
+	Layer name	Όνομα επιπέδου

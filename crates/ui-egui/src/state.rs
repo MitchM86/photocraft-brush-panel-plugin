@@ -620,6 +620,10 @@ pub struct ToolOptions {
     pub persp_resolution_unit: String,
     #[serde(default = "yes_tool")]
     pub persp_grid: bool,
+    /// Shape tools' mode: `shape`, `path` (a Work Path outline) or `pixels` (painted onto the
+    /// active layer).
+    #[serde(default = "default_shape_mode")]
+    pub shape_mode: String,
     /// Frame tool: `rectangle` or `ellipse`.
     #[serde(default = "default_frame_shape")]
     pub frame_shape: String,
@@ -757,6 +761,10 @@ fn fifty() -> f32 {
     50.0
 }
 
+fn default_shape_mode() -> String {
+    "shape".into()
+}
+
 fn default_frame_shape() -> String {
     "rectangle".into()
 }
@@ -854,6 +862,7 @@ impl Default for ToolOptions {
             persp_resolution_unit: default_crop_resolution_unit(),
             persp_grid: true,
             frame_shape: default_frame_shape(),
+            shape_mode: default_shape_mode(),
             crop_overlay: Default::default(),
             crop_overlay_show: Default::default(),
             crop_overlay_orientation: 0,
@@ -1147,6 +1156,12 @@ pub struct UiState {
     /// Layers panel kind filter ("pixel", "adjustment", "type", "shape", "smart"); empty = all.
     #[serde(default)]
     pub layer_filter: Vec<String>,
+    /// Layers panel name filter (Select › Find Layers): only layers whose name contains it.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub layer_name_filter: String,
+    /// Select › Find Layers asked for the Layers panel's name field to take the keyboard.
+    #[serde(skip)]
+    pub find_layers_focus: bool,
     /// Actions panel: which row is selected and which are expanded. The list lives on the session.
     #[serde(default)]
     pub actions: crate::actions::ActionsUi,
@@ -1293,6 +1308,8 @@ impl Default for UiState {
             slices: Default::default(),
             shell: Default::default(),
             layer_filter: Vec::new(),
+            layer_name_filter: String::new(),
+            find_layers_focus: false,
             pen: None,
             freeform: None,
             sampler_drag: None,

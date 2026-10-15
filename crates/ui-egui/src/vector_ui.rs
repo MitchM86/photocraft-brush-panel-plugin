@@ -134,6 +134,11 @@ fn fill_param(app: &PhotocraftApp) -> Value {
 pub fn create_shape(app: &mut PhotocraftApp, mut geometry: Value) -> Result<Value, String> {
     geometry["fill"] = fill_param(app);
     geometry["stroke"] = stroke_param(app);
+    let o = &app.ui.tool_options;
+    if o.shape_mode != "shape" {
+        geometry["mode"] = json!(o.shape_mode);
+        geometry["antiAlias"] = json!(o.anti_alias);
+    }
     app.run("shape.create", geometry)
 }
 
@@ -151,7 +156,10 @@ pub fn draw_shape_preview(app: &PhotocraftApp, painter: &egui::Painter, xf: &Vie
         path
     };
     // ponytail: preview colours skip the canvas's colour management; the commit renders them exactly.
-    let fill = if o.shape_fill { rgb32(app.session.tools.foreground) } else { Color32::TRANSPARENT };
+    // Path mode draws an outline only; Pixels mode a fill without stroke.
+    let path_mode = tool != Tool::CustomShape && o.shape_mode == "path";
+    let pixels = tool != Tool::CustomShape && o.shape_mode == "pixels";
+    let fill = if (o.shape_fill || pixels) && !path_mode { rgb32(app.session.tools.foreground) } else { Color32::TRANSPARENT };
     {
         let origin = xf.to_screen(0.0, 0.0);
         let x = xf.to_screen(1.0, 0.0) - origin;
@@ -163,7 +171,7 @@ pub fn draw_shape_preview(app: &PhotocraftApp, painter: &egui::Painter, xf: &Vie
             fill: (fill != Color32::TRANSPARENT).then(|| {
                 photocraft_doc::Fill::Solid(photocraft_doc::Color::rgba(fill.r() as f32 / 255.0, fill.g() as f32 / 255.0, fill.b() as f32 / 255.0, 1.0))
             }),
-            stroke: (o.stroke_width > 0.0)
+            stroke: (o.stroke_width > 0.0 && !path_mode && !pixels)
                 .then(|| o.shape_stroke.stroke(o.stroke_width * xf.zoom, photocraft_doc::Fill::Solid(photocraft_doc::Color::rgba(c[0], c[1], c[2], c[3])))),
             ..Default::default()
         };
@@ -716,21 +724,33 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
         }
         return true;
     }
-    let mut mode = "shape".to_string();
-    crate::widgets::dropdown(ui, "shape-mode", &mut mode, &[("shape".to_string(), tl!("Shape"))], 80.0);
-    crate::widgets::vline(ui, 22.0);
-    lbl(ui, tl!("Fill:"));
-    crate::widgets::checkbox(ui, &mut o.shape_fill, "");
-    let (r, _) = ui.allocate_exact_size(vec2(22.0, 16.0), Sense::hover());
-    ui.painter().rect_filled(r, 2.0, rgb32(app.session.tools.foreground));
-    ui.painter().rect_stroke(r, 2.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Outside);
-    lbl(ui, tl!("Stroke:"));
-    let bg = app.session.tools.background;
-    let stroke_color = swatch(ui, Some(&photocraft_doc::Fill::Solid(photocraft_doc::Color::rgba(bg[0], bg[1], bg[2], bg[3]))), tl!("Stroke color"));
-    crate::widgets::value_field(ui, &mut o.stroke_width, 0.0..=288.0, "px", 58.0);
-    if let Some(style) = crate::shape_stroke_ui::button(ui, "tool-stroke", &o.shape_stroke, &mut app.ui.stroke_editor, true, tool != Tool::EllipseShape, None) {
-        o.shape_stroke = style;
+    // Shape, Path (a Work Path outline) or Pixels (painted onto the active layer), as in
+    // Photoshop; the Custom Shape tool makes shapes only.
+    if tool != Tool::CustomShape {
+        let modes = [("shape".to_string(), tl!("Shape")), ("path".to_string(), tl!("Path")), ("pixels".to_string(), tl!("Pixels"))];
+        crate::widgets::dropdown(ui, "shape-mode", &mut o.shape_mode, &modes, 80.0);
+        crate::widgets::vline(ui, 22.0);
     }
+    let stroke_color = if tool == Tool::CustomShape || o.shape_mode == "shape" {
+        lbl(ui, tl!("Fill:"));
+        crate::widgets::checkbox(ui, &mut o.shape_fill, "");
+        let (r, _) = ui.allocate_exact_size(vec2(22.0, 16.0), Sense::hover());
+        ui.painter().rect_filled(r, 2.0, rgb32(app.session.tools.foreground));
+        ui.painter().rect_stroke(r, 2.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Outside);
+        lbl(ui, tl!("Stroke:"));
+        let bg = app.session.tools.background;
+        let stroke_color = swatch(ui, Some(&photocraft_doc::Fill::Solid(photocraft_doc::Color::rgba(bg[0], bg[1], bg[2], bg[3]))), tl!("Stroke color"));
+        crate::widgets::value_field(ui, &mut o.stroke_width, 0.0..=288.0, "px", 58.0);
+        if let Some(style) = crate::shape_stroke_ui::button(ui, "tool-stroke", &o.shape_stroke, &mut app.ui.stroke_editor, true, tool != Tool::EllipseShape, None) {
+            o.shape_stroke = style;
+        }
+        stroke_color
+    } else {
+        if o.shape_mode == "pixels" {
+            crate::widgets::checkbox(ui, &mut o.anti_alias, tl!("Anti-alias"));
+        }
+        None
+    };
     match tool {
         Tool::Rectangle => {
             crate::widgets::vline(ui, 22.0);
@@ -1230,6 +1250,32 @@ mod tests {
         // ⌘ on another anchor shows its handles instead.
         pen.focus = Some(0);
         assert_eq!(pen_handles(&pen), Vec::new());
+    }
+
+    #[test]
+    fn shape_tools_draw_a_work_path_or_pixels_in_those_modes() {
+        let drag = |a: &mut PhotocraftApp| {
+            let n = egui::Modifiers::NONE;
+            crate::canvas::tool_event(a, crate::canvas::ToolEvent::Down { x: 20.0, y: 20.0, pressure: 1.0 }, n);
+            crate::canvas::tool_event(a, crate::canvas::ToolEvent::Move { x: 50.0, y: 45.0, pressure: 1.0 }, n);
+            crate::canvas::tool_event(a, crate::canvas::ToolEvent::Up { x: 50.0, y: 45.0 }, n);
+            assert!(!a.ui.status_error, "{}", a.ui.status);
+        };
+        let mut a = app();
+        let layers = a.session.active().unwrap().doc.walk().len();
+        a.ui.tool = Tool::Rectangle;
+        a.ui.tool_options.shape_mode = "path".into();
+        drag(&mut a);
+        let st = a.session.active().unwrap();
+        assert_eq!(st.doc.walk().len(), layers, "Path mode makes no layer");
+        assert_eq!(st.doc.work_path.as_ref().map(|p| p.subpaths.len()), Some(1));
+        a.ui.tool_options.shape_mode = "pixels".into();
+        a.ui.tool = Tool::EllipseShape;
+        a.run("layer.new.layer", json!({})).unwrap();
+        drag(&mut a);
+        let st = a.session.active().unwrap();
+        let s = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap();
+        assert!(s.content_bounds().width() > 20, "Pixels mode painted the active layer");
     }
 
     #[test]

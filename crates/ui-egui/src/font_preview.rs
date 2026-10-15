@@ -1,4 +1,5 @@
-//! Small font-menu samples, rendered by the same font database as document text.
+//! Font-menu samples, rendered by the same font database as document text, at Type › Font
+//! Preview Size ([`set_size`], once per frame).
 
 use std::collections::VecDeque;
 use std::sync::PoisonError;
@@ -13,13 +14,43 @@ const WIDTH: f32 = 100.0;
 const HEIGHT: f32 = 24.0;
 const CACHE_LIMIT: usize = 128;
 
-/// Family, display scale, and the font database generations, so a family installed or fetched
-/// (served fonts) after its first miss gets a sample once it is available.
-type Key = (String, u32, (u64, u64));
+/// Family, display scale, preview size (%), and the font database generations, so a family
+/// installed or fetched (served fonts) after its first miss gets a sample once it is available.
+type Key = (String, u32, u32, (u64, u64));
+
+/// Type › Font Preview Size as a factor of the medium sample.
+pub fn factor_of(size: &str) -> f32 {
+    match size {
+        "small" => 0.75,
+        "large" => 1.35,
+        "extraLarge" => 1.75,
+        "huge" => 2.25,
+        _ => 1.0,
+    }
+}
+
+fn size_id() -> egui::Id {
+    egui::Id::new("font-preview-size")
+}
+
+/// Make Type › Font Preview Size (`small` … `huge`) the size samples are drawn at.
+pub fn set_size(ctx: &egui::Context, size: &str) {
+    ctx.data_mut(|d| d.insert_temp(size_id(), factor_of(size)));
+}
+
+/// The sample size factor in effect (1 = medium).
+pub fn factor(ctx: &egui::Context) -> f32 {
+    ctx.data(|d| d.get_temp::<f32>(size_id())).unwrap_or(1.0)
+}
+
+/// A sample's size in points at factor `f`.
+pub fn sample_size(f: f32) -> egui::Vec2 {
+    vec2(WIDTH * f, HEIGHT * f)
+}
 #[derive(Clone, Default)]
 struct Cache(VecDeque<(Key, Option<TextureHandle>)>);
 
-fn image(engine: &mut photocraft_text::TextEngine, family: &str, scale: u32) -> Option<ColorImage> {
+fn image(engine: &mut photocraft_text::TextEngine, family: &str, scale: u32, f: f32) -> Option<ColorImage> {
     // Unknown/unreadable families keep their plain menu label, rather than a misleading fallback.
     if !engine.fonts.has_family(family) {
         return None;
@@ -34,11 +65,11 @@ fn image(engine: &mut photocraft_text::TextEngine, family: &str, scale: u32) -> 
     if text.is_empty() {
         return None;
     }
-    let layer = TextLayer { text, font_family: family.into(), size_pt: 18.0 * scale as f32, ..Default::default() };
+    let layer = TextLayer { text, font_family: family.into(), size_pt: 18.0 * scale as f32 * f, ..Default::default() };
     let layout = engine.layout(&layer, 72.0);
     let bounds = layout.bounds()?;
-    let width = (WIDTH as u32 * scale) as usize;
-    let height = (HEIGHT as u32 * scale) as usize;
+    let width = (WIDTH * f).round() as usize * scale as usize;
+    let height = (HEIGHT * f).round() as usize * scale as usize;
     let transform = Affine::translate(f64::from(-bounds[0]), f64::from((height as f32 - (bounds[3] - bounds[1])) / 2.0 - bounds[1]));
     // Reject oversized ink before the rasterizer allocates a surface (malformed installed fonts).
     let ink = photocraft_text::render::ink_rect(&layout, &transform);
@@ -54,7 +85,8 @@ fn image(engine: &mut photocraft_text::TextEngine, family: &str, scale: u32) -> 
 pub(crate) fn paint(ui: &egui::Ui, family: &str, row: Rect) {
     let ctx = ui.ctx();
     let scale = ctx.pixels_per_point().ceil().clamp(1.0, 4.0) as u32;
-    let key = (family.to_owned(), scale, (photocraft_text::fonts::generation(), photocraft_text::served::generation()));
+    let f = factor(ctx);
+    let key = (family.to_owned(), scale, (f * 100.0).round() as u32, (photocraft_text::fonts::generation(), photocraft_text::served::generation()));
     let id = egui::Id::new("font-menu-previews");
     let cached = ctx.data_mut(|d| {
         let cache = d.get_temp_mut_or_default::<Cache>(id);
@@ -65,7 +97,7 @@ pub(crate) fn paint(ui: &egui::Ui, family: &str, row: Rect) {
         Some(texture)
     });
     let texture = cached.unwrap_or_else(|| {
-        let texture = image(&mut photocraft_text::shared().lock().unwrap_or_else(PoisonError::into_inner), family, scale)
+        let texture = image(&mut photocraft_text::shared().lock().unwrap_or_else(PoisonError::into_inner), family, scale, f)
             .map(|img| ctx.load_texture(format!("font-sample-{family}"), img, TextureOptions::LINEAR));
         ctx.data_mut(|d| {
             let cache = d.get_temp_mut_or_default::<Cache>(id);
@@ -77,7 +109,8 @@ pub(crate) fn paint(ui: &egui::Ui, family: &str, row: Rect) {
         texture
     });
     if let Some(texture) = texture {
-        let rect = Rect::from_min_size(pos2(row.right() - WIDTH - 8.0, row.center().y - HEIGHT / 2.0), vec2(WIDTH, HEIGHT));
+        let s = sample_size(f);
+        let rect = Rect::from_min_size(pos2(row.right() - s.x - 8.0, row.center().y - s.y / 2.0), s);
         ui.painter().image(texture.id(), rect, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), crate::theme::Tokens::get(ctx).text);
     }
 }
@@ -89,12 +122,23 @@ mod tests {
     #[test]
     fn previews_use_the_requested_face_and_scale() {
         let mut engine = photocraft_text::TextEngine::new();
-        let sans = image(&mut engine, "Inter", 1).expect("bundled sans");
-        let mono = image(&mut engine, "JetBrains Mono", 1).expect("bundled mono");
+        let sans = image(&mut engine, "Inter", 1, 1.0).expect("bundled sans");
+        let mono = image(&mut engine, "JetBrains Mono", 1, 1.0).expect("bundled mono");
         assert_eq!(sans.size, [100, 24]);
         assert!(sans.pixels.iter().any(|p| p.a() > 0));
         assert_ne!(sans.pixels, mono.pixels, "samples use different font outlines");
-        assert_eq!(image(&mut engine, "Inter", 2).unwrap().size, [200, 48]);
-        assert!(image(&mut engine, "Missing font", 1).is_none());
+        assert_eq!(image(&mut engine, "Inter", 2, 1.0).unwrap().size, [200, 48]);
+        assert!(image(&mut engine, "Missing font", 1, 1.0).is_none());
+    }
+
+    #[test]
+    fn font_preview_size_scales_the_samples() {
+        let mut engine = photocraft_text::TextEngine::new();
+        assert_eq!(image(&mut engine, "Inter", 1, factor_of("small")).unwrap().size, [75, 18]);
+        assert_eq!(image(&mut engine, "Inter", 1, factor_of("huge")).unwrap().size, [225, 54]);
+        let ctx = egui::Context::default();
+        assert_eq!(factor(&ctx), 1.0);
+        set_size(&ctx, "large");
+        assert_eq!(factor(&ctx), 1.35);
     }
 }

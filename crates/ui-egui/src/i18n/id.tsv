@@ -2978,3 +2978,5 @@ fontWeight	Italic	Miring
 	Create a new rectangular frame	Buat bingkai persegi baru
 	Create a new elliptical frame	Buat bingkai elips baru
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Seret bingkai · di atas gambar terpilih akan memangkasnya · Tempatkan Tersemat atau jatuhkan berkas untuk mengisi bingkai terpilih
+	This command needs a file on disk; it isn't available in the browser	Perintah ini memerlukan berkas di disk; tidak tersedia di peramban
+	Layer name	Nama layer

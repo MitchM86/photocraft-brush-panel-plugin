@@ -2417,7 +2417,9 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     let mut on_gpu = false;
     // A flipped view draws through the CPU path (the GPU canvas shader has no mirroring).
     // Rotation stays on the GPU: it is a view uniform, not a CPU blit.
-    let gpu_ok = crate::gpu_canvas::gpu_view_ok(flip, view.rotation);
+    // View › Pattern Preview draws the image's neighbours too, which only the CPU path does.
+    let pattern = app.ui.view.pattern_preview;
+    let gpu_ok = crate::gpu_canvas::gpu_view_ok(flip, view.rotation) && !pattern;
     if app.gpu.is_some()
         && gpu_ok
         && let Some((k, key, preview_size)) =
@@ -2498,6 +2500,9 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             } else {
                 let uv = if flip { Rect::from_min_max(pos2(1.0, 0.0), pos2(0.0, 1.0)) } else { Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)) };
                 painter.image(tex, img_rect, uv, Color32::WHITE);
+            }
+            if pattern {
+                paint_pattern_neighbours(&painter, &xf, tex, size);
             }
         }
     }
@@ -3317,6 +3322,25 @@ fn paint_mapped_image(painter: &egui::Painter, xf: &ViewXform, tex: egui::Textur
     mesh.add_triangle(0, 1, 2);
     mesh.add_triangle(0, 2, 3);
     painter.add(egui::Shape::mesh(mesh));
+}
+
+/// View › Pattern Preview: the image again on each side and corner, so the seams a pattern made
+/// from it would have show (Photoshop repeats it the same way). Transparent pixels show the
+/// pasteboard there, not the checkerboard.
+fn paint_pattern_neighbours(painter: &egui::Painter, xf: &ViewXform, tex: egui::TextureId, size: [f32; 2]) {
+    let [w, h] = size;
+    for (i, j) in [(-1.0, -1.0), (0.0, -1.0), (1.0, -1.0), (-1.0, 0.0), (1.0, 0.0), (-1.0, 1.0), (0.0, 1.0), (1.0, 1.0)] {
+        let (x0, y0) = (i * w, j * h);
+        let pts = [xf.to_screen(x0, y0), xf.to_screen(x0 + w, y0), xf.to_screen(x0 + w, y0 + h), xf.to_screen(x0, y0 + h)];
+        let uvs = [pos2(0.0, 0.0), pos2(1.0, 0.0), pos2(1.0, 1.0), pos2(0.0, 1.0)];
+        let mut mesh = Mesh::with_texture(tex);
+        for (pos, uv) in pts.into_iter().zip(uvs) {
+            mesh.vertices.push(egui::epaint::Vertex { pos, uv, color: Color32::WHITE });
+        }
+        mesh.add_triangle(0, 1, 2);
+        mesh.add_triangle(0, 2, 3);
+        painter.add(egui::Shape::mesh(mesh));
+    }
 }
 
 fn paint_mapped_quad(painter: &egui::Painter, xf: &ViewXform, size: [f32; 2], color: Color32) {

@@ -3679,3 +3679,5 @@ cameraRaw	Masking	Маскування
 	Create a new rectangular frame	Створити прямокутну рамку
 	Create a new elliptical frame	Створити еліптичну рамку
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Намалюйте рамку · над вибраним зображенням вона його обрізає · «Помістити вбудоване» або перетягування файлу заповнює вибрану рамку
+	This command needs a file on disk; it isn't available in the browser	Цій команді потрібен файл на диску; у браузері вона недоступна
+	Layer name	Назва шару

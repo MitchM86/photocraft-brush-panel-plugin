@@ -2646,3 +2646,5 @@ fontWeight	Italic	Corsivo
 	Create a new rectangular frame	Crea una nuova cornice rettangolare
 	Create a new elliptical frame	Crea una nuova cornice ellittica
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Disegna una cornice · su un'immagine selezionata la ritaglia · Inserisci incorporato o trascina un file per riempire la cornice selezionata
+	This command needs a file on disk; it isn't available in the browser	Questo comando richiede un file su disco; non è disponibile nel browser
+	Layer name	Nome livello

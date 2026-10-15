@@ -3745,3 +3745,5 @@ cameraRaw	Whites	Witten
 	Create a new rectangular frame	Nieuw rechthoekig kader maken
 	Create a new elliptical frame	Nieuw elliptisch kader maken
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Sleep een kader · boven een geselecteerde afbeelding knipt het die bij · Ingesloten plaatsen of een bestand neerzetten vult het geselecteerde kader
+	This command needs a file on disk; it isn't available in the browser	Deze opdracht heeft een bestand op schijf nodig; in de browser is hij niet beschikbaar
+	Layer name	Laagnaam

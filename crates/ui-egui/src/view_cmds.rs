@@ -83,17 +83,11 @@ pub struct ViewOptions {
     pub flip_horizontal: bool,
     /// View › Pixel Aspect Ratio preset id ("square", "d1DvNtsc", …) and its correction toggle.
     pub pixel_aspect: String,
-    pub pixel_aspect_correction: bool,
     pub pattern_preview: bool,
-    pub pixel_art_preview: bool,
     /// Window › Arrange layout of the document area: "tabs" or a tile/n-up layout id.
     pub arrange: String,
     /// Type › Font Preview Size: "small" | "medium" | "large" | "extraLarge" | "huge".
     pub font_preview_size: String,
-    /// Type › Language Options: "defaultFeatures" | "eastAsianFeatures" | "middleEasternFeatures",
-    /// and the Middle Eastern & South Asian composer.
-    pub language_features: String,
-    pub middle_eastern_composer: bool,
     /// Parameters from the last successfully applied New Guide Layout dialog.
     pub guide_layout: Value,
 }
@@ -111,13 +105,9 @@ impl Default for ViewOptions {
             snap_to: SnapTo::default(),
             flip_horizontal: false,
             pixel_aspect: "square".into(),
-            pixel_aspect_correction: false,
             pattern_preview: false,
-            pixel_art_preview: false,
             arrange: "tabs".into(),
             font_preview_size: "medium".into(),
-            language_features: "defaultFeatures".into(),
-            middle_eastern_composer: false,
             guide_layout: default_guide_layout(),
         }
     }
@@ -143,7 +133,6 @@ impl ViewOptions {
 const SCREEN_MODES: [&str; 3] = ["standard", "fullScreenWithMenuBar", "fullScreen"];
 const PIXEL_ASPECTS: [&str; 8] = ["square", "d1DvNtsc", "d1DvPal", "d1DvNtscWidescreen", "hdv1080", "d1DvPalWidescreen", "dvcproHd1080", "anamorphic2To1"];
 const FONT_PREVIEW: [&str; 5] = ["small", "medium", "large", "extraLarge", "huge"];
-const LANGUAGE: [&str; 3] = ["defaultFeatures", "eastAsianFeatures", "middleEasternFeatures"];
 /// Window › Arrange layouts drawn by [`cells`].
 const LAYOUTS: [&str; 10] = [
     "tileAllVertically",
@@ -249,9 +238,6 @@ pub fn handles(id: &str) -> bool {
     if let Some(k) = id.strip_prefix("type.fontPreviewSize.") {
         return FONT_PREVIEW.contains(&k);
     }
-    if let Some(k) = id.strip_prefix("type.languageOptions.") {
-        return LANGUAGE.contains(&k) || k == "middleEasternAndSouthAsianComposer";
-    }
     if let Some(k) = id.strip_prefix("window.arrange.") {
         return LAYOUTS.contains(&k)
             || matches!(
@@ -276,9 +262,7 @@ pub fn handles(id: &str) -> bool {
             | "view.fitArtboardOnScreen"
             | "window.panel.layerComps"
             | "view.flipHorizontal"
-            | "view.pixelAspectRatioCorrection"
             | "view.patternPreview"
-            | "view.pixelArtPreview"
             | "view.rotateView"
             | "view.resetView"
             | "window.panel.layers"
@@ -342,13 +326,6 @@ pub fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
     if let Some(k) = id.strip_prefix("type.fontPreviewSize.") {
         return FONT_PREVIEW.contains(&k).then(|| o.font_preview_size == k);
     }
-    if let Some(k) = id.strip_prefix("type.languageOptions.") {
-        return if k == "middleEasternAndSouthAsianComposer" {
-            Some(o.middle_eastern_composer)
-        } else {
-            LANGUAGE.contains(&k).then(|| o.language_features == k)
-        };
-    }
     if let Some(k) = id.strip_prefix("window.arrange.")
         && LAYOUTS.contains(&k)
     {
@@ -363,9 +340,7 @@ pub fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
     Some(match id {
         "view.extras" => o.extras,
         "view.flipHorizontal" => o.flip_horizontal,
-        "view.pixelAspectRatioCorrection" => o.pixel_aspect_correction,
         "view.patternPreview" => o.pattern_preview,
-        "view.pixelArtPreview" => o.pixel_art_preview,
         _ => return None,
     })
 }
@@ -430,6 +405,16 @@ fn wraps(id: &str) -> bool {
             | "type.pasteLoremIpsum"
             | "image.applyImage"
             | "image.calculations"
+            | "select.saveSelection"
+            | "select.loadSelection"
+            | "file.openExrParts"
+            | "select.findLayers"
+            | "file.import.videoFramesToLayers"
+            | "layer.videoLayers.newVideoLayerFromFile"
+            | "file.import.variableDataSets"
+            | "edit.presets.migratePresets"
+            | "file.export.renderVideo"
+            | "file.export.dataSetsAsFiles"
     )
 }
 
@@ -522,14 +507,6 @@ fn run(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, p: &Value) -> Res
         o.font_preview_size = k.to_string();
         return Ok(json!(k));
     }
-    if let Some(k) = id.strip_prefix("type.languageOptions.") {
-        if k == "middleEasternAndSouthAsianComposer" {
-            o.middle_eastern_composer = flag_param(p, o.middle_eastern_composer);
-            return Ok(json!(o.middle_eastern_composer));
-        }
-        o.language_features = k.to_string();
-        return Ok(json!(k));
-    }
     if let Some(k) = id.strip_prefix("window.arrange.") {
         return arrange(app, k);
     }
@@ -542,17 +519,9 @@ fn run(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, p: &Value) -> Res
             o.flip_horizontal = flag_param(p, o.flip_horizontal);
             Ok(json!(o.flip_horizontal))
         }
-        "view.pixelAspectRatioCorrection" => {
-            o.pixel_aspect_correction = flag_param(p, o.pixel_aspect_correction);
-            Ok(json!(o.pixel_aspect_correction))
-        }
         "view.patternPreview" => {
             o.pattern_preview = flag_param(p, o.pattern_preview);
             Ok(json!(o.pattern_preview))
-        }
-        "view.pixelArtPreview" => {
-            o.pixel_art_preview = flag_param(p, o.pixel_art_preview);
-            Ok(json!(o.pixel_art_preview))
         }
         "view.twoHundredPercent" | "view.printSize" => {
             let i = app.session.active_index().ok_or("no document")?;
@@ -893,6 +862,29 @@ fn front(app: &mut PhotocraftApp, id: &str, params: &Value) -> Option<Result<Val
     match id {
         "file.openAs" => Some(app.open_dialog_file()),
         "file.openExrParts" => open_exr_parts_dialog(app),
+        // Photoshop: the Layers panel's search, filtering by name.
+        "select.findLayers" => {
+            crate::dock::show_panel(app, crate::dock::Panel::Layers);
+            app.ui.find_layers_focus = true;
+            Some(Ok(Value::Null))
+        }
+        // Commands that read a file by its path: pick it, then run.
+        "file.import.videoFramesToLayers" | "layer.videoLayers.newVideoLayerFromFile" | "file.import.variableDataSets" | "edit.presets.migratePresets" => {
+            let doc = app.active_doc_id().ok();
+            let exts: &[&str] = match id {
+                "file.import.variableDataSets" => &["csv", "txt"],
+                _ => &[],
+            };
+            let id = id.to_string();
+            Some(app.pick_file_path(exts, move |app, path| {
+                if let Some(doc) = doc {
+                    app.refocus(doc)?;
+                }
+                app.run(&id, json!({"path": path}))
+            }))
+        }
+        "file.export.renderVideo" => dialog(app, json!({"dir": dir, "format": "png"}), json!({"format": ["png", "jpg", "tiff", "gif"]})),
+        "file.export.dataSetsAsFiles" => dialog(app, json!({"dir": dir, "format": "png", "naming": "{name}"}), json!({"format": ["png", "jpg", "psd", "tiff"]})),
         "file.saveACopy" => Some(save_a_copy(app)),
         "file.placeEmbedded" | "file.placeLinked" => {
             let doc = match app.active_doc_id() {

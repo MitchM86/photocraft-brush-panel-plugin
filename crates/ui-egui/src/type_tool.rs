@@ -951,10 +951,11 @@ pub(crate) fn family_picker_in(ui: &mut egui::Ui, salt: &str, current: &mut Stri
             ui.data_mut(|d| d.remove::<String>(search_id));
             ui.close();
         }
+        let sample = crate::font_preview::sample_size(crate::font_preview::factor(ui.ctx()));
         for f in filtered {
             let response = ui.add_sized(
-                [330.0, 28.0],
-                egui::Button::selectable(f == current, f).truncate().right_text(egui::Atom::custom(ui.id().with(("font-sample", f)), egui::vec2(100.0, 24.0))),
+                [230.0 + sample.x, (sample.y + 4.0).max(28.0)],
+                egui::Button::selectable(f == current, f).truncate().right_text(egui::Atom::custom(ui.id().with(("font-sample", f)), sample)),
             );
             if (down || up) && f == current {
                 response.scroll_to_me(Some(egui::Align::Center));

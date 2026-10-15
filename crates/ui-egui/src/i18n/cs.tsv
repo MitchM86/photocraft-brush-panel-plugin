@@ -2577,3 +2577,5 @@ fontWeight	Italic	Kurzíva
 	Create a new rectangular frame	Vytvořit nový obdélníkový rámeček
 	Create a new elliptical frame	Vytvořit nový eliptický rámeček
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Táhněte rámeček · nad vybraným obrazem jej ořízne · Umístit vložené nebo přetažení souboru vyplní vybraný rámeček
+	This command needs a file on disk; it isn't available in the browser	Tento příkaz potřebuje soubor na disku; v prohlížeči není k dispozici
+	Layer name	Název vrstvy

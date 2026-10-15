@@ -614,6 +614,13 @@ fn shape_create(s: &mut Session, p: &Value) -> Result<Value> {
         None => None,
     };
     vector::flatten::validate_shape(&path, stroke.as_ref()).map_err(|e| bad(CMD, e))?;
+    // The shape tools' Path and Pixels modes (Photoshop's options bar).
+    match p.get("mode").and_then(Value::as_str).unwrap_or("shape") {
+        "shape" => {}
+        "path" => return shape_to_work_path(s, path),
+        "pixels" => return shape_to_pixels(s, path, fgc, p),
+        other => return Err(bad(CMD, format!("unknown mode `{other}` (shape, path or pixels)"))),
+    }
     // Add to an existing shape layer with a path operation (Shape tool in combine/subtract… mode).
     if let Some(target) = p.get("addTo").and_then(Value::as_u64) {
         let op = p.get("op").and_then(Value::as_str).map_or(Some(PathOp::Combine), op_from).ok_or_else(|| bad(CMD, "unknown `op`"))?;
@@ -640,6 +647,54 @@ fn shape_create(s: &mut Session, p: &Value) -> Result<Value> {
         Ok(id)
     })?;
     shape_info(s, id)
+}
+
+/// Path mode: the outline joins the Work Path (made if there is none), as the Pen's Path mode.
+fn shape_to_work_path(s: &mut Session, path: Path) -> Result<Value> {
+    let n = s.edit("Work Path", |doc, _| {
+        let wp = doc.work_path.get_or_insert_with(Path::default);
+        wp.subpaths.extend(path.subpaths);
+        Ok(wp.subpaths.len())
+    })?;
+    Ok(json!({"workPath": true, "subpaths": n}))
+}
+
+/// Pixels mode: the shape filled with `color` and painted onto the active pixel layer (inside the
+/// selection, keeping a transparency lock), anti-aliased unless `"antiAlias": false`.
+fn shape_to_pixels(s: &mut Session, path: Path, color: Color, p: &Value) -> Result<Value> {
+    const CMD: &str = "shape.create";
+    let id = s.active().and_then(|d| d.active_layer).ok_or(EngineError::Other("no active layer".into()))?;
+    let aa = p.get("antiAlias").and_then(Value::as_bool).unwrap_or(true);
+    let dmg = s.edit("Shape", |doc, _| {
+        let mut sh = ShapeLayer { path, fill: Some(Fill::Solid(color)), stroke: None, ..Default::default() };
+        refresh_shape(doc, &mut sh);
+        let cache = sh.cache.take().unwrap_or_else(|| photocraft_raster::Surface::new(doc.pixel_format()));
+        let rect = cache.content_bounds().intersect(&doc.bounds());
+        let sel = doc.selection.clone();
+        let l = doc.layer_mut(id).ok_or(EngineError::NoLayer(id))?;
+        let lock = l.locks.transparency;
+        let LayerContent::Raster(surf) = &mut l.content else {
+            return Err(bad(CMD, "Pixels mode paints on a pixel layer: select one, or use Shape mode"));
+        };
+        if rect.is_empty() {
+            return Ok(rect);
+        }
+        let mut px = vec![[0.0f32; 4]; rect.width() as usize * rect.height() as usize];
+        cache.read_rgba_into(rect, &mut px);
+        let cov: Vec<f32> = px.iter().map(|c| if aa { c[3] } else if c[3] >= 0.5 { 1.0 } else { 0.0 }).collect();
+        let fmt = surf.format();
+        let mut paint = photocraft_paint::retouch::Region::new(rect, fmt.channels());
+        let rgb = color.to_rgb();
+        let native = photocraft_raster::from_rgba(&fmt, [rgb[0], rgb[1], rgb[2], 1.0]);
+        for c in paint.data.chunks_exact_mut(fmt.channels()) {
+            c.copy_from_slice(&native);
+        }
+        Ok(photocraft_paint::retouch::apply_coverage(surf, rect, &cov, 1.0, sel.as_ref(), lock, &paint, BlendMode::Normal))
+    })?;
+    if let Some(st) = s.active_mut() {
+        st.last_damage = Some(dmg);
+    }
+    Ok(json!({"layer": id.0, "damage": [dmg.x0, dmg.y0, dmg.width(), dmg.height()]}))
 }
 
 fn shape_edit(s: &mut Session, p: &Value) -> Result<Value> {
@@ -1332,7 +1387,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "New Shape Layer",
             ["Layer", "New"],
             leak(format!(
-                r##"{{"kind":"rect|roundedRect|ellipse|polygon|star|line|path"="rect","rect":[x,y,w,h] (rect/roundedRect/ellipse/polygon/star),"radii":[tl,tr,br,bl]|r (roundedRect=10),"sides":3..100=5,"starRatio":0..1 (star=0.5),"from":[x,y],"to":[x,y],"weight":px=1 (line),"path":{{…}} (kind path),{fill}=foreground,{stroke}=none,"name":str?,"addTo":layerId? + "op":"combine|subtract|intersect|exclude" (append to an existing shape layer)}} → shape.info. {PATH_FORM}"##
+                r##"{{"mode":"shape|path|pixels"="shape" (path: add to the Work Path; pixels: paint the filled shape in the foreground colour onto the active pixel layer, "antiAlias":bool=true),"kind":"rect|roundedRect|ellipse|polygon|star|line|path"="rect","rect":[x,y,w,h] (rect/roundedRect/ellipse/polygon/star),"radii":[tl,tr,br,bl]|r (roundedRect=10),"sides":3..100=5,"starRatio":0..1 (star=0.5),"from":[x,y],"to":[x,y],"weight":px=1 (line),"path":{{…}} (kind path),{fill}=foreground,{stroke}=none,"name":str?,"addTo":layerId? + "op":"combine|subtract|intersect|exclude" (append to an existing shape layer)}} → shape.info. {PATH_FORM}"##
             )),
             has_doc,
             shape_create
@@ -1570,3 +1625,33 @@ pub fn specs() -> Vec<CommandSpec> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod shape_mode_tests {
+    use super::*;
+
+    #[test]
+    fn path_mode_adds_to_the_work_path_and_pixels_mode_paints_the_layer() {
+        let mut s = Session::new();
+        s.execute("file.new", json!({"width": 80, "height": 60, "background": "white"})).unwrap();
+        let layers = s.active().unwrap().doc.layers.len();
+        s.execute("shape.create", json!({"kind": "ellipse", "rect": [10, 10, 20, 20], "mode": "path"})).unwrap();
+        s.execute("shape.create", json!({"kind": "rect", "rect": [40, 10, 20, 20], "mode": "path"})).unwrap();
+        let st = s.active().unwrap();
+        assert_eq!(st.doc.layers.len(), layers, "no shape layer");
+        assert_eq!(st.doc.work_path.as_ref().unwrap().subpaths.len(), 2);
+        s.execute("tools.setColors", json!({"foreground": "#0000ff"})).unwrap();
+        s.execute("shape.create", json!({"kind": "rect", "rect": [5, 30, 20, 20], "mode": "pixels"})).unwrap();
+        let st = s.active().unwrap();
+        assert_eq!(st.doc.layers.len(), layers, "still no shape layer");
+        let bg = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap();
+        let fmt = bg.format();
+        assert!(photocraft_raster::to_rgba(&fmt, &bg.pixel(15, 40))[2] > 0.99, "painted blue");
+        assert!(photocraft_raster::to_rgba(&fmt, &bg.pixel(40, 40))[0] > 0.99, "white around it");
+        assert_eq!(st.history.entries().last().map(String::as_str), Some("Shape"));
+        assert!(s.execute("shape.create", json!({"kind": "rect", "rect": [5, 30, 20, 20], "mode": "stamp"})).is_err());
+        // Pixels mode needs a pixel layer.
+        s.execute("shape.create", json!({"kind": "rect", "rect": [5, 5, 5, 5]})).unwrap();
+        assert!(s.execute("shape.create", json!({"kind": "rect", "rect": [5, 30, 20, 20], "mode": "pixels"})).is_err());
+    }
+}

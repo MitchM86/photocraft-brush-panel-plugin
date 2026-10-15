@@ -26,9 +26,12 @@ fn show_snap_extras_and_screen_modes_are_state() {
         "view.flipHorizontal",
         "window.arrange.fourUp",
         "type.fontPreviewSize.huge",
-        "type.languageOptions.eastAsianFeatures",
     ] {
         assert!(is_live(id), "{id}");
+    }
+    // Shown greyed until they do something (the dead-button sweep).
+    for id in ["type.languageOptions.eastAsianFeatures", "view.pixelAspectRatioCorrection", "view.pixelArtPreview"] {
+        assert!(!is_live(id), "{id}");
     }
     assert_eq!(checked(&app, "view.show.layerEdges"), Some(false));
     menu(&mut app, &ctx, "view.show.layerEdges", json!({})).unwrap();
@@ -283,4 +286,29 @@ fn lookup_export_dialog_uses_the_current_adjustment_selection() {
     let direct = app.run("file.export.colorLookupTables", json!({"size": 3, "scope": "selected"})).unwrap();
     assert_eq!(direct["layerCount"], 1);
     assert!(direct["cube"].as_str().unwrap().contains("LUT_3D_SIZE 3"));
+}
+
+/// The dead-button sweep (2026-10-15): menu items that used to answer with "missing path" or
+/// "missing channel" now open their window or a file picker, and Split Warp is greyed without a
+/// warp.
+#[test]
+fn menu_items_open_their_windows_instead_of_parameter_errors() {
+    let (mut app, ctx) = app_with(1);
+    for id in ["select.loadSelection", "select.saveSelection", "file.export.renderVideo", "file.export.dataSetsAsFiles"] {
+        let n = app.ui.dialogs.len();
+        let r = menu(&mut app, &ctx, id, json!({}));
+        assert!(r.is_ok() && app.ui.dialogs.len() == n + 1, "{id}: {r:?}");
+    }
+    // With no file dialog service (tests), a picker answers Cancel rather than a parameter error.
+    for id in ["file.openExrParts", "file.import.videoFramesToLayers", "file.import.variableDataSets", "layer.videoLayers.newVideoLayerFromFile", "edit.presets.migratePresets"] {
+        let r = menu(&mut app, &ctx, id, json!({}));
+        assert!(!matches!(&r, Err(e) if e.contains("invalid parameters")), "{id}: {r:?}");
+    }
+    menu(&mut app, &ctx, "select.findLayers", json!({})).unwrap();
+    assert!(app.ui.find_layers_focus, "the Layers panel's name field takes the keyboard");
+    menu(&mut app, &ctx, "type.fontPreviewSize.large", json!({})).unwrap();
+    assert_eq!(app.ui.view.font_preview_size, "large");
+    for id in ["edit.transform.splitWarpCrosswise", "edit.transform.removeWarpSplit"] {
+        assert!(!crate::menus::is_enabled(&app, id), "{id} is greyed without a warp");
+    }
 }

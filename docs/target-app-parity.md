@@ -60,7 +60,7 @@ architecture and the PSD writer are the serial parts.
 
 | Component | Weight | Ours / Photoshop | % | Kind |
 |---|---:|---|---:|---|
-| Menu commands | 30% | 628 / 628 catalog items dispatch a live command | 100% | measured (`cargo xtask parity`) |
+| Menu commands | 30% | 622 / 628 catalog items dispatch a live command (six that only moved a tick mark are greyed since the 2026-10-15 dead-button sweep) | 99% | measured (`cargo xtask parity`) |
 | Toolbox tools | 15% | 68 / 68 (Photoshop's 67 `.kys` tools plus Remove, Triangle, Curvature Pen; minus legacy Rounded Rectangle and Targeted Adjustment) | 100% | measured (`Tool` enum in `ui-egui/src/state.rs`, `TOOL_SECTIONS` in `panels.rs`) |
 | Panels | 10% | 30 / 35 Window-menu panels | 86% | measured (`view_cmds.rs`, panel modules) |
 | Filters and adjustments | 10% | every Filter and Image › Adjustments item live; Filter Gallery 47 looks | 100% | measured (menu catalog) |
@@ -527,6 +527,7 @@ See [method and results](octagonal-mask-performance.md).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-15 | minor | Menu commands 628 → 622 of 628 (100% → 99%): the dead-button sweep greyed six tick-only items |
 | 2026-10-15 | minor | Toolbox tools 62 → 68 of 68 (91% → 100%): Horizontal and Vertical Type Mask, Art History Brush, Perspective Crop, Artboard, Frame |
 | 2026-10-12 | minor | Undo, History: snapshots and the History Brush source |
 | 2026-10-12 | minor | Toolbox tools 53 → 58 of 68 (78% → 85%): Freeform Pen, Curvature Pen, Add/Delete Anchor Point, Convert Point |

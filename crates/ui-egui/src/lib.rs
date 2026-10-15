@@ -1436,6 +1436,7 @@ impl eframe::App for PhotocraftApp {
         self.drain_control(ctx);
         native_menu::run(self, ctx);
         type_tool::end_if_left(self);
+        font_preview::set_size(ctx, &self.ui.view.font_preview_size);
         perspective_crop_ui::end_if_left(self);
         if self.ui.pen.is_some() && self.ui.tool != state::Tool::Pen {
             vector_ui::pen_commit(self, false);

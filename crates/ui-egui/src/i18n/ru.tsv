@@ -2860,3 +2860,5 @@ fontWeight	Italic	Курсив
 	Create a new rectangular frame	Создать прямоугольный кадр
 	Create a new elliptical frame	Создать эллиптический кадр
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Нарисуйте кадр · над выбранным изображением он обрезает его · «Поместить встроенные» или перетаскивание файла заполняет выбранный кадр
+	This command needs a file on disk; it isn't available in the browser	Этой команде нужен файл на диске; в браузере она недоступна
+	Layer name	Имя слоя

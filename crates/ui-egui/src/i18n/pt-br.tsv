@@ -2999,3 +2999,5 @@ fontWeight	Italic	Itálico
 	Create a new rectangular frame	Criar um novo quadro retangular
 	Create a new elliptical frame	Criar um novo quadro elíptico
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Arraste um quadro · sobre uma imagem selecionada ele a recorta · Inserir incorporado ou soltar um arquivo preenche o quadro selecionado
+	This command needs a file on disk; it isn't available in the browser	Este comando precisa de um arquivo no disco; não está disponível no navegador
+	Layer name	Nome da camada

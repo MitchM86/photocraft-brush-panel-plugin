@@ -2991,3 +2991,5 @@ fontWeight	Italic	Italique
 	Create a new rectangular frame	Créer un cadre rectangulaire
 	Create a new elliptical frame	Créer un cadre elliptique
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Tracez un cadre · sur une image sélectionnée, il la découpe · Importer incorporé ou déposer un fichier remplit le cadre sélectionné
+	This command needs a file on disk; it isn't available in the browser	Cette commande a besoin d'un fichier sur le disque ; elle n'est pas disponible dans le navigateur
+	Layer name	Nom du calque

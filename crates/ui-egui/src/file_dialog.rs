@@ -174,6 +174,18 @@ impl PhotocraftApp {
         })
     }
 
+    /// One file on disk for a command that reads it by path itself (video frames, data sets,
+    /// presets). A browser hands over contents, not a path, so the command can't run there.
+    pub(crate) fn pick_file_path(&mut self, extensions: &[&str], then: impl FnOnce(&mut Self, String) -> Result<Value, String> + 'static) -> Result<Value, String> {
+        let initial_dir = last_used_dir(&self.ui.recent_files);
+        let extensions = (!extensions.is_empty()).then(|| extensions.iter().map(|s| (*s).to_string()).collect());
+        self.ask_file(FileDialogRequest::Open { multiple: false, initial_dir, extensions }, move |app, answer| match answer {
+            FileDialogAnswer::Paths(paths) => then(app, paths.into_iter().next().ok_or(CANCELLED)?),
+            FileDialogAnswer::Contents(..) => Err(tl!("This command needs a file on disk; it isn't available in the browser").into()),
+            FileDialogAnswer::SaveTo(_) => Err(UNEXPECTED.into()),
+        })
+    }
+
     /// File › Open: opens every chosen file, reporting each failure (see [`Self::open_paths`]).
     pub fn open_dialog_file(&mut self) -> Result<Value, String> {
         let initial_dir = last_used_dir(&self.ui.recent_files);

@@ -2554,3 +2554,5 @@ fontWeight	Italic	斜體
 	Create a new rectangular frame	建立新的矩形框架
 	Create a new elliptical frame	建立新的橢圓框架
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	拖曳出框架 · 在選取的影像上會裁切該影像 · 置入嵌入的物件或拖放檔案可填滿選取的框架
+	This command needs a file on disk; it isn't available in the browser	此命令需要磁碟上的檔案；在瀏覽器中無法使用
+	Layer name	圖層名稱

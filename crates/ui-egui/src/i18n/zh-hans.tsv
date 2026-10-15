@@ -2585,3 +2585,5 @@ fontWeight	Italic	斜体
 	Create a new rectangular frame	创建新的矩形图框
 	Create a new elliptical frame	创建新的椭圆图框
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	拖出图框 · 在所选图像上会裁切该图像 · 置入嵌入对象或拖放文件可填充所选图框
+	This command needs a file on disk; it isn't available in the browser	此命令需要磁盘上的文件；在浏览器中不可用
+	Layer name	图层名称

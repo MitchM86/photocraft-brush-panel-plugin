@@ -1906,6 +1906,18 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut actions: Vec<(String, Value)> = Vec::new();
 
     let t = Tokens::get(ui.ctx());
+    // Select › Find Layers: the name field, in every theme once asked for or in use.
+    let name_field = |app: &mut PhotocraftApp, ui: &mut egui::Ui, width: f32| {
+        let id = ui.id().with("layer-name-filter");
+        let r = ui.add(egui::TextEdit::singleline(&mut app.ui.layer_name_filter).id(id).hint_text(tl!("Layer name")).desired_width(width));
+        if std::mem::take(&mut app.ui.find_layers_focus) {
+            r.request_focus();
+        }
+    };
+    if !t.pro && (app.ui.find_layers_focus || !app.ui.layer_name_filter.is_empty()) {
+        ui.horizontal(|ui| name_field(app, ui, (ui.available_width() - 4.0).max(80.0)));
+        ui.add_space(4.0);
+    }
     if t.pro {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 2.0;
@@ -1931,6 +1943,8 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     }
                 }
             }
+            ui.add_space(4.0);
+            name_field(app, ui, (ui.available_width() - 4.0).clamp(60.0, 160.0));
         });
         ui.add_space(4.0);
     }
@@ -2017,7 +2031,7 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
 
     // Top of the stack first, groups above their contents, closed groups' contents hidden (#126).
-    let mut rows = crate::layer_tree_ui::display_rows(&doc, !app.ui.layer_filter.is_empty());
+    let mut rows = crate::layer_tree_ui::display_rows(&doc, !app.ui.layer_filter.is_empty() || !app.ui.layer_name_filter.is_empty());
     // The Type Mask tools' invisible type layer is not a layer to the user.
     if let Some(hidden) = crate::type_mask_ui::hidden_layer(app) {
         rows.retain(|(_, l)| l.id != hidden);
@@ -2047,6 +2061,7 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 ctx.request_repaint();
             }
             let filter = app.ui.layer_filter.clone();
+            let name_filter = app.ui.layer_name_filter.trim().to_lowercase();
             let fx_collapsed = app.session.active().map(|d| d.fx_collapsed.clone()).unwrap_or_default();
             crate::layer_row_ui::begin(ui.ctx());
             // The drawn rows, top to bottom (#1721): the space between them and below the last
@@ -2055,6 +2070,9 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             for &(depth, l) in &rows {
                 // Select › Isolate Layers.
                 if !photocraft_engine::select_extra_cmds::isolation_shows(&doc, &isolated, l.id) {
+                    continue;
+                }
+                if !name_filter.is_empty() && !l.name.to_lowercase().contains(&name_filter) {
                     continue;
                 }
                 if !filter.is_empty() {
