@@ -27,7 +27,7 @@ const TOOL_SECTIONS: &[&[&[Tool]]] = &[
         &[Tool::Remove, Tool::SpotHealing, Tool::Healing, Tool::Patch, Tool::ContentAwareMove, Tool::RedEye],
         &[Tool::Brush, Tool::Pencil, Tool::ColorReplacement, Tool::MixerBrush],
         &[Tool::CloneStamp, Tool::PatternStamp],
-        &[Tool::HistoryBrush],
+        &[Tool::HistoryBrush, Tool::ArtHistoryBrush],
         &[Tool::Eraser, Tool::BackgroundEraser, Tool::MagicEraser],
         &[Tool::Gradient, Tool::PaintBucket],
         &[Tool::Blur, Tool::Sharpen, Tool::Smudge],

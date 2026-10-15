@@ -102,6 +102,7 @@ pub enum Tool {
     CloneStamp,
     PatternStamp,
     HistoryBrush,
+    ArtHistoryBrush,
     Blur,
     Sharpen,
     Smudge,
@@ -129,7 +130,7 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: [Tool; 64] = [
+    pub const ALL: [Tool; 65] = [
         Tool::Move,
         Tool::RectMarquee,
         Tool::EllipseMarquee,
@@ -170,6 +171,7 @@ impl Tool {
         Tool::CloneStamp,
         Tool::PatternStamp,
         Tool::HistoryBrush,
+        Tool::ArtHistoryBrush,
         Tool::Blur,
         Tool::Sharpen,
         Tool::Smudge,
@@ -240,6 +242,7 @@ impl Tool {
             Tool::CloneStamp => "Clone Stamp Tool",
             Tool::PatternStamp => "Pattern Stamp Tool",
             Tool::HistoryBrush => "History Brush Tool",
+            Tool::ArtHistoryBrush => "Art History Brush Tool",
             Tool::Blur => "Blur Tool",
             Tool::Sharpen => "Sharpen Tool",
             Tool::Smudge => "Smudge Tool",
@@ -292,6 +295,7 @@ impl Tool {
                 | Tool::CloneStamp
                 | Tool::PatternStamp
                 | Tool::HistoryBrush
+                | Tool::ArtHistoryBrush
                 | Tool::Blur
                 | Tool::Sharpen
                 | Tool::Smudge
@@ -320,7 +324,7 @@ impl Tool {
             Tool::Zoom => 'Z',
             Tool::Remove | Tool::SpotHealing | Tool::Healing | Tool::Patch | Tool::ContentAwareMove | Tool::RedEye => 'J',
             Tool::CloneStamp | Tool::PatternStamp => 'S',
-            Tool::HistoryBrush => 'Y',
+            Tool::HistoryBrush | Tool::ArtHistoryBrush => 'Y',
             Tool::Blur | Tool::Sharpen | Tool::Smudge => '\0',
             Tool::Dodge | Tool::Burn | Tool::Sponge => 'O',
             Tool::QuickSelection | Tool::ObjectSelection => 'W',
@@ -646,6 +650,15 @@ pub struct ToolOptions {
     /// Color Replacement › Tolerance (%).
     #[serde(default = "default_replace_tolerance")]
     pub replace_tolerance: f32,
+    /// Art History Brush: Mode, Style (`paint.artHistoryBrush` names), Area (px) and Tolerance (%).
+    #[serde(default = "normal_mode")]
+    pub art_mode: photocraft_color::BlendMode,
+    #[serde(default = "default_art_style")]
+    pub art_style: String,
+    #[serde(default = "fifty")]
+    pub art_area: f32,
+    #[serde(default)]
+    pub art_tolerance: f32,
     /// Magnetic Lasso: detection width (px, 1..256), edge contrast (%, 1..100), how often it
     /// fastens points by itself (0..100), and whether pen pressure narrows the width.
     pub magnetic_width: f32,
@@ -717,6 +730,14 @@ fn one() -> f32 {
 
 fn fifty() -> f32 {
     50.0
+}
+
+fn normal_mode() -> photocraft_color::BlendMode {
+    photocraft_color::BlendMode::Normal
+}
+
+fn default_art_style() -> String {
+    "tightShort".into()
 }
 
 /// The session brush starts out as the Brush's (the tool the app opens with).
@@ -813,6 +834,10 @@ impl Default for ToolOptions {
             replace_sampling: default_continuous(),
             replace_limits: default_contiguous(),
             replace_tolerance: default_replace_tolerance(),
+            art_mode: normal_mode(),
+            art_style: default_art_style(),
+            art_area: 50.0,
+            art_tolerance: 0.0,
             magnetic_width: 10.0,
             magnetic_contrast: 10.0,
             magnetic_frequency: 57.0,
@@ -1335,7 +1360,7 @@ mod tests {
         assert!(!Tool::RedEye.is_brushlike());
         assert_eq!(Tool::from_name("patternStamp"), Some(Tool::PatternStamp));
         assert_eq!(Tool::from_name("Pattern Stamp Tool"), Some(Tool::PatternStamp));
-        assert_eq!(Tool::ALL.len(), 64);
+        assert_eq!(Tool::ALL.len(), 65);
         assert_eq!(Tool::from_name("Remove Tool"), Some(Tool::Remove));
         assert_eq!(Tool::Remove.key(), 'J');
         assert!(Tool::Remove.is_brushlike());

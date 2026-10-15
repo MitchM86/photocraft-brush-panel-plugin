@@ -8,6 +8,7 @@ pub static ICONS: &[(&str, &[u8])] = &[
     ("align-right", include_bytes!("../../../assets/icons/align-right.svg")),
     ("app-window", include_bytes!("../../../assets/icons/app-window.svg")),
     ("arrow-left-right", include_bytes!("../../../assets/icons/arrow-left-right.svg")),
+    ("art-history", include_bytes!("../../../assets/icons/art-history.svg")),
     ("ban", include_bytes!("../../../assets/icons/ban.svg")),
     ("bandage", include_bytes!("../../../assets/icons/bandage.svg")),
     ("bandage-sparkle", include_bytes!("../../../assets/icons/bandage-sparkle.svg")),

@@ -260,14 +260,16 @@ enum EngineStroke {
     Brush(Box<photocraft_engine::brush_cmds::LiveStroke>),
     Retouch(photocraft_engine::retouch_cmds::LiveRetouch),
     Dab(photocraft_engine::retouch_cmds::LiveDab),
+    Art(Box<photocraft_engine::retouch_cmds::LiveArtHistory>),
 }
 
 impl EngineStroke {
     /// The brush engine's strokes can change while the pointer is held still (see
-    /// `LiveStroke::wants_time`); the retouch strokes don't.
+    /// `LiveStroke::wants_time`), and the Art History Brush keeps painting; the retouch strokes don't.
     fn wants_time(&self) -> bool {
         match self {
             EngineStroke::Brush(l) => l.wants_time(),
+            EngineStroke::Art(_) => true,
             EngineStroke::Retouch(_) | EngineStroke::Dab(_) => false,
         }
     }
@@ -277,6 +279,7 @@ impl EngineStroke {
             Self::Brush(s) => &s.doc,
             Self::Retouch(s) => &s.doc,
             Self::Dab(s) => &s.doc,
+            Self::Art(s) => &s.doc,
         }
     }
     fn bounds(&self) -> DRect {
@@ -284,6 +287,7 @@ impl EngineStroke {
             Self::Brush(s) => s.bounds(),
             Self::Retouch(s) => s.bounds(),
             Self::Dab(s) => s.bounds(),
+            Self::Art(s) => s.bounds(),
         }
     }
     fn push(&mut self, pts: &[photocraft_engine::paint::StrokePoint]) -> photocraft_engine::Result<DRect> {
@@ -291,12 +295,14 @@ impl EngineStroke {
             Self::Brush(s) => s.push(pts),
             Self::Retouch(s) => s.push(pts),
             Self::Dab(s) => s.push(pts),
+            Self::Art(s) => s.push(pts),
         }
     }
     /// The jitter seed the commit must reuse (the Clone Stamp's comes from the session brush).
     fn seed(&self) -> Option<u64> {
         match self {
             Self::Brush(s) => Some(s.seed),
+            Self::Art(s) => Some(s.seed),
             Self::Retouch(_) => None,
             Self::Dab(_) => None,
         }
@@ -347,7 +353,7 @@ fn stroke_params(app: &PhotocraftApp, tool: Tool, erase: bool, points: &[Vec<f64
 
 /// Tools whose strokes the engine renders while they are drawn (`LiveStroke`).
 pub(crate) fn strokes_live(tool: Tool) -> bool {
-    matches!(tool, Tool::Brush | Tool::Pencil | Tool::Eraser | Tool::Blur | Tool::Sharpen | Tool::Smudge | Tool::Dodge | Tool::Burn | Tool::Sponge)
+    matches!(tool, Tool::Brush | Tool::Pencil | Tool::Eraser | Tool::Blur | Tool::Sharpen | Tool::Smudge | Tool::Dodge | Tool::Burn | Tool::Sponge | Tool::ArtHistoryBrush)
         || live_retouch_command(tool).is_some()
 }
 
@@ -464,7 +470,15 @@ fn begin_live_stroke(app: &PhotocraftApp) -> Option<LiveStroke> {
     static STROKES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let st = app.session.active()?;
     let d = app.drag.as_ref()?;
-    let stroke = if let Some((cmd, mut p)) = crate::retouch_ui::dab_params(app, d.tool, d.modifiers) {
+    let n = STROKES.fetch_add(1, std::sync::atomic::Ordering::Relaxed) & 0xff_ffff;
+    let stroke = if d.tool == Tool::ArtHistoryBrush {
+        // The params `finish_gesture` commits, with this stroke's seed.
+        let mut p = crate::retouch_ui::art_history_params(app);
+        p["points"] = json!(app.stylus.stroke_points(&d.points));
+        p["target"] = paint_target(app);
+        p["seed"] = json!((n + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15) ^ app.stylus.clock_ms.to_bits());
+        EngineStroke::Art(Box::new(photocraft_engine::retouch_cmds::LiveArtHistory::begin(&app.session, &p).ok()?))
+    } else if let Some((cmd, mut p)) = crate::retouch_ui::dab_params(app, d.tool, d.modifiers) {
         // The params `retouch_ui::finish_stroke` commits; Sample All Layers isn't previewed.
         p["points"] = json!(d.points);
         p["target"] = paint_target(app);
@@ -479,7 +493,6 @@ fn begin_live_stroke(app: &PhotocraftApp) -> Option<LiveStroke> {
         let p = stroke_params(app, d.tool, d.erase, &app.stylus.stroke_points(&d.points));
         EngineStroke::Brush(Box::new(photocraft_engine::brush_cmds::LiveStroke::begin_with(&app.session, stroke_command(app, d.tool), &p).ok()?))
     };
-    let n = STROKES.fetch_add(1, std::sync::atomic::Ordering::Relaxed) & 0xff_ffff;
     let damage = vec![stroke.bounds()];
     Some(LiveStroke { stroke, doc: st.doc.id, revision: st.revision, key: (1 << 44) | (n << 20), damage, fed: d.points.len() })
 }
@@ -561,6 +574,7 @@ pub(crate) fn freehand_tool(tool: Tool) -> bool {
             | Tool::Eraser
             | Tool::BackgroundEraser
             | Tool::HistoryBrush
+            | Tool::ArtHistoryBrush
             | Tool::Remove
             | Tool::SpotHealing
             | Tool::Healing
@@ -4501,6 +4515,26 @@ pub(crate) fn finish_gesture(app: &mut PhotocraftApp, d: Drag) {
             && crate::shape_dialog::open(app, t, d.start).is_some() => {}
         t if crate::vector_ui::is_shape_tool(t) => crate::vector_ui::finish_shape(app, t, d.start, [end[0], end[1]], d.live),
         t if t.is_type() => crate::type_tool::pointer_up(app, d.start, [end[0], end[1]]),
+        Tool::ArtHistoryBrush => {
+            let live = app.live_stroke.take();
+            let mut p = crate::retouch_ui::art_history_params(app);
+            p["points"] = json!(app.stylus.stroke_points(&d.points));
+            p["target"] = paint_target(app);
+            if let Some(seed) = live.as_ref().and_then(|l| l.stroke.seed()) {
+                p["seed"] = json!(seed);
+            }
+            match app.run("paint.artHistoryBrush", p) {
+                Ok(_) => {
+                    if let Some(l) = live {
+                        shown_as_document(app, l.doc, |k| l.since(k).is_some());
+                    }
+                }
+                Err(e) => {
+                    app.ui.status = e;
+                    app.ui.status_error = true;
+                }
+            }
+        }
         Tool::Brush | Tool::Pencil | Tool::Eraser => {
             let live = app.live_stroke.take();
             let mut p = stroke_params(app, d.tool, d.erase, &app.stylus.stroke_points(&d.points));

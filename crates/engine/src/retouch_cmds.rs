@@ -1,5 +1,6 @@
 //! Retouching tools as commands: Clone Stamp, Pattern Stamp, Healing Brush, Spot Healing Brush,
-//! Patch, Content-Aware Move, Remove, Dodge, Burn, Sponge, Blur, Sharpen, Smudge and History Brush.
+//! Patch, Content-Aware Move, Remove, Dodge, Burn, Sponge, Blur, Sharpen, Smudge, History Brush and
+//! Art History Brush.
 //!
 //! Every command takes a Photoshop-style brush (`points`, `size`, `hardness`, `opacity`, `flow`,
 //! `spacing`, `layer`), respects the active selection as a mask and the layer's transparency lock, and
@@ -1045,9 +1046,14 @@ macro_rules! brush_params {
     };
 }
 
+// After `brush_params!`, which it uses.
+mod art_history;
+pub use art_history::LiveArtHistory;
+
 /// Retouching command specs.
 pub fn specs() -> Vec<CommandSpec> {
     vec![
+        art_history::spec(),
         CommandSpec {
             id: "paint.cloneStamp",
             label: "Clone Stamp",

@@ -43,6 +43,18 @@ pub(crate) fn clone_params(app: &PhotocraftApp) -> Option<Value> {
     Some(p)
 }
 
+/// `paint.artHistoryBrush` params from the options bar (without `points`, `target` and `seed`).
+pub(crate) fn art_history_params(app: &PhotocraftApp) -> Value {
+    let o = &app.ui.tool_options;
+    json!({
+        "style": o.art_style,
+        "area": o.art_area,
+        "tolerance": o.art_tolerance,
+        "mode": o.art_mode.label(),
+        "opacity": app.session.tools.brush.opacity * 100.0,
+    })
+}
+
 /// The command and options-bar params (without `points` and `target`) of a sequential-dab tool:
 /// Blur, Sharpen, Smudge, Dodge, Burn, Sponge. Shared by the live preview and the commit. `mods`
 /// are the stroke's: ⌥ turns on Smudge's Finger Painting, as in Photoshop (Dodge/Burn and
@@ -422,6 +434,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
             }
         }
         Tool::HistoryBrush => opt(ui, "Paints from the document's opening state"),
+        Tool::ArtHistoryBrush => art_history_options(app, ui),
         Tool::QuickSelection => {
             crate::widgets::checkbox(ui, &mut o.sample_all_layers, tl!("Sample All Layers"));
             crate::widgets::checkbox(ui, &mut o.enhance_edge, tl!("Enhance Edge"));
@@ -452,6 +465,48 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
         _ => {}
     }
     true
+}
+
+/// Photoshop's Art History Brush bar: Mode, Opacity, Style, Area and Tolerance.
+fn art_history_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    use photocraft_color::BlendMode;
+    opt(ui, tl!("Mode:"));
+    let modes: Vec<(BlendMode, &str)> = [BlendMode::Normal, BlendMode::Darken, BlendMode::Lighten, BlendMode::Hue, BlendMode::Saturation, BlendMode::Color, BlendMode::Luminosity]
+        .into_iter()
+        .map(|m| (m, tl!(m.label())))
+        .collect();
+    crate::widgets::dropdown(ui, "art-history-mode", &mut app.ui.tool_options.art_mode, &modes, 100.0);
+    let before = app.session.tools.brush.clone();
+    let mut opacity = before.opacity * 100.0;
+    opt(ui, tl!("Opacity:"));
+    crate::widgets::value_field(ui, &mut opacity, 1.0..=100.0, "%", 58.0);
+    if (opacity - before.opacity * 100.0).abs() > 1e-3 {
+        let brush = photocraft_engine::paint::BrushSettings { opacity: opacity / 100.0, ..before.clone() };
+        crate::brush_panel::commit_gesture(app, ui.ctx(), &before, &brush);
+    }
+    crate::widgets::vline(ui, 22.0);
+    opt(ui, tl!("Style:"));
+    let styles: Vec<(String, &str)> = [
+        ("tightShort", tl!("Tight Short")),
+        ("tightMedium", tl!("Tight Medium")),
+        ("tightLong", tl!("Tight Long")),
+        ("looseMedium", tl!("Loose Medium")),
+        ("looseLong", tl!("Loose Long")),
+        ("dab", tl!("Dab")),
+        ("tightCurl", tl!("Tight Curl")),
+        ("looseCurl", tl!("Loose Curl")),
+        ("tightCurlLong", tl!("Tight Curl Long")),
+        ("looseCurlLong", tl!("Loose Curl Long")),
+    ]
+    .into_iter()
+    .map(|(k, l)| (k.to_string(), l))
+    .collect();
+    let o = &mut app.ui.tool_options;
+    crate::widgets::dropdown(ui, "art-history-style", &mut o.art_style, &styles, 120.0);
+    opt(ui, tl!("Area:"));
+    crate::widgets::value_field(ui, &mut o.art_area, 0.0..=500.0, "px", 62.0);
+    opt(ui, tl!("Tolerance:"));
+    crate::widgets::value_field(ui, &mut o.art_tolerance, 0.0..=100.0, "%", 58.0);
 }
 
 fn pattern_stamp_options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
@@ -523,6 +578,30 @@ mod tests {
         app.ui.tool = Tool::Eraser;
         app.ui.tool_options.eraser_mode = "pencil".into();
         assert_eq!(crate::eraser_ui::history_params(&app), json!({"hardness": 100}));
+    }
+
+    #[test]
+    fn art_history_brush_paints_the_source_in_strokes_with_its_options() {
+        let mut app = app();
+        app.run("edit.fill", json!({"color": "#cc2222"})).unwrap();
+        app.ui.tool_options.art_style = "dab".into();
+        app.ui.tool_options.art_area = 8.0;
+        app.run("tools.setBrush", json!({"brush": {"size": 4, "hardness": 1.0, "opacity": 1.0}})).unwrap();
+        let steps = app.session.active().unwrap().history.entries().len();
+        drag(&mut app, Tool::ArtHistoryBrush);
+        let (id, p) = app.session.journal.last().cloned().unwrap();
+        assert_eq!((id.as_str(), &p["style"], &p["area"], &p["tolerance"], &p["mode"]), ("paint.artHistoryBrush", &json!("dab"), &json!(8.0), &json!(0.0), &json!("Normal")));
+        assert!(p["seed"].as_u64().is_some(), "the commit repeats the live stroke's seed");
+        let st = app.session.active().unwrap();
+        assert_eq!(st.history.entries().len(), steps + 1);
+        let s = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap();
+        // The opening state (white) is painted back in strokes over the red, near the drag only.
+        let white = (0..60).flat_map(|y| (0..100).map(move |x| (x, y))).filter(|&(x, y)| s.rgba(x, y)[1] > 0.9).collect::<Vec<_>>();
+        assert!(white.len() > 30, "{}", white.len());
+        // Dabs land within the Area (8 px) of the drag at y = 30, plus the 4 px tip.
+        assert!(white.iter().all(|&(_, y)| (19..=41).contains(&y)), "dabs stay within the Area of the drag");
+        assert_eq!(Tool::ArtHistoryBrush.key(), 'Y');
+        assert!(crate::icons::exists(crate::icons::tool_icon(Tool::ArtHistoryBrush)));
     }
 
     #[test]
