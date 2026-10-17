@@ -2163,6 +2163,8 @@ mod stamp_tests;
 #[cfg(test)]
 mod alt_click_tests;
 #[cfg(test)]
+mod mixer_pen_tests;
+#[cfg(test)]
 mod stroke_timing_tests;
 
 #[cfg(test)]

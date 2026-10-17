@@ -9,11 +9,14 @@
 //! 1. **Pickup**: the brush carries a bitmap of picked-up paint on a brush-local grid, one texel
 //!    per pixel offset from the dab centre. An empty texel fills straight away from the canvas
 //!    under it; a filled one drifts towards it, so paint picked up earlier is carried forward
-//!    and fades over [`DRAG`] tip diameters of travel: the smears and streaks. The canvas is
+//!    and fades over [`drag`]`(wet)` tip diameters of travel (a third of a width at Wet 50 %,
+//!    so the brush has caught up with the canvas within a width): the smears and streaks. The
+//!    canvas is
 //!    read **as it was when the stroke began** (with Sample All Layers, over the other layers):
 //!    picking up its own fresh paint would wash the canvas colour out of the mix.
-//! 2. **Brush paint**: the reservoir texel and the picked-up paint (its amount × Wet) mixed by
-//!    Mix ([`brush_paint`]). Whatever share the pickup can't fill falls back to the reservoir, so
+//! 2. **Brush paint**: the reservoir texel and the picked-up paint (its amount × [`pickup_amount`]
+//!    `(wet)`, full from Wet 50 %) mixed by Mix ([`brush_paint`]): at Mix 50 % half the paint is
+//!    the canvas's. Whatever share the pickup can't fill falls back to the reservoir, so
 //!    an empty pickup paints the plain load at any Mix, and a dry reservoir at Mix 100 % is a
 //!    pure smudge.
 //! 3. **Deposit** onto the canvas as painted so far ([`deposit`]): colour mixed by amount, alpha
@@ -54,15 +57,25 @@ pub type Latent = [f32; LATENT];
 /// Distances along the stroke are measured in this fraction of the tip diameter: deposits,
 /// pickup, running dry and contamination per this distance don't depend on the brush spacing.
 pub const REFERENCE_SPACING: f32 = 0.1;
-/// Tip diameters over which carried paint fades to 1/e.
-pub const DRAG: f32 = 1.0;
+/// Tip diameters over which carried paint fades to 1/e at Wet `wet` (0..1): wetter paint carries
+/// further, the longer streaks Photoshop's Wet describes; at Wet 50 % a third of a width, so the
+/// brush holds the canvas under it again within a width.
+pub fn drag(wet: f32) -> f32 {
+    0.1 + 0.5 * wet.clamp(0.0, 1.0)
+}
+
+/// How much of the paint it carries the brush puts into its mix at Wet `wet` (0..1): none dry,
+/// rising to all of it at Wet 50 %, so Mix alone sets the canvas's share from there on.
+pub fn pickup_amount(wet: f32) -> f32 {
+    (2.0 * wet.clamp(0.0, 1.0)).min(1.0)
+}
 /// mixer_core's dab spacing (a fraction of the diameter), which its Load half-life and
 /// contamination were tuned per: they are kept per this distance travelled, so a Load setting
 /// feels the same at any brush size and spacing.
 pub const LOAD_REFERENCE: f32 = 0.05;
 /// How far a reservoir texel moves towards the paint it picks up per [`LOAD_REFERENCE`] of the
 /// diameter travelled, at Wet 100 %.
-pub const CONTAMINATION: f32 = 0.01;
+pub const CONTAMINATION: f32 = 0.001;
 /// Tip mask values below this are skipped.
 pub const MASK_EPS: f32 = 1e-4;
 /// The mixer fills in dabs between the brush engine's so they are at most this fraction of the
@@ -467,6 +480,8 @@ pub struct Mixer {
     last: Option<(f64, f64)>,
     /// The brush engine's previous dab (what [`Mixer::stroke_dab`] fills in from).
     last_dab: Option<crate::Dab>,
+    /// The canvas: what lies outside it isn't picked up (a layer can reach past it, out of sight).
+    canvas: Option<Rect>,
     /// The brush's paint under the current dab, per texel (kept to reuse the allocation), and the
     /// texel rows and columns the last dab wrote.
     brush: Vec<Colorant>,
@@ -484,7 +499,14 @@ impl Mixer {
         let empty = || vec![Colorant::NONE; side * side];
         let reservoir = state.reservoir.as_ref().map_or_else(empty, grid);
         let pickup = state.pickup.as_ref().map_or_else(empty, grid);
-        Self { settings: settings.clone(), codec, pre, r: (side / 2) as i32, side, reservoir, pickup, tiles: HashMap::new(), last: None, last_dab: None, brush: Vec::new(), brush_span: (0, 0, 0, 0), state: state.clone() }
+        Self { settings: settings.clone(), codec, pre, r: (side / 2) as i32, side, reservoir, pickup, tiles: HashMap::new(), last: None, last_dab: None, brush: Vec::new(), brush_span: (0, 0, 0, 0), canvas: None, state: state.clone() }
+    }
+
+    /// Pick up only inside `canvas` (the document's bounds): a layer's pixels past its edge are out
+    /// of sight, so the brush mustn't drag their colours in.
+    pub fn within(mut self, canvas: Rect) -> Self {
+        self.canvas = Some(canvas);
+        self
     }
 
     /// The brush's paint after the dabs so far.
@@ -585,7 +607,8 @@ impl Mixer {
         self.ensure_tiles(halo, sample);
         let wet = (self.settings.wet * fp.dab.wet).clamp(0.0, 1.0);
         let mix_ratio = (self.settings.mix * fp.dab.mix).clamp(0.0, 1.0);
-        let pickup_rate = 1.0 - (-dist / (DRAG * diameter)).exp();
+        let pickup_rate = 1.0 - (-dist / (drag(wet) * diameter)).exp();
+        let amount = pickup_amount(wet);
         // Running dry and contamination go by brush widths travelled.
         let widths = dist / diameter;
         let half_life = reservoir_half_life(self.settings.load);
@@ -599,15 +622,19 @@ impl Mixer {
         // What the brush picks up, densely over the dab (plus a pixel for interpolation).
         let (hw, hh) = (halo.width() as usize, halo.height() as usize);
         let tiles = &self.tiles;
+        let seen = self.canvas.map_or(halo, |c| halo.intersect(&c));
         let mut src = vec![Colorant::NONE; hw * hh];
         src.par_chunks_mut(hw).enumerate().for_each(|(j, row)| {
             let y = halo.y0 + j as i32;
+            if y < seen.y0 || y >= seen.y1 {
+                return;
+            }
             let ty = y.div_euclid(TILE);
             // A tile's stretch of the row at a time.
-            let mut x = halo.x0;
-            while x < halo.x1 {
+            let mut x = seen.x0;
+            while x < seen.x1 {
                 let tx = x.div_euclid(TILE);
-                let end = halo.x1.min((tx + 1) * TILE);
+                let end = seen.x1.min((tx + 1) * TILE);
                 if let Some(t) = tiles.get(&(tx, ty)) {
                     let li = ((y - ty * TILE) * TILE + (x - tx * TILE)) as usize;
                     let cells = t.seen.as_ref().unwrap_or(&t.own);
@@ -657,10 +684,12 @@ impl Mixer {
                     // 1. Pickup: an empty texel fills at once, a filled one drifts.
                     if wet > 0.0 {
                         let at = bilinear(&src, hw, hh, sx - halo.x0 as f32, sy - halo.y0 as f32);
-                        let rate = if prow[tx].a <= 0.0 { 1.0 } else { pickup_rate * mask };
+                        // As fast under the soft rim as under the core: a rim drifting slower would
+                        // hold the colours left behind and, painting last, tint the stroke with them.
+                        let rate = if prow[tx].a <= 0.0 { 1.0 } else { pickup_rate };
                         prow[tx] = mix(&prow[tx], &at, rate);
                     }
-                    let picked = Colorant { a: prow[tx].a * wet, ..prow[tx] };
+                    let picked = Colorant { a: prow[tx].a * amount, ..prow[tx] };
                     // 2. The brush's paint.
                     let mut held = rrow[tx];
                     brow[tx] = brush_paint(&held, &picked, mix_ratio);
@@ -909,6 +938,112 @@ mod tests {
         let g = mid(MixMode::Pigment);
         assert!(g.iter().zip([41, 130, 57]).all(|(a, b)| (a - b).abs() <= 3), "{g:?}, want about (41, 130, 57)");
         assert_eq!(mid(MixMode::Rgb)[..3], [126, 122, 67]);
+    }
+
+    /// Mixbox's pigment table (from the crate's header).
+    const PIGMENTS: [[u8; 3]; 13] = [
+        [254, 236, 0],
+        [252, 211, 0],
+        [255, 105, 0],
+        [255, 39, 2],
+        [128, 2, 46],
+        [78, 0, 66],
+        [25, 0, 89],
+        [0, 33, 133],
+        [13, 27, 68],
+        [0, 60, 50],
+        [7, 109, 22],
+        [107, 148, 4],
+        [123, 72, 0],
+    ];
+
+    fn rgba8(c: [u8; 3]) -> [f32; 4] {
+        [f32::from(c[0]) / 255.0, f32::from(c[1]) / 255.0, f32::from(c[2]) / 255.0, 1.0]
+    }
+
+    #[test]
+    fn pigment_mix_is_mixbox_lerp_for_every_pigment_pair() {
+        // PhotoCraft's mix (8-bit pixels through the Pigment space) against the crate's own lerp.
+        let codec = Codec::new(MixMode::Pigment, PixelFormat::RGBA8);
+        let mut worst = 0;
+        for (i, a) in PIGMENTS.iter().enumerate() {
+            for b in &PIGMENTS[i + 1..] {
+                for t in [0.25, 0.5, 0.75] {
+                    let got = u8s3(codec.decode_rgba(&mix(&codec.encode_rgba(rgba8(*a)), &codec.encode_rgba(rgba8(*b)), t)));
+                    let want = mixbox::lerp(a, b, t).map(i32::from);
+                    let d = got.iter().zip(want).map(|(g, w)| (g - w).abs()).max().unwrap_or(0);
+                    worst = worst.max(d);
+                    assert!(d <= 1, "{a:?} + {b:?} at {t}: {got:?}, Mixbox {want:?}");
+                }
+            }
+        }
+        assert!(worst <= 1);
+        // 32-bit (linear-light) documents through the linear functions, against lerp_linear_float.
+        let codec = Codec::new(MixMode::Pigment, PixelFormat::RGBA32F);
+        let lin = |c: [u8; 3]| c.map(|v| photocraft_color::convert::srgb_to_linear(f32::from(v) / 255.0));
+        for (a, b) in [(PIGMENTS[7], PIGMENTS[1]), (PIGMENTS[3], PIGMENTS[10])] {
+            let (la, lb) = (lin(a), lin(b));
+            let got = codec.decode_rgba(&mix(&codec.encode_rgba([la[0], la[1], la[2], 1.0]), &codec.encode_rgba([lb[0], lb[1], lb[2], 1.0]), 0.5));
+            let want = mixbox::lerp_linear_float(&la, &lb, 0.5);
+            assert!(got.iter().zip(want).all(|(g, w)| (g - w).abs() < 1e-4), "{got:?} vs {want:?}");
+        }
+    }
+
+    fn u8s3(c: [f32; 4]) -> [i32; 3] {
+        [0, 1, 2].map(|i| (c[i] * 255.0).round() as i32)
+    }
+
+    #[test]
+    fn a_colour_mixed_with_itself_is_itself() {
+        // 1,000 random colours, each mixed with itself, in both modes: within ±1.
+        for mode in [MixMode::Rgb, MixMode::Pigment] {
+            let codec = Codec::new(mode, PixelFormat::RGBA8);
+            for i in 0..1000 {
+                let c = [0, 1, 2].map(|k| (crate::rng::hash2(i, k, 77) * 255.0).round() / 255.0);
+                let z = codec.encode_rgba([c[0], c[1], c[2], 1.0]);
+                let got = u8s3(codec.decode_rgba(&mix(&z, &z, 0.37)));
+                let want = c.map(|v| (v * 255.0).round() as i32);
+                assert!(got.iter().zip(want).all(|(g, w)| (g - w).abs() <= 1), "{mode:?}: {want:?} → {got:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_clean_brush_from_yellow_into_blue_leaves_green() {
+        // No load, Mix 100 %: the brush carries Hansa Yellow into Cobalt Blue. In Pigment mode the
+        // meeting is green; averaging RGB makes it grey.
+        let (yellow, blue) = (rgba8([252, 211, 0]), rgba8([0, 33, 133]));
+        let run = |mode: MixMode| {
+            let mut img = image(400, 80, blue);
+            img.fill_rect(Rect::new(0, 0, 200, 80), &yellow);
+            let mut st = MixerState::default();
+            let mut k = line(40.0, 40.0, 380.0, 0.1);
+            k.brush.size = 40.0;
+            paint(&mut img, None, &mut st, &settings(mode, 0.6, 1.0, 1.0), &k);
+            img.rgba(212, 40)
+        };
+        let (pig, rgb) = (run(MixMode::Pigment), run(MixMode::Rgb));
+        assert!(pig[1] > pig[0] + 0.1 && pig[1] > pig[2] + 0.05, "Pigment: {pig:?} isn't green");
+        assert!(rgb[1] <= rgb[0].max(rgb[2]) + 0.05, "RGB: {rgb:?}");
+    }
+
+    #[test]
+    fn a_half_and_half_stroke_leaves_an_opaque_image_opaque() {
+        // Wet/Load/Mix 50 over an opaque image, through the reservoir running low: alpha stays 255
+        // everywhere, in both modes.
+        for mode in [MixMode::Rgb, MixMode::Pigment] {
+            let mut img = image(400, 80, YELLOW);
+            img.fill_rect(Rect::new(200, 0, 400, 80), &RED);
+            let mut st = loaded(BLUE);
+            let mut k = line(40.0, 20.0, 380.0, 0.1);
+            k.brush.size = 40.0;
+            paint(&mut img, None, &mut st, &settings(mode, 0.5, 0.5, 0.5), &k);
+            for y in 0..80 {
+                for x in 0..400 {
+                    assert_eq!((img.rgba(x, y)[3] * 255.0).round(), 255.0, "{mode:?} ({x},{y})");
+                }
+            }
+        }
     }
 
     #[test]
@@ -1181,6 +1316,64 @@ mod tests {
     }
 
     #[test]
+    fn mix_alone_sets_the_canvas_share() {
+        // Wet 50 / Mix 50 over a flat colour, one width into the stroke: within a few percent of
+        // halfway between the load and the canvas (RGB, where halfway is the plain average). At
+        // Load 100 % the load stays as it is, so Mix alone decides; at Load 50 % it has thinned a
+        // little in a width (half-life 5 widths), leaving the canvas a few percent more.
+        for (wet, load, mix, tolerance) in [(0.5, 1.0, 0.5, 0.03), (1.0, 1.0, 0.5, 0.03), (0.5, 1.0, 0.25, 0.03), (0.75, 1.0, 0.75, 0.03), (0.5, 0.5, 0.5, 0.06)] {
+            let mut img = image(400, 80, YELLOW);
+            let mut st = loaded(BLUE);
+            let mut k = line(40.0, 40.0, 360.0, 0.1);
+            k.brush.size = 40.0;
+            paint(&mut img, None, &mut st, &settings(MixMode::Rgb, wet, load, mix), &k);
+            let got = img.rgba(80, 40);
+            let want: Vec<f32> = (0..3).map(|c| BLUE[c] + (YELLOW[c] - BLUE[c]) * mix).collect();
+            let span = (0..3).map(|c| (YELLOW[c] - BLUE[c]).abs()).fold(0.0, f32::max);
+            let off = (0..3).map(|c| (got[c] - want[c]).abs()).fold(0.0, f32::max) / span;
+            assert!(off < tolerance, "Wet {wet} Load {load} Mix {mix}: {got:?} is {:.1} % off {want:?}", off * 100.0);
+        }
+    }
+
+    #[test]
+    fn crossing_into_a_colour_catches_up_within_a_width() {
+        // Wet 50: a stroke from cream into orange is within 10 % of a stroke over orange alone,
+        // one width past the edge.
+        let cream = [235.0 / 255.0, 225.0 / 255.0, 190.0 / 255.0, 1.0];
+        let orange = [240.0 / 255.0, 120.0 / 255.0, 20.0 / 255.0, 1.0];
+        for mode in [MixMode::Rgb, MixMode::Pigment] {
+            let run = |from_cream: bool| {
+                let mut img = image(500, 80, orange);
+                if from_cream {
+                    img.fill_rect(Rect::new(0, 0, 200, 80), &cream);
+                }
+                let mut st = loaded(BROWN);
+                let mut k = line(40.0, 20.0, 480.0, 0.1);
+                k.brush.size = 40.0;
+                paint(&mut img, None, &mut st, &settings(mode, 0.5, 0.5, 0.5), &k);
+                (img.rgba(240, 40), img.rgba(100, 40))
+            };
+            let ((crossed, over_cream), (alone, _)) = (run(true), run(false));
+            let gap = (0..3).map(|c| (over_cream[c] - alone[c]).abs()).fold(0.0, f32::max);
+            let off = (0..3).map(|c| (crossed[c] - alone[c]).abs()).fold(0.0, f32::max) / gap;
+            assert!(off < 0.1, "{mode:?}: one width in, {:.1} % of the way back to the cream stroke", off * 100.0);
+        }
+    }
+
+    #[test]
+    fn a_dry_reservoir_smudges_and_an_empty_pickup_paints_the_load() {
+        let codec = Codec::new(MixMode::Rgb, PixelFormat::RGBA8);
+        let (load, canvas) = (codec.encode_rgba(BLUE), codec.encode_rgba(YELLOW));
+        // A dry reservoir at Mix 100 %: the picked-up paint only.
+        let dry = Colorant { a: 0.0, ..load };
+        assert_eq!(brush_paint(&dry, &canvas, 1.0), canvas);
+        // Nothing picked up: the plain load at any Mix.
+        for m in [0.0, 0.5, 1.0] {
+            assert_eq!(brush_paint(&load, &Colorant::NONE, m), load, "Mix {m}");
+        }
+    }
+
+    #[test]
     fn a_textured_load_leaves_streaks_not_a_stamp_pattern() {
         // A patch of noise dragged dry along a row: each of its rows streaks along the stroke.
         // Taking only the texel under a pixel at the last dab over it would print the patch
@@ -1302,3 +1495,4 @@ mod tests {
         );
     }
 }
+

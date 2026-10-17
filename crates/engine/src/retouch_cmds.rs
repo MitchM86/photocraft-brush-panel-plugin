@@ -939,7 +939,10 @@ impl LiveDab {
             let size = stroke.brush.size;
             let doc = &s.active().ok_or(EngineError::NoDocument)?.doc;
             let under = (m.sample_all_layers && id.is_some()).then(|| crate::brush_cmds::OtherLayers::new(doc, id));
-            return Self::start(s, cmd, p, stroke, id, 0, |_| Box::new(|_, _| {}), move |pre| Some(Box::new((photocraft_paint::mixer::Mixer::new(&m, &state, pre.clone(), size), under))));
+            let canvas = doc.bounds();
+            return Self::start(s, cmd, p, stroke, id, 0, |_| Box::new(|_, _| {}), move |pre| {
+                Some(Box::new((photocraft_paint::mixer::Mixer::new(&m, &state, pre.clone(), size).within(canvas), under)))
+            });
         }
         if sample_all_layers(p) {
             return Err(bad(cmd, "Sample All Layers strokes aren't previewed live"));

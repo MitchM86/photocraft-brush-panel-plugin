@@ -527,8 +527,9 @@ fn mixer_brush(s: &mut Session, p: &Value) -> Result<Value> {
     let dmg = s.edit("Mixer Brush", |doc, _| {
         let sel = doc.selection.clone();
         let mut under = (sample_all && id.is_some()).then(|| OtherLayers::new(doc, id));
+        let canvas = doc.bounds();
         let (surf, lock) = crate::channel_cmds::target_surface(doc, id, p)?;
-        let mut mixer = Mixer::new(&m, &state, surf.clone(), stroke.brush.size);
+        let mut mixer = Mixer::new(&m, &state, surf.clone(), stroke.brush.size).within(canvas);
         let dmg = photocraft_paint::mixer::run_stroke(surf, &stroke, &mut mixer, |r| under.as_mut().map(|u| u.covering(r)), sel.as_ref(), lock);
         state = mixer.state();
         Ok(dmg)
