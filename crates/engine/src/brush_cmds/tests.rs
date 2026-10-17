@@ -133,13 +133,69 @@ fn mixer_brush_reservoir_and_cleaning() {
         json!({"points": [[5, 15], [195, 15]], "size": 8, "wet": 0, "load": 0, "mix": 0, "brush": {"pressureSize": false, "spacing": 0.25}}),
     )
     .unwrap();
-    assert!(rgba(&s, 10, 15)[3] > 0.95 && rgba(&s, 190, 15)[3] < 0.5, "low load dries out");
+    // Load 0 % runs dry within a brush width.
+    assert!(rgba(&s, 6, 15)[3] > 0.95 && rgba(&s, 14, 15)[3] < 0.1, "low load dries out");
     assert!(s.tools.mixer.pickup.is_none(), "cleaned after stroke");
     // Wet, not cleaned: the pickup persists into the session.
-    s.execute("paint.mixerBrush", json!({"points": [[5, 5], [100, 5]], "size": 8, "wet": 100, "mix": 80, "cleanAfterStroke": false})).unwrap();
+    // Ending on the paint (transparent pixels give nothing to pick up).
+    s.execute("paint.mixerBrush", json!({"points": [[100, 15], [6, 15]], "size": 8, "wet": 100, "mix": 80, "cleanAfterStroke": false})).unwrap();
     assert!(s.tools.mixer.pickup.is_some());
     // Sample All Layers path runs.
     s.execute("paint.mixerBrush", json!({"points": [[5, 25], [50, 25]], "size": 6, "sampleAllLayers": true})).unwrap();
+}
+
+#[test]
+fn mixer_brush_loads_a_new_foreground_colour_and_keeps_the_load_otherwise() {
+    let mut s = session(200, 30);
+    s.execute("tools.setColors", json!({"foreground": "#ff0000"})).unwrap();
+    let dry = json!({"size": 8, "wet": 0, "load": 100, "brush": {"pressureSize": false}});
+    let stroke = |s: &mut Session, y: i32| {
+        let mut p = dry.clone();
+        p["points"] = json!([[5, y], [195, y]]);
+        s.execute("paint.mixerBrush", p).unwrap();
+    };
+    stroke(&mut s, 5);
+    assert_eq!(rgba(&s, 100, 5), [1.0, 0.0, 0.0, 1.0]);
+    // Loaded from the image (⌥-click): the next stroke paints that, not the foreground colour.
+    s.execute("paint.stroke", json!({"points": [[100, 25], [104, 25]], "size": 8, "color": "#00ff00"})).unwrap();
+    s.execute("paint.mixerLoad", json!({"x": 102, "y": 25, "size": 4})).unwrap();
+    stroke(&mut s, 15);
+    assert_eq!(rgba(&s, 100, 15), [0.0, 1.0, 0.0, 1.0]);
+    // A new foreground colour loads the brush with it.
+    s.execute("tools.setColors", json!({"foreground": "#0000ff"})).unwrap();
+    stroke(&mut s, 10);
+    assert_eq!(rgba(&s, 100, 10), [0.0, 0.0, 1.0, 1.0]);
+}
+
+#[test]
+fn mixer_brush_load_solid_colors_only_and_clean() {
+    let mut s = session(60, 40);
+    // Left half red, right half green under a 12 px tip at the seam.
+    s.execute("paint.stroke", json!({"points": [[15, 20], [15, 20]], "size": 30, "color": "#ff0000"})).unwrap();
+    s.execute("paint.stroke", json!({"points": [[45, 20], [45, 20]], "size": 30, "color": "#00ff00"})).unwrap();
+    s.execute("paint.mixerLoad", json!({"x": 30, "y": 20, "size": 12})).unwrap();
+    let res = s.tools.mixer.reservoir.clone().unwrap();
+    assert!(res.side > 1 && res.px.iter().any(|c| c[0] > 0.9) && res.px.iter().any(|c| c[1] > 0.9), "a patch of both colours");
+    let r = s.execute("paint.mixerLoad", json!({"x": 30, "y": 20, "size": 12, "solidOnly": true})).unwrap();
+    let res = s.tools.mixer.reservoir.clone().unwrap();
+    assert_eq!(res.side, 1, "one colour");
+    let c = r["color"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<_>>();
+    assert!(c[0] > 0.3 && c[1] > 0.3, "a mix of red and green: {c:?}");
+    // Nothing to load from transparency.
+    assert!(s.execute("paint.mixerLoad", json!({"x": 30, "y": 2, "size": 3})).is_err());
+    // Clean Brush: a wet stroke then only smears, painting nothing on transparency.
+    s.execute("paint.mixerClean", json!({})).unwrap();
+    assert!(s.tools.mixer.reservoir.is_none());
+    s.execute("paint.mixerBrush", json!({"points": [[5, 36], [55, 36]], "size": 4, "wet": 100, "loadAfterStroke": false})).unwrap();
+    assert_eq!(rgba(&s, 30, 36)[3], 0.0);
+    assert!(s.tools.mixer.reservoir.is_none(), "still clean");
+    // Load the brush after each stroke refills a clean brush with the foreground colour.
+    s.execute("paint.mixerBrush", json!({"points": [[5, 36], [55, 36]], "size": 4, "wet": 100})).unwrap();
+    assert_eq!(s.tools.mixer.swatch(), Some([0.0, 0.0, 0.0, 1.0]));
+    // Load Brush with a picked colour.
+    s.execute("paint.mixerLoadColor", json!({"color": "#336699"})).unwrap();
+    let c = s.tools.mixer.swatch().unwrap();
+    assert!((c[2] - 0.6).abs() < 0.01, "{c:?}");
 }
 
 #[test]
@@ -612,7 +668,7 @@ fn mixer_brush_uses_the_brush_mixer_settings() {
     // No wet/load params: the brush's Mixer settings (a dry brush with 0 % Load) apply.
     s.execute("tools.setBrush", json!({"brush": {"pressureSize": false, "spacing": 0.25, "mixer": {"wet": 0, "load": 0, "mix": 0}}})).unwrap();
     s.execute("paint.mixerBrush", json!({"points": [[5, 15], [195, 15]], "size": 8})).unwrap();
-    assert!(rgba(&s, 10, 15)[3] > 0.95 && rgba(&s, 190, 15)[3] < 0.5, "the brush's 0 % Load dries out");
+    assert!(rgba(&s, 6, 15)[3] > 0.95 && rgba(&s, 14, 15)[3] < 0.1, "the brush's 0 % Load dries out");
     // A param still overrides the brush.
     s.execute("paint.mixerBrush", json!({"points": [[5, 5], [195, 5]], "size": 8, "load": 100})).unwrap();
     assert!(rgba(&s, 190, 5)[3] > 0.95);

@@ -86,7 +86,7 @@ tablets against Photoshop side by side.
 | Tool | Status | Notes |
 |---|---|---|
 | Brush, Pencil (aliased, Auto Erase), Eraser (Brush/Pencil/Block) | done | Pencil 1 px quality #2139 |
-| Mixer Brush (Wet, Load, Mix, Flow, Sample All Layers) | partial | "incomplete" (#2247) |
+| Mixer Brush (Wet, Load, Mix, Flow, Sample All Layers, live stroke, per-pixel pickup, ⌥-click patch load, Load/Clean Brush, Load Solid Colors Only, load/clean after each stroke, RGB or Pigment mixing) | partial | presets (Dry … Very Wet, Heavy Mix) missing; rules from mixer_core (PhotoCraftMixer) on PhotoCraft's dabs, smear after Krita's Color Smudge idea, Pigment mixing by Mixbox (Secret Weapons, CC BY-NC 4.0); spacing- and size-independent, sub-pixel brush grid (`paint/src/mixer.rs`; comparison sheet: `cargo run -p photocraft-paint --release --example mixer_sheet`) (#2247) |
 | Clone Stamp (opacity, flow, aligned, sample, overlay) | partial | Clone Source W/H link and Alt target cursor (TOOL-213-8) |
 | Pattern Stamp (aligned, impressionist) | done | |
 | History Brush | done | Art History Brush missing |

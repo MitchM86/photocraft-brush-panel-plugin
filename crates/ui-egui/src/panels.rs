@@ -925,12 +925,8 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     Tool::MixerBrush => {
                         brush_preset_chip(ui, b, &mut app.ui);
                         crate::brush_picker::settings_toggle(app, ui);
-                        // The brush load, as in Photoshop: the foreground colour, or what ⌥-click picked up.
-                        let load = crate::retouch_ui::mixer_color(app).map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8);
-                        let (r, resp) = ui.allocate_exact_size(egui::vec2(22.0, 16.0), egui::Sense::hover());
-                        ui.painter().rect_filled(r, 2.0, egui::Color32::from_rgb(load[0], load[1], load[2]));
-                        ui.painter().rect_stroke(r, 2.0, egui::Stroke::new(1.0, t.field_border), egui::StrokeKind::Outside);
-                        resp.on_hover_text(crate::i18n::fmt(tl!("Current brush load ({alt}-click the image to load its colour)"), &[("alt", &crate::shortcuts::pretty("Alt"))]));
+                        widgets::vline(ui, 22.0);
+                        mixer_load_controls(app, ui);
                         widgets::vline(ui, 22.0);
                         for (label, value) in [
                             (tl!("Wet"), &mut b.mixer.wet),
@@ -940,8 +936,12 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         ] {
                             percent_field(ui, label, value, 0.0..=100.0, 62.0);
                         }
+                        opt_label(ui, tl!("Smoothing"));
+                        smoothing_field(ui, b, 62.0);
                         widgets::vline(ui, 22.0);
                         widgets::checkbox(ui, &mut b.mixer.sample_all_layers, tl!("Sample All Layers"));
+                        mixing_dropdown(ui, &mut b.mixer.mode);
+                        widgets::toggle(ui, &mut b.pressure_size, tl!("Pressure for Size"));
                     }
                     // Photoshop's single-pixel marquees: the selection mode and Feather (no Style,
                     // and their edges are always hard).
@@ -3344,6 +3344,93 @@ fn smoothing_options(ui: &mut egui::Ui, b: &mut photocraft_engine::BrushSettings
         widgets::checkbox(ui, &mut s.adjust_for_zoom, tl!("Adjust for Zoom"));
         widgets::checkbox(ui, &mut s.curves, tl!("Basic Smoothing (Krita)")).on_hover_text(tl!("Join the pen's samples with curves instead of straight lines, without lag"));
     });
+}
+
+/// The Mixer Brush's load controls, as in Photoshop's options bar: the current brush load
+/// (click: pick a colour to load; its menu: Load Brush, Clean Brush, Load Solid Colors Only) and
+/// the Load / Clean the brush after each stroke toggles.
+/// The Mixer Brush's colour mixing: RGB, or Pigment (Mixbox).
+pub(crate) fn mixing_dropdown(ui: &mut egui::Ui, mode: &mut photocraft_paint::MixMode) {
+    opt_label(ui, tl!("Mixing"));
+    let opts = [
+        (photocraft_paint::MixMode::Rgb, "RGB", tl!("Mix colours by averaging their RGB values")),
+        (photocraft_paint::MixMode::Pigment, tl!("Pigment"), tl!("Mix colours like real paint (Mixbox): blue and yellow make green")),
+    ];
+    widgets::dropdown_with_tooltips(ui, "mixer-mixing", mode, &opts, 86.0);
+}
+
+fn mixer_load_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    let t = Tokens::get(ui.ctx());
+    // What the next stroke paints with: a foreground colour not loaded yet loads at the stroke.
+    let (mixer, fg) = (&app.session.tools.mixer, app.session.tools.foreground);
+    let load = if mixer.loaded_with == Some(fg) { mixer.swatch() } else { Some(fg) };
+    let (r, swatch) = ui.allocate_exact_size(vec2(26.0, 18.0), Sense::click());
+    let p = ui.painter();
+    match load {
+        Some(c) => {
+            let c = c.map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8);
+            p.rect_filled(r, 2.0, egui::Color32::from_rgb(c[0], c[1], c[2]));
+        }
+        // A clean brush: empty, struck through.
+        None => {
+            p.rect_filled(r, 2.0, t.field);
+            p.line_segment([r.left_bottom(), r.right_top()], egui::Stroke::new(1.5, t.danger));
+        }
+    }
+    p.rect_stroke(r, 2.0, egui::Stroke::new(1.0, t.field_border), egui::StrokeKind::Outside);
+    let tip = crate::i18n::fmt(tl!("Current brush load: click to choose the colour to load ({alt}-click the image to load from it)"), &[("alt", &crate::shortcuts::pretty("Alt"))]);
+    let swatch = crate::brush_picker::named(swatch, tl!("Current brush load")).on_hover_text(tip);
+    if swatch.clicked() {
+        let c = load.unwrap_or(app.session.tools.foreground);
+        crate::color_picker_ui::open_for_command(app, tl!("Color Picker (Load Color)"), [c[0], c[1], c[2]], "paint.mixerLoadColor", json!({}));
+    }
+    let menu = icons::button(ui, "chevron-down", 16.0, false, tl!("Brush load options"));
+    let menu = crate::brush_picker::named(menu, tl!("Brush load options"));
+    let solid = app.ui.tool_options.mixer_solid_only;
+    let chosen = crate::press_menu::show(&menu, |ui, m| {
+        ui.set_min_width(190.0);
+        if m.item(ui, tl!("Load Brush")) {
+            return Some("load");
+        }
+        if m.item(ui, tl!("Clean Brush")) {
+            return Some("clean");
+        }
+        ui.separator();
+        let mark = if solid { "✓ " } else { "    " };
+        if m.item(ui, format!("{mark}{}", tl!("Load Solid Colors Only"))) {
+            return Some("solid");
+        }
+        None
+    })
+    .flatten();
+    let report = |app: &mut PhotocraftApp, r: Result<serde_json::Value, String>| {
+        if let Err(e) = r {
+            app.ui.status = e;
+            app.ui.status_error = true;
+        }
+    };
+    match chosen {
+        Some("load") => {
+            let r = app.run("paint.mixerLoadColor", json!({}));
+            report(app, r);
+        }
+        Some("clean") => {
+            let r = app.run("paint.mixerClean", json!({}));
+            report(app, r);
+        }
+        Some("solid") => app.ui.tool_options.mixer_solid_only = !solid,
+        _ => {}
+    }
+    let o = &mut app.ui.tool_options;
+    for (icon, on, tip) in [
+        ("brush", &mut o.mixer_load_after, tl!("Load the brush after each stroke")),
+        ("brush-cleaning", &mut o.mixer_clean_after, tl!("Clean the brush after each stroke")),
+    ] {
+        let b = icons::button(ui, icon, 24.0, *on, tip);
+        if crate::brush_picker::named(b, tip).clicked() {
+            *on = !*on;
+        }
+    }
 }
 
 /// Options-bar brush chip: a click shows or hides Photoshop's Brush Preset picker below it (size,

@@ -2024,7 +2024,19 @@
 	Mixer Brush	Pędzel mieszający
 	Mixer Brush Tool	Narzędzie Pędzel mieszający
 	Wet	Wilgotność
-	Current brush load ({alt}-click the image to load its colour)	Bieżące nasycenie pędzla ({alt}-klik w obrazie pobiera jego kolor)
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	Bieżące nasycenie pędzla: kliknij, aby wybrać kolor nasycenia ({alt}-klik w obrazie pobiera z niego)
+	Current brush load	Bieżące nasycenie pędzla
+	Color Picker (Load Color)	Próbnik kolorów (kolor nasycenia)
+	Brush load options	Opcje nasycenia pędzla
+	Load Brush	Nasyć pędzel
+	Clean Brush	Oczyść pędzel
+	Load Solid Colors Only	Nasycaj tylko kolorami jednolitymi
+	Load the brush after each stroke	Nasycaj pędzel po każdym pociągnięciu
+	Clean the brush after each stroke	Oczyść pędzel po każdym pociągnięciu
+	Mixing	Mieszanie
+	Pigment	Pigment
+	Mix colours by averaging their RGB values	Miesza kolory, uśredniając ich wartości RGB
+	Mix colours like real paint (Mixbox): blue and yellow make green	Miesza kolory jak prawdziwa farba (Mixbox): niebieski i żółty dają zielony
 	Erase to History	Wymaż do historii
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Zamiast wymazywać, przywróć stan źródłowy pędzla historii ({alt}-przeciągnięcie: jedno pociągnięcie)
 	Mix	Mieszanie

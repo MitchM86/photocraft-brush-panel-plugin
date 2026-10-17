@@ -968,7 +968,19 @@
 	Mix	Смешивание
 	Auto Clean Brush	Автоочистка кисти
 	Wet	Влага
-	Current brush load ({alt}-click the image to load its colour)	Текущая загрузка кисти ({alt}-щелчок по изображению загружает его цвет)
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	Текущая загрузка кисти: щелкните, чтобы выбрать цвет загрузки ({alt}-щелчок по изображению загружает из него)
+	Current brush load	Текущая загрузка кисти
+	Color Picker (Load Color)	Палитра цветов (цвет загрузки)
+	Brush load options	Параметры загрузки кисти
+	Load Brush	Загрузить кисть
+	Clean Brush	Очистить кисть
+	Load Solid Colors Only	Загружать только чистые цвета
+	Load the brush after each stroke	Загружать кисть после каждого мазка
+	Clean the brush after each stroke	Очищать кисть после каждого мазка
+	Mixing	Смешивание
+	Pigment	Пигмент
+	Mix colours by averaging their RGB values	Смешивает цвета усреднением значений RGB
+	Mix colours like real paint (Mixbox): blue and yellow make green	Смешивает цвета как настоящая краска (Mixbox): синий и жёлтый дают зелёный
 	Erase to History	Стирать до исторического состояния
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Вместо стирания возвращать исходное состояние архивной кисти ({alt}-перетаскивание: один мазок)
 	Rate	Скорость

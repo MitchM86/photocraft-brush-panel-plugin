@@ -30,7 +30,7 @@ pub struct CommandSpec {
 pub(crate) fn always(_: &Session) -> std::result::Result<(), String> {
     Ok(())
 }
-fn has_doc(s: &Session) -> std::result::Result<(), String> {
+pub(crate) fn has_doc(s: &Session) -> std::result::Result<(), String> {
     s.active().map(|_| ()).ok_or_else(|| "no document open".into())
 }
 fn has_layer(s: &Session) -> std::result::Result<(), String> {

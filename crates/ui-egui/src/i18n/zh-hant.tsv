@@ -2032,7 +2032,19 @@
 	Mixer Brush	混合器筆刷
 	Mixer Brush Tool	混合器筆刷工具
 	Wet	濕度
-	Current brush load ({alt}-click the image to load its colour)	目前筆刷載入（{alt}-按一下影像以載入其顏色）
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	目前筆刷載入：按一下以選擇要載入的顏色（{alt}-按一下影像以從中載入）
+	Current brush load	目前筆刷載入
+	Color Picker (Load Color)	檢色器（載入顏色）
+	Brush load options	筆刷載入選項
+	Load Brush	載入筆刷
+	Clean Brush	清除筆刷
+	Load Solid Colors Only	只載入純色
+	Load the brush after each stroke	每次筆畫後載入筆刷
+	Clean the brush after each stroke	每次筆畫後清除筆刷
+	Mixing	混色
+	Pigment	顏料
+	Mix colours by averaging their RGB values	依 RGB 值的平均來混合顏色
+	Mix colours like real paint (Mixbox): blue and yellow make green	像真實顏料一樣混色（Mixbox）：藍色和黃色混出綠色
 	Erase to History	清除至步驟記錄
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	不擦除，而是繪回步驟記錄筆刷的來源狀態（{alt}-拖曳：一筆）
 	Mix	混合

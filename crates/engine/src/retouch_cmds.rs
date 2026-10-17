@@ -903,10 +903,11 @@ fn dab_cmd(s: &mut Session, p: &Value, cmd: &str) -> Result<Value> {
     Ok(json!({ "damage": damage_json(dmg) }))
 }
 
-/// A Dodge, Burn, Sponge, Blur, Sharpen or Smudge stroke shown while it is drawn: each new dab
-/// runs the tool's effect on a working copy of the target, in order, and the changed area is
-/// mixed back over the original at the brush opacity, as `apply_dab_stroke` does on release.
-/// Sample All Layers isn't previewed (its composite spans the whole stroke).
+/// A Dodge, Burn, Sponge, Blur, Sharpen, Smudge or Mixer Brush stroke shown while it is drawn:
+/// each new dab runs the tool's effect on a working copy of the target, in order, and the changed
+/// area is mixed back over the original at the brush opacity, as `apply_dab_stroke` does on
+/// release. The Mixer Brush runs the same `Mixer` as its commit (`mixer::run_stroke`) and
+/// previews Sample All Layers; the other tools don't (their composite spans the whole stroke).
 pub struct LiveDab {
     /// The active document with the stroke so far.
     pub doc: std::sync::Arc<Document>,
@@ -923,22 +924,51 @@ pub struct LiveDab {
     sel: Option<Surface>,
     lock: bool,
     bounds: Rect,
+    /// The Mixer Brush's stroke (it paints into its own cache and flushes per push), and the
+    /// other layers' composite with Sample All Layers.
+    mixer: Option<Box<(photocraft_paint::mixer::Mixer, Option<crate::brush_cmds::OtherLayers>)>>,
 }
 
 impl LiveDab {
     /// Start a live stroke of `cmd` from its params; their `points` are rendered.
     pub fn begin(s: &Session, cmd: &str, p: &Value) -> Result<Self> {
         has_pixel_layer(s).map_err(EngineError::Other)?;
+        if cmd == "paint.mixerBrush" {
+            // The stroke `paint.mixerBrush` commits, with the brush's paint as it stands.
+            let (stroke, id, m, state) = crate::brush_cmds::mixer_stroke_params(s, p)?;
+            let size = stroke.brush.size;
+            let doc = &s.active().ok_or(EngineError::NoDocument)?.doc;
+            let under = (m.sample_all_layers && id.is_some()).then(|| crate::brush_cmds::OtherLayers::new(doc, id));
+            return Self::start(s, cmd, p, stroke, id, 0, |_| Box::new(|_, _| {}), move |pre| Some(Box::new((photocraft_paint::mixer::Mixer::new(&m, &state, pre.clone(), size), under))));
+        }
         if sample_all_layers(p) {
             return Err(bad(cmd, "Sample All Layers strokes aren't previewed live"));
         }
         let (stroke, id) = parse_brush(s, p, cmd)?;
         let (tool, _) = DabTool::parse(s, cmd, p, &stroke)?;
+        let spacing = stroke.brush.spacing;
+        Self::start(s, cmd, p, stroke, id, tool.halo(), move |pre| tool.effect(pre.format(), spacing), |_| None)
+    }
+
+    /// Start a live stroke of `stroke` whose dabs run the effect `effect` makes for the target as
+    /// the stroke begins, reading `halo` pixels around each dab, or the Mixer Brush `mixer` makes.
+    #[allow(clippy::too_many_arguments, clippy::type_complexity)]
+    fn start(
+        s: &Session,
+        cmd: &str,
+        p: &Value,
+        stroke: Stroke,
+        id: Option<LayerId>,
+        halo: i32,
+        effect: impl FnOnce(&Surface) -> DabEffect,
+        mixer: impl FnOnce(&Surface) -> Option<Box<(photocraft_paint::mixer::Mixer, Option<crate::brush_cmds::OtherLayers>)>>,
+    ) -> Result<Self> {
         let mut doc = (*s.active().ok_or(EngineError::NoDocument)?.doc).clone();
         let sel = doc.selection.clone();
         let (surf, lock) = crate::channel_cmds::target_surface(&mut doc, id, p)?;
         let pre_surf = surf.clone();
-        let effect = tool.effect(pre_surf.format(), stroke.brush.spacing);
+        let effect = effect(&pre_surf);
+        let mixer = mixer(&pre_surf);
         // `apply_dab_stroke` generates the same dabs (`dabs`: zoom 1, no smoothing scale).
         let renderer = photocraft_paint::StrokeRenderer::new(&stroke.brush, None, 1.0).record_dabs();
         let mut live = Self {
@@ -947,7 +977,7 @@ impl LiveDab {
             renderer,
             done: 0,
             effect,
-            halo: tool.halo(),
+            halo,
             work: pre_surf.clone(),
             pre_surf,
             id,
@@ -956,6 +986,7 @@ impl LiveDab {
             sel,
             lock,
             bounds: Rect::EMPTY,
+            mixer,
         };
         live.push(&stroke.points)?;
         Ok(live)
@@ -974,7 +1005,23 @@ impl LiveDab {
         let ctx = self.renderer.ctx.clone();
         let new: Vec<_> = self.renderer.dabs().get(self.done..).unwrap_or_default().to_vec();
         let mut dmg = Rect::EMPTY;
-        for (k, d) in new.iter().enumerate() {
+        if let Some(m) = self.mixer.as_deref_mut() {
+            // The Mixer Brush: every new dab into its stroke cache, then one flush.
+            let (mixer, under) = m;
+            let all = self.renderer.dabs();
+            for (k, d) in new.iter().enumerate() {
+                // Dabs filled in from the previous one lie between the two.
+                let prev = (self.done + k).checked_sub(1).and_then(|i| all.get(i)).map_or(Rect::EMPTY, |p| ctx.dab_rect(p, false));
+                let sample = under.as_mut().map(|u| u.covering(ctx.dab_rect(d, false).union(&prev)));
+                dmg = dmg.union(&mixer.stroke_dab(&ctx, d, self.done + k, sample));
+            }
+            if !dmg.is_empty() {
+                let mut region = Region::read(&self.work, dmg);
+                mixer.flush(&mut region, dmg);
+                region.write(&mut self.work);
+            }
+        }
+        for (k, d) in new.iter().enumerate().filter(|_| self.mixer.is_none()) {
             let r = ctx.dab_rect(d, false);
             if r.is_empty() {
                 continue;

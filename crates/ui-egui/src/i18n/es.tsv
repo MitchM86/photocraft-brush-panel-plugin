@@ -2033,7 +2033,19 @@
 	Mixer Brush	Pincel mezclador
 	Mixer Brush Tool	Herramienta Pincel mezclador
 	Wet	Húmedo
-	Current brush load ({alt}-click the image to load its colour)	Carga actual del pincel ({alt}-clic en la imagen para cargar su color)
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	Carga actual del pincel: haga clic para elegir el color de carga ({alt}-clic en la imagen para cargar de ella)
+	Current brush load	Carga actual del pincel
+	Color Picker (Load Color)	Selector de color (color de carga)
+	Brush load options	Opciones de carga del pincel
+	Load Brush	Cargar pincel
+	Clean Brush	Limpiar pincel
+	Load Solid Colors Only	Cargar solo colores sólidos
+	Load the brush after each stroke	Cargar el pincel después de cada trazo
+	Clean the brush after each stroke	Limpiar el pincel después de cada trazo
+	Mixing	Mezcla
+	Pigment	Pigmento
+	Mix colours by averaging their RGB values	Mezcla los colores promediando sus valores RGB
+	Mix colours like real paint (Mixbox): blue and yellow make green	Mezcla los colores como pintura real (Mixbox): azul y amarillo dan verde
 	Erase to History	Borrar a historia
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Volver a pintar el estado de origen del pincel de historia en lugar de borrar ({alt}-arrastrar: un trazo)
 	Mix	Mezcla

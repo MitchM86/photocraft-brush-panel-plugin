@@ -1992,7 +1992,19 @@
 	Apply the pen's tilt and rotation to the tip shape	Terapkan kemiringan dan rotasi pena ke bentuk ujung
 	Mixer Brush	Kuas Pencampur
 	Wet	Basah
-	Current brush load ({alt}-click the image to load its colour)	Muatan kuas saat ini ({alt}-klik gambar untuk memuat warnanya)
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	Muatan kuas saat ini: klik untuk memilih warna muatan ({alt}-klik gambar untuk memuat darinya)
+	Current brush load	Muatan kuas saat ini
+	Color Picker (Load Color)	Pemilih Warna (Warna Muatan)
+	Brush load options	Opsi muatan kuas
+	Load Brush	Muat Kuas
+	Clean Brush	Bersihkan Kuas
+	Load Solid Colors Only	Muat Warna Solid Saja
+	Load the brush after each stroke	Muat kuas setelah setiap sapuan
+	Clean the brush after each stroke	Bersihkan kuas setelah setiap sapuan
+	Mixing	Pencampuran
+	Pigment	Pigmen
+	Mix colours by averaging their RGB values	Mencampur warna dengan merata-ratakan nilai RGB-nya
+	Mix colours like real paint (Mixbox): blue and yellow make green	Mencampur warna seperti cat sungguhan (Mixbox): biru dan kuning menjadi hijau
 	Erase to History	Hapus ke Riwayat
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Lukis kembali status sumber Kuas Riwayat alih-alih menghapus ({alt}-seret: satu goresan)
 	Mix	Campur

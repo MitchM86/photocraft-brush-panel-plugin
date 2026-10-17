@@ -353,7 +353,10 @@ fn stroke_params(app: &PhotocraftApp, tool: Tool, erase: bool, points: &[Vec<f64
 
 /// Tools whose strokes the engine renders while they are drawn (`LiveStroke`).
 pub(crate) fn strokes_live(tool: Tool) -> bool {
-    matches!(tool, Tool::Brush | Tool::Pencil | Tool::Eraser | Tool::Blur | Tool::Sharpen | Tool::Smudge | Tool::Dodge | Tool::Burn | Tool::Sponge | Tool::ArtHistoryBrush)
+    matches!(
+        tool,
+        Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::Eraser | Tool::Blur | Tool::Sharpen | Tool::Smudge | Tool::Dodge | Tool::Burn | Tool::Sponge | Tool::ArtHistoryBrush
+    )
         || live_retouch_command(tool).is_some()
 }
 
@@ -478,6 +481,12 @@ fn begin_live_stroke(app: &PhotocraftApp) -> Option<LiveStroke> {
         p["target"] = paint_target(app);
         p["seed"] = json!((n + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15) ^ app.stylus.clock_ms.to_bits());
         EngineStroke::Art(Box::new(photocraft_engine::retouch_cmds::LiveArtHistory::begin(&app.session, &p).ok()?))
+    } else if d.tool == Tool::MixerBrush {
+        // The params `retouch_ui::finish_stroke` commits (Sample All Layers previews too).
+        let mut p = crate::retouch_ui::mixer_params(app);
+        p["points"] = json!(d.points);
+        p["target"] = paint_target(app);
+        EngineStroke::Dab(photocraft_engine::retouch_cmds::LiveDab::begin(&app.session, "paint.mixerBrush", &p).ok()?)
     } else if let Some((cmd, mut p)) = crate::retouch_ui::dab_params(app, d.tool, d.modifiers) {
         // The params `retouch_ui::finish_stroke` commits; Sample All Layers isn't previewed.
         p["points"] = json!(d.points);
@@ -3876,13 +3885,14 @@ pub(crate) fn alt_samples(tool: Tool, mods: egui::Modifiers) -> bool {
     mods.alt && !mods.ctrl && matches!(tool, Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::Gradient | Tool::PaintBucket)
 }
 
-/// Mixer Brush ⌥-click, as in Photoshop: load the brush with the colour under the pointer (from
-/// the current layer, or every layer with Sample All Layers). The foreground colour stays; a
-/// new foreground colour loads the brush again (`retouch_ui::finish_stroke`).
+/// Mixer Brush ⌥-click, as in Photoshop: load the brush with the image under the tip (from the
+/// current layer, or every layer with Sample All Layers), or its average colour with Load Solid
+/// Colors Only. The foreground colour stays; a new foreground colour loads the brush again.
 fn load_mixer(app: &mut PhotocraftApp, x: f64, y: f64) {
-    let layers = if app.session.tools.brush.mixer.sample_all_layers { "all" } else { "current" };
-    if let Some([r, g, b]) = sample_color(app, x, y, layers) {
-        app.ui.mixer_load = Some([[r, g, b, 1.0], app.session.tools.foreground]);
+    let solid = app.ui.tool_options.mixer_solid_only;
+    if let Err(e) = app.run("paint.mixerLoad", json!({"x": x, "y": y, "solidOnly": solid})) {
+        app.ui.status = e;
+        app.ui.status_error = true;
     }
 }
 
@@ -4549,7 +4559,7 @@ pub(crate) fn finish_gesture(app: &mut PhotocraftApp, d: Drag) {
         app.last_stroke_end = Some((st.doc.id, [end[0], end[1]]));
     }
     // A live Clone Stamp preview ends here; the commit below replaces it.
-    if live_retouch_command(d.tool).is_some() || crate::retouch_ui::dab_params(app, d.tool, d.modifiers).is_some() {
+    if live_retouch_command(d.tool).is_some() || d.tool == Tool::MixerBrush || crate::retouch_ui::dab_params(app, d.tool, d.modifiers).is_some() {
         app.live_stroke = None;
     }
     if crate::eraser_ui::finish_stroke(app, d.tool, &d.points) || crate::retouch_ui::finish_stroke(app, d.tool, &d.points, d.modifiers) {

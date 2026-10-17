@@ -1894,7 +1894,19 @@
 	Mixer Brush	Πινέλο ανάμειξης (Mixer Brush)
 	Mixer Brush Tool	Πινέλο ανάμειξης (Mixer Brush Tool)
 	Wet	Υγρασία
-	Current brush load ({alt}-click the image to load its colour)	Τρέχουσα φόρτωση πινέλου ({alt}-κλικ στην εικόνα φορτώνει το χρώμα της)
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	Τρέχουσα φόρτωση πινέλου: κλικ για επιλογή χρώματος φόρτωσης ({alt}-κλικ στην εικόνα φορτώνει από αυτήν)
+	Current brush load	Τρέχουσα φόρτωση πινέλου
+	Color Picker (Load Color)	Επιλογέας χρωμάτων (χρώμα φόρτωσης)
+	Brush load options	Επιλογές φόρτωσης πινέλου
+	Load Brush	Φόρτωση πινέλου
+	Clean Brush	Καθαρισμός πινέλου
+	Load Solid Colors Only	Φόρτωση μόνο συμπαγών χρωμάτων
+	Load the brush after each stroke	Φόρτωση του πινέλου μετά από κάθε πινελιά
+	Clean the brush after each stroke	Καθαρισμός του πινέλου μετά από κάθε πινελιά
+	Mixing	Ανάμειξη
+	Pigment	Χρωστική
+	Mix colours by averaging their RGB values	Ανακατεύει τα χρώματα με τον μέσο όρο των τιμών RGB
+	Mix colours like real paint (Mixbox): blue and yellow make green	Ανακατεύει τα χρώματα σαν πραγματική μπογιά (Mixbox): μπλε και κίτρινο κάνουν πράσινο
 	Erase to History	Σβήσιμο στο ιστορικό
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Επαναφορά της κατάστασης πηγής του πινέλου ιστορικού αντί για σβήσιμο ({alt}-σύρσιμο: μία πινελιά)
 	Load	Φόρτωση

@@ -1301,7 +1301,7 @@ live_coordinate_regression!(
 live_coordinate_regression!(
     live_dab_rejects_invalid_batches_without_changing_the_preview,
     LiveDab,
-    ["paint.dodge", "paint.burn", "paint.sponge", "paint.blur", "paint.sharpen", "paint.smudge"]
+    ["paint.dodge", "paint.burn", "paint.sponge", "paint.blur", "paint.sharpen", "paint.smudge", "paint.mixerBrush"]
 );
 
 /// The live Dodge shows what the commit paints, also where a stroke doubles back across the
@@ -1334,6 +1334,71 @@ fn live_dodge_matches_the_commit_across_cells() {
     }
     assert!(changed);
     assert!(worst <= 1e-4, "live and commit differ by {worst}");
+}
+
+/// The Mixer Brush paints while it is drawn, and the preview is what the commit paints: both run
+/// the same mixer (`Mixer::stroke_dab` into the stroke cache, then `flush`), with the brush's paint
+/// travelling from dab to dab, so this needs the same dabs in the same order. In both mixing modes,
+/// on 8-bit layers (the preview writes them after every push) and 32-bit ones.
+#[test]
+fn live_mixer_brush_matches_the_commit() {
+    for depth in [8, 32] {
+        for mode in ["rgb", "pigment"] {
+            let mut s = session(200, 90, depth, "rgb");
+            paint_layer(&mut s, texture);
+            s.execute("tools.setColors", json!({"foreground": "#ff0000"})).unwrap();
+            let all = [[10.0, 40.0], [100.0, 60.0], [180.0, 40.0], [60.0, 30.0], [150.0, 70.0]];
+            let pts = |v: &[[f64; 2]]| v.iter().map(|q| StrokePoint::new(q[0], q[1], 1.0)).collect::<Vec<_>>();
+            let opts = |p: &[[f64; 2]]| json!({"points": p, "size": 30, "hardness": 80, "wet": 60, "load": 50, "mix": 40, "mode": mode});
+            let mut live = LiveDab::begin(&s, "paint.mixerBrush", &opts(&all[..1])).unwrap();
+            live.push(&pts(&all[1..3])).unwrap();
+            live.push(&pts(&all[3..])).unwrap();
+            let shown = live.doc.clone();
+            s.execute("paint.mixerBrush", opts(&all)).unwrap();
+            let id = s.active().unwrap().active_layer.unwrap();
+            let (a, b) = (shown.layer(id).unwrap().surface().unwrap(), s.active().unwrap().doc.layer(id).unwrap().surface().unwrap());
+            let (mut changed, mut worst) = (false, 0.0f32);
+            for y in 0..90 {
+                for x in 0..200 {
+                    let (got, want) = (a.rgba(x, y), b.rgba(x, y));
+                    changed |= (want[0] - texture(x, y)[0]).abs() > 0.02;
+                    // The commit also lays the smoothing catch-up dabs, which the live stroke shows on release.
+                    if (x - 150).pow(2) + (y - 70).pow(2) > 30 * 30 {
+                        worst = (0..4).map(|c| (got[c] - want[c]).abs()).fold(worst, f32::max);
+                    }
+                }
+            }
+            assert!(changed, "{depth}-bit {mode}");
+            assert!(worst <= 1e-4, "{depth}-bit {mode}: live and commit differ by {worst}");
+        }
+    }
+}
+
+/// Sample All Layers: on an empty layer above the image the Mixer Brush picks up and blends the
+/// image's colours (a dry or unsampled brush would paint its load only), live as on commit.
+#[test]
+fn live_mixer_brush_samples_all_layers_like_the_commit() {
+    let mut s = session(200, 90, 32, "rgb");
+    paint_layer(&mut s, texture);
+    s.execute("layer.new.layer", json!({})).unwrap();
+    s.execute("tools.setColors", json!({"foreground": "#ffffff"})).unwrap();
+    let pts = [[10.0, 40.0], [190.0, 40.0]];
+    let opts = |all: bool| json!({"points": pts, "size": 24, "hardness": 100, "wet": 100, "mix": 100, "sampleAllLayers": all});
+    let live = LiveDab::begin(&s, "paint.mixerBrush", &opts(true)).unwrap();
+    let shown = live.doc.clone();
+    s.execute("paint.mixerBrush", opts(true)).unwrap();
+    let id = s.active().unwrap().active_layer.unwrap();
+    let (a, b) = (shown.layer(id).unwrap().surface().unwrap(), s.active().unwrap().doc.layer(id).unwrap().surface().unwrap());
+    let c = b.rgba(100, 40);
+    assert!(c[3] > 0.95, "paints on the empty layer: {c:?}");
+    assert!((c[0] - texture(100, 40)[0]).abs() < 0.35 && c[0] < 0.95, "the image's colour, not white: {c:?} vs {:?}", texture(100, 40));
+    let worst = (0..90).flat_map(|y| (0..140).map(move |x| (x, y))).map(|(x, y)| (0..4).map(|k| (a.rgba(x, y)[k] - b.rgba(x, y)[k]).abs()).fold(0.0, f32::max)).fold(0.0, f32::max);
+    assert!(worst <= 1e-4, "live and commit differ by {worst}");
+    // Without Sample All Layers the empty layer only takes the load.
+    s.execute("edit.undo", json!({})).unwrap();
+    s.execute("paint.mixerBrush", opts(false)).unwrap();
+    let c = s.active().unwrap().doc.layer(id).unwrap().surface().unwrap().rgba(100, 40);
+    assert!(c[0] > 0.99 && c[1] > 0.99 && c[2] > 0.99, "{c:?}");
 }
 
 #[test]

@@ -385,6 +385,7 @@ fn about_tab_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, tab: &str) {
             });
             ui.add_space(10.0);
             ui.weak("egui · wgpu · photocraft-engine");
+            ui.weak("Mixbox by Secret Weapons, CC BY-NC 4.0");
         }
     }
 }

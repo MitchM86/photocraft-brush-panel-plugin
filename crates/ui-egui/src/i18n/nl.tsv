@@ -2004,7 +2004,19 @@
 	Mixer Brush	Mengpenseel
 	Mixer Brush Tool	Mengpenseelgereedschap
 	Wet	Nat
-	Current brush load ({alt}-click the image to load its colour)	Huidige penseellading ({alt}-klik in de afbeelding om de kleur te laden)
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	Huidige penseellading: klik om de laadkleur te kiezen ({alt}-klik in de afbeelding om eruit te laden)
+	Current brush load	Huidige penseellading
+	Color Picker (Load Color)	Kleurkiezer (laadkleur)
+	Brush load options	Opties voor penseellading
+	Load Brush	Penseel laden
+	Clean Brush	Penseel reinigen
+	Load Solid Colors Only	Alleen volle kleuren laden
+	Load the brush after each stroke	Penseel laden na elke streek
+	Clean the brush after each stroke	Penseel reinigen na elke streek
+	Mixing	Mengen
+	Pigment	Pigment
+	Mix colours by averaging their RGB values	Mengt kleuren door hun RGB-waarden te middelen
+	Mix colours like real paint (Mixbox): blue and yellow make green	Mengt kleuren zoals echte verf (Mixbox): blauw en geel geven groen
 	Erase to History	Wissen naar historie
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	In plaats van wissen de bronstatus van het historiepenseel terugschilderen ({alt}-slepen: één streek)
 	Mix	Mengen

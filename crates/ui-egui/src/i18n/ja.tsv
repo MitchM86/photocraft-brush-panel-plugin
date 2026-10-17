@@ -2035,7 +2035,19 @@
 	Mixer Brush	混合ブラシ
 	Mixer Brush Tool	混合ブラシツール
 	Wet	ウェット
-	Current brush load ({alt}-click the image to load its colour)	現在のブラシの補充量（{alt}+クリックで画像の色を補充）
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	現在のブラシの補充量：クリックで補充するカラーを選択（{alt}+クリックで画像から補充）
+	Current brush load	現在のブラシの補充量
+	Color Picker (Load Color)	カラーピッカー（補充カラー）
+	Brush load options	ブラシの補充オプション
+	Load Brush	ブラシを補充
+	Clean Brush	ブラシをクリーン
+	Load Solid Colors Only	単色のみを補充
+	Load the brush after each stroke	ストロークごとにブラシを補充
+	Clean the brush after each stroke	ストロークごとにブラシをクリーン
+	Mixing	混色
+	Pigment	顔料
+	Mix colours by averaging their RGB values	RGB値の平均で色を混ぜます
+	Mix colours like real paint (Mixbox): blue and yellow make green	本物の絵の具のように混色します（Mixbox）：青と黄で緑になります
 	Erase to History	ヒストリーで消去
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	消去せずにヒストリーブラシのソースの状態を描き戻す（{alt}+ドラッグ: 1 ストローク）
 	Mix	混合

@@ -1998,7 +1998,19 @@
 	Apply the pen's tilt and rotation to the tip shape	Appliquer l'inclinaison et la rotation du stylet à la forme de la pointe
 	Mixer Brush	Pinceau mélangeur
 	Wet	Humidité
-	Current brush load ({alt}-click the image to load its colour)	Charge actuelle de la forme ({alt}-clic dans l'image pour charger sa couleur)
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	Charge actuelle de la forme : cliquez pour choisir la couleur à charger ({alt}-clic dans l'image pour charger depuis celle-ci)
+	Current brush load	Charge actuelle de la forme
+	Color Picker (Load Color)	Sélecteur de couleurs (couleur de charge)
+	Brush load options	Options de charge de la forme
+	Load Brush	Charger la forme
+	Clean Brush	Nettoyer la forme
+	Load Solid Colors Only	Charger uniquement les couleurs unies
+	Load the brush after each stroke	Charger la forme après chaque tracé
+	Clean the brush after each stroke	Nettoyer la forme après chaque tracé
+	Mixing	Mélange
+	Pigment	Pigment
+	Mix colours by averaging their RGB values	Mélange les couleurs en faisant la moyenne de leurs valeurs RVB
+	Mix colours like real paint (Mixbox): blue and yellow make green	Mélange les couleurs comme de la vraie peinture (Mixbox) : le bleu et le jaune donnent du vert
 	Erase to History	Effacer à partir de l'historique
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Repeindre l'état source du pinceau d'historique au lieu d'effacer ({alt}-glisser : un tracé)
 	Mix	Mélange

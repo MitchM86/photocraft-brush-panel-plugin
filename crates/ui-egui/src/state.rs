@@ -660,6 +660,13 @@ pub struct ToolOptions {
     /// Eraser › Erase to History: strokes paint back the History Brush's source state instead of
     /// erasing (⌥-drag does it for one stroke), as in Photoshop.
     pub erase_to_history: bool,
+    /// Mixer Brush: load the brush and clean it after each stroke (Photoshop's two options-bar
+    /// toggles, on by default), and ⌥-click loading one averaged colour (Load Solid Colors Only).
+    #[serde(default = "yes")]
+    pub mixer_load_after: bool,
+    #[serde(default = "yes")]
+    pub mixer_clean_after: bool,
+    pub mixer_solid_only: bool,
     /// Freeform Pen › Curve Fit: how closely (0.5–10 px) the path follows the drawn stroke.
     #[serde(default = "default_curve_fit")]
     pub freeform_curve_fit: f32,
@@ -876,6 +883,9 @@ impl Default for ToolOptions {
             pencil_auto_erase: false,
             eraser_mode: default_eraser_mode(),
             erase_to_history: false,
+            mixer_load_after: true,
+            mixer_clean_after: true,
+            mixer_solid_only: false,
             freeform_curve_fit: default_curve_fit(),
             freeform_magnetic: false,
             replace_mode: default_replace_mode(),
@@ -1146,10 +1156,6 @@ pub struct UiState {
     /// Path Selection tool: selected path components and the drag in progress.
     #[serde(default)]
     pub path_selection: crate::path_select::PathSelection,
-    /// The Mixer Brush's ⌥-click load and the foreground colour when it was taken: it loads the
-    /// brush until the foreground colour changes.
-    #[serde(skip)]
-    pub mixer_load: Option<[[f32; 4]; 2]>,
     /// Selected row in the Paths panel ("work" or a saved path name).
     #[serde(default)]
     pub selected_path: Option<String>,
@@ -1317,7 +1323,6 @@ impl Default for UiState {
             stroke_editor: None,
             direct_selection: Default::default(),
             path_selection: Default::default(),
-            mixer_load: None,
             selected_path: None,
             panels: Panels::default(),
             views: Vec::new(),

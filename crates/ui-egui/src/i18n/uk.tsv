@@ -948,7 +948,19 @@
 	Mix	Змішування
 	Auto Clean Brush	Автоматично очищувати пензель
 	Wet	Вологість
-	Current brush load ({alt}-click the image to load its colour)	Поточне завантаження пензля ({alt}+клацання по зображенню завантажує його колір)
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	Поточне завантаження пензля: клацніть, щоб вибрати колір завантаження ({alt}+клацання по зображенню завантажує з нього)
+	Current brush load	Поточне завантаження пензля
+	Color Picker (Load Color)	Палітра кольорів (колір завантаження)
+	Brush load options	Параметри завантаження пензля
+	Load Brush	Завантажити пензель
+	Clean Brush	Очистити пензель
+	Load Solid Colors Only	Завантажувати лише суцільні кольори
+	Load the brush after each stroke	Завантажувати пензель після кожного мазка
+	Clean the brush after each stroke	Очищати пензель після кожного мазка
+	Mixing	Змішування
+	Pigment	Пігмент
+	Mix colours by averaging their RGB values	Змішує кольори усередненням значень RGB
+	Mix colours like real paint (Mixbox): blue and yellow make green	Змішує кольори як справжня фарба (Mixbox): синій і жовтий дають зелений
 	Erase to History	Стирати до історії
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Замість стирання повертати вихідний стан пензля історії ({alt}+перетягування: один мазок)
 	Rate	Частота

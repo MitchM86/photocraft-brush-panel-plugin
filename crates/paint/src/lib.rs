@@ -37,7 +37,7 @@ pub use brush::{
     PressureResponse, Scattering, SectionLocks, ShapeDynamics, Smoothing, Texture, TipShape, Transfer,
 };
 pub use curve::ResponseCurve;
-pub use mixer::MixerSettings;
+pub use mixer::{MixMode, MixerSettings};
 pub use render::{BrushContext, StrokeRenderer, grid_center, grid_square, render_stroke};
 pub use tile::{GrayTile, StoredTile};
 

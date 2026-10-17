@@ -577,6 +577,7 @@ fn mixer_options(ui: &mut egui::Ui, b: &mut BrushSettings) {
     pct(ui, tl!("Mix"), &mut m.mix, 1.0);
     pct(ui, tl!("Flow"), &mut m.flow, 1.0);
     widgets::checkbox(ui, &mut m.sample_all_layers, "Sample All Layers");
+    ui.horizontal(|ui| crate::panels::mixing_dropdown(ui, &mut m.mode));
 }
 
 /// Tilt is stored in degrees (±90, W3C Pointer Events); Photoshop shows it as ±100 %.

@@ -2050,7 +2050,19 @@
 	Mixer Brush	Míchací štětec
 	Mixer Brush Tool	Nástroj Míchací štětec
 	Wet	Vlhkost
-	Current brush load ({alt}-click the image to load its colour)	Aktuální náplň štětce ({alt}+klik do obrazu nabere jeho barvu)
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	Aktuální náplň štětce: klepnutím zvolíte barvu náplně ({alt}+klik do obrazu nabere z něj)
+	Current brush load	Aktuální náplň štětce
+	Color Picker (Load Color)	Výběr barvy (barva náplně)
+	Brush load options	Volby náplně štětce
+	Load Brush	Naplnit štětec
+	Clean Brush	Vyčistit štětec
+	Load Solid Colors Only	Nabírat jen plné barvy
+	Load the brush after each stroke	Naplnit štětec po každém tahu
+	Clean the brush after each stroke	Vyčistit štětec po každém tahu
+	Mixing	Míchání
+	Pigment	Pigment
+	Mix colours by averaging their RGB values	Míchá barvy průměrováním hodnot RGB
+	Mix colours like real paint (Mixbox): blue and yellow make green	Míchá barvy jako skutečné barvy (Mixbox): modrá a žlutá dají zelenou
 	Erase to History	Mazat do historie
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Místo mazání vrátit zdrojový stav štětce historie ({alt}+tažení: jeden tah)
 	Mix	Míchání

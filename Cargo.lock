@@ -3389,6 +3389,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mixbox"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7dc7072c6974f853e367c55d051cdee335ca9116ccc55a1f905de0892a6560c6"
+dependencies = [
+ "libm",
+]
+
+[[package]]
 name = "moxcms"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4598,9 +4607,11 @@ dependencies = [
 name = "photocraft-paint"
 version = "0.6.0"
 dependencies = [
+ "mixbox",
  "photocraft-color",
  "photocraft-geom",
  "photocraft-raster",
+ "rayon",
  "serde",
  "serde_json",
 ]

@@ -76,11 +76,11 @@ pub(crate) fn dab_params(app: &PhotocraftApp, tool: Tool, mods: egui::Modifiers)
     })
 }
 
-/// The colour the Mixer Brush loads: the last ⌥-click's while the foreground colour is unchanged
-/// since, else the foreground colour.
-pub(crate) fn mixer_color(app: &PhotocraftApp) -> [f32; 4] {
-    let fg = app.session.tools.foreground;
-    app.ui.mixer_load.filter(|[_, then]| *then == fg).map_or(fg, |[c, _]| c)
+/// `paint.mixerBrush` params beyond the brush and points: the foreground colour (a new one loads
+/// the brush, as in Photoshop) and the options bar's after-each-stroke toggles.
+pub(crate) fn mixer_params(app: &PhotocraftApp) -> Value {
+    let o = &app.ui.tool_options;
+    json!({"color": app.session.tools.foreground, "loadAfterStroke": o.mixer_load_after, "cleanAfterStroke": o.mixer_clean_after})
 }
 
 /// Finish a stroke with a retouching tool. Returns false if `tool` isn't one.
@@ -90,7 +90,7 @@ pub fn finish_stroke(app: &mut PhotocraftApp, tool: Tool, points: &[[f64; 3]], m
     let (cmd, mut p): (&str, Value) = match tool {
         Tool::SpotHealing => ("paint.spotHealing", json!({"type": o.spot_type, "sampleAllLayers": o.sample_all_layers})),
         Tool::Remove => ("paint.remove", json!({"sampleAllLayers": o.sample_all_layers})),
-        Tool::MixerBrush => ("paint.mixerBrush", json!({"color": mixer_color(app)})),
+        Tool::MixerBrush => ("paint.mixerBrush", mixer_params(app)),
         Tool::ColorReplacement => (
             "paint.colorReplacement",
             json!({"mode": o.replace_mode, "sampling": o.replace_sampling, "limits": o.replace_limits, "tolerance": o.replace_tolerance, "antiAlias": o.anti_alias}),
@@ -641,6 +641,7 @@ mod tests {
         app.run("paint.pencil", json!({"points": [[30, 30]], "size": 20, "color": "#204080"})).unwrap();
         app.run("tools.setColors", json!({"foreground": "#f02010"})).unwrap();
         app.ui.tool = Tool::MixerBrush;
+        app.ui.tool_options.mixer_solid_only = true;
         crate::paint_mouse::sync_tool_brush(&mut app);
         let steps = app.session.active().unwrap().history.past_len();
         let alt = egui::Modifiers::ALT;
@@ -648,17 +649,21 @@ mod tests {
         tool_event(&mut app, ToolEvent::Up { x: 30.0, y: 30.0 }, alt);
         assert_eq!(app.session.active().unwrap().history.past_len(), steps, "⌥-click paints nothing");
         let hex = |c: [f32; 4]| c.map(|v| (v * 255.0).round() as u8);
-        assert_eq!(hex(mixer_color(&app)), [0x20, 0x40, 0x80, 255], "it loads the colour under it");
+        let swatch = |app: &PhotocraftApp| hex(app.session.tools.mixer.swatch().unwrap());
+        // Load Solid Colors Only, so the swatch is the colour itself (a patch would average in the
+        // transparency around the dot).
+        assert_eq!(swatch(&app), [0x20, 0x40, 0x80, 255], "it loads the colour under it");
         assert_eq!(hex(app.session.tools.foreground), [0xf0, 0x20, 0x10, 255], "the foreground colour stays");
-        // A stroke loads it.
+        // A stroke paints with it, and the brush keeps it.
         tool_event(&mut app, ToolEvent::Down { x: 70.0, y: 30.0, pressure: 1.0 }, egui::Modifiers::NONE);
         tool_event(&mut app, ToolEvent::Up { x: 70.0, y: 30.0 }, egui::Modifiers::NONE);
-        let (id, p) = app.session.journal.last().cloned().unwrap();
-        assert_eq!(id, "paint.mixerBrush");
-        assert_eq!(hex(serde_json::from_value::<[f32; 4]>(p["color"].clone()).unwrap()), [0x20, 0x40, 0x80, 255]);
-        // Picking a new foreground colour loads that instead.
+        assert_eq!(app.session.journal.last().unwrap().0, "paint.mixerBrush");
+        assert_eq!(swatch(&app), [0x20, 0x40, 0x80, 255]);
+        // Picking a new foreground colour loads that at the next stroke instead.
         app.run("tools.setColors", json!({"foreground": "#00ff00"})).unwrap();
-        assert_eq!(hex(mixer_color(&app)), [0, 255, 0, 255]);
+        tool_event(&mut app, ToolEvent::Down { x: 70.0, y: 50.0, pressure: 1.0 }, egui::Modifiers::NONE);
+        tool_event(&mut app, ToolEvent::Up { x: 70.0, y: 50.0 }, egui::Modifiers::NONE);
+        assert_eq!(swatch(&app), [0, 255, 0, 255]);
     }
 
     fn active(app: &PhotocraftApp) -> &photocraft_doc::Layer {

@@ -1997,7 +1997,19 @@
 	Apply the pen's tilt and rotation to the tip shape	Aplicar a inclinação e a rotação da caneta à forma da ponta
 	Mixer Brush	Pincel misturador
 	Wet	Molhado
-	Current brush load ({alt}-click the image to load its colour)	Carga atual do pincel ({alt}-clique na imagem para carregar sua cor)
+	Current brush load: click to choose the colour to load ({alt}-click the image to load from it)	Carga atual do pincel: clique para escolher a cor de carga ({alt}-clique na imagem para carregar dela)
+	Current brush load	Carga atual do pincel
+	Color Picker (Load Color)	Seletor de cores (cor de carga)
+	Brush load options	Opções de carga do pincel
+	Load Brush	Carregar pincel
+	Clean Brush	Limpar pincel
+	Load Solid Colors Only	Carregar somente cores sólidas
+	Load the brush after each stroke	Carregar o pincel após cada traçado
+	Clean the brush after each stroke	Limpar o pincel após cada traçado
+	Mixing	Mistura
+	Pigment	Pigmento
+	Mix colours by averaging their RGB values	Mistura as cores pela média dos valores RGB
+	Mix colours like real paint (Mixbox): blue and yellow make green	Mistura as cores como tinta de verdade (Mixbox): azul e amarelo dão verde
 	Erase to History	Apagar para histórico
 	Paint back the History Brush's source state instead of erasing ({alt}-drag: one stroke)	Pintar de volta o estado de origem do pincel do histórico em vez de apagar ({alt}-arrastar: um traço)
 	Mix	Mistura

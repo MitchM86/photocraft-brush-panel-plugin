@@ -175,6 +175,23 @@ pub fn sample_color(doc: &Document, active: Option<LayerId>, x: f64, y: f64, siz
     average(&buf.px, averaging_model(doc), doc.depth)
 }
 
+/// The pixels of `rect` (straight RGBA, row-major) from the layers `which` names, as the
+/// Eyedropper sees them: transparent off the canvas, or when `which` needs an active layer and
+/// there is none. The Mixer Brush's ⌥-click loads them.
+pub fn sample_region(doc: &Document, active: Option<LayerId>, rect: Rect, which: SampleLayers) -> Vec<[f32; 4]> {
+    let n = rect.width() as usize * rect.height() as usize;
+    let inside = rect.intersect(&doc.bounds());
+    let Some(src) = sampled_document(doc, active, which).filter(|_| !inside.is_empty()) else { return vec![[0.0; 4]; n] };
+    let buf = photocraft_compose::render(&src, inside);
+    let mut out = vec![[0.0f32; 4]; n];
+    let (w, iw) = (rect.width() as usize, inside.width() as usize);
+    for (i, px) in buf.px.iter().enumerate() {
+        let (x, y) = (inside.x0 + (i % iw) as i32, inside.y0 + (i / iw) as i32);
+        out[(y - rect.y0) as usize * w + (x - rect.x0) as usize] = *px;
+    }
+    out
+}
+
 /// The colour model the averages are taken in: the document's, except CMYK. CMYK documents are
 /// composited in RGB (see `photocraft_compose`), and the profile's RGB → CMYK → RGB round trip
 /// is not exact (deep shadows move by several levels), so averaging in CMYK would make a 3×3

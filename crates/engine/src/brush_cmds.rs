@@ -8,7 +8,7 @@
 
 use photocraft_doc::LayerContent;
 use photocraft_geom::Rect;
-use photocraft_paint::mixer::{MixerSettings, apply_mixer_stroke};
+use photocraft_paint::mixer::{Mixer, MixerSettings, MixerState, Paint};
 use photocraft_paint::replace::{Limits, ReplaceMode, ReplaceSettings, Sampling, apply_color_replacement};
 use photocraft_paint::{BrushPreset, BrushSettings, GrayTile, Stroke, StrokePoint, StrokeRenderer, TipShape, render_stroke};
 use photocraft_raster::Surface;
@@ -507,51 +507,158 @@ fn pct(p: &Value, k: &str, d: f32) -> f32 {
     num(p, k).unwrap_or(d).clamp(0.0, 100.0) / 100.0
 }
 
-fn mixer_brush(s: &mut Session, p: &Value) -> Result<Value> {
+/// What a Mixer Brush stroke runs: the stroke (its own Flow, no opacity), target layer (`None`
+/// for a channel), options and the brush's paint as the stroke starts. Shared with the live
+/// preview (`retouch_cmds::LiveDab`).
+pub(crate) fn mixer_stroke_params(s: &Session, p: &Value) -> Result<(Stroke, Option<photocraft_doc::LayerId>, MixerSettings, MixerState)> {
     let cmd = "paint.mixerBrush";
     let pts = parse_points(p, cmd)?;
     let brush = resolve_brush(s, p, cmd)?;
-    // The brush's Mixer Brush options, overridden by the scalar params.
+    let m = mixer_settings(&brush, p);
+    let id = if crate::channel_cmds::is_channel_target(p) { None } else { Some(layer_id(s, p)?) };
+    let stroke = photocraft_paint::mixer::mixer_stroke(&Stroke { brush, points: pts }, &m);
+    Ok((stroke, id, m, mixer_state_for_stroke(s, p)))
+}
+
+fn mixer_brush(s: &mut Session, p: &Value) -> Result<Value> {
+    let (stroke, id, m, mut state) = mixer_stroke_params(s, p)?;
+    let sample_all = m.sample_all_layers;
+    let (clean_after, load_after) = (flag(p, "cleanAfterStroke", true), flag(p, "loadAfterStroke", true));
+    let dmg = s.edit("Mixer Brush", |doc, _| {
+        let sel = doc.selection.clone();
+        let mut under = (sample_all && id.is_some()).then(|| OtherLayers::new(doc, id));
+        let (surf, lock) = crate::channel_cmds::target_surface(doc, id, p)?;
+        let mut mixer = Mixer::new(&m, &state, surf.clone(), stroke.brush.size);
+        let dmg = photocraft_paint::mixer::run_stroke(surf, &stroke, &mut mixer, |r| under.as_mut().map(|u| u.covering(r)), sel.as_ref(), lock);
+        state = mixer.state();
+        Ok(dmg)
+    })?;
+    // Photoshop's two options-bar toggles.
+    if clean_after {
+        state.wash();
+    }
+    if load_after {
+        match state.reservoir {
+            Some(_) => state.refill(),
+            None => state.load(Paint::solid(color(p.get("color"), s.tools.foreground))),
+        }
+    }
+    s.tools.mixer = state;
+    Ok(damage_json(s, dmg))
+}
+
+/// The Mixer Brush options of a stroke: the brush's, overridden by the scalar params.
+pub(crate) fn mixer_settings(brush: &BrushSettings, p: &Value) -> MixerSettings {
     let bm = &brush.mixer;
-    let m = MixerSettings {
+    MixerSettings {
         wet: pct(p, "wet", bm.wet * 100.0),
         load: pct(p, "load", bm.load * 100.0),
         mix: pct(p, "mix", bm.mix * 100.0),
         flow: pct(p, "flow", bm.flow * 100.0),
         sample_all_layers: flag(p, "sampleAllLayers", bm.sample_all_layers),
-    };
-    let sample_all = m.sample_all_layers;
-    let (clean, load_after) = (flag(p, "cleanAfterStroke", true), flag(p, "loadAfterStroke", true));
+        mode: p.get("mode").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or(bm.mode),
+    }
+}
+
+/// The brush's paint as a stroke starts: loaded with `color` (else the foreground colour) when
+/// that colour changed since the brush was last loaded, as picking a new foreground colour loads
+/// the brush in Photoshop.
+pub(crate) fn mixer_state_for_stroke(s: &Session, p: &Value) -> MixerState {
     let mut state = s.tools.mixer.clone();
-    if load_after || state.reservoir.is_none() {
-        state.load(color(p.get("color"), s.tools.foreground));
+    let c = color(p.get("color"), s.tools.foreground);
+    if state.loaded_with != Some(c) {
+        state.load(Paint::solid(c));
+        state.loaded_with = Some(c);
     }
-    let id = if crate::channel_cmds::is_channel_target(p) { None } else { Some(layer_id(s, p)?) };
-    let stroke = Stroke { brush, points: pts };
-    let dmg = s.edit("Mixer Brush", |doc, _| {
-        let sel = doc.selection.clone();
-        let sample = if sample_all {
-            let ds = photocraft_paint::dabs(&stroke);
-            let ctx = photocraft_paint::BrushContext::new(&stroke.brush);
-            let area = ds.iter().fold(Rect::EMPTY, |r, d| r.union(&ctx.dab_rect(d, false)));
-            let buf = photocraft_compose::render(doc, area);
-            let mut surf = Surface::new(photocraft_color::PixelFormat::RGBA32F);
-            let flat: Vec<f32> = buf.px.iter().flatten().copied().collect();
-            if !area.is_empty() {
-                surf.write_region(area, &flat);
+    state
+}
+
+/// Sample All Layers for the Mixer Brush: the composite of every visible layer but the one painted
+/// on (the brush sees that one as it changes), rendered tile by tile as the stroke reaches it.
+pub(crate) struct OtherLayers {
+    doc: photocraft_doc::Document,
+    surf: Surface,
+    done: std::collections::HashSet<photocraft_geom::TileCoord>,
+}
+
+impl OtherLayers {
+    pub(crate) fn new(doc: &photocraft_doc::Document, target: Option<photocraft_doc::LayerId>) -> Self {
+        let mut doc = doc.clone();
+        if let Some(l) = target.and_then(|id| doc.layer_mut(id)) {
+            l.visible = false;
+        }
+        Self { doc, surf: Surface::new(photocraft_color::PixelFormat::RGBA32F), done: Default::default() }
+    }
+
+    /// The composite, rendered at least over `r`.
+    pub(crate) fn covering(&mut self, r: Rect) -> &Surface {
+        let bounds = self.doc.bounds();
+        for tc in r.intersect(&bounds).tiles() {
+            if self.done.insert(tc) {
+                let area = tc.rect().intersect(&bounds);
+                let buf = photocraft_compose::render(&self.doc, area);
+                let flat: Vec<f32> = buf.px.iter().flatten().copied().collect();
+                self.surf.write_region(area, &flat);
             }
-            Some(surf)
-        } else {
-            None
-        };
-        let (surf, lock) = crate::channel_cmds::target_surface(doc, id, p)?;
-        Ok(apply_mixer_stroke(surf, sample.as_ref(), &stroke, &m, &mut state, sel.as_ref(), lock))
-    })?;
-    if clean {
-        state.clean();
+        }
+        &self.surf
     }
-    s.tools.mixer = state;
-    Ok(damage_json(s, dmg))
+}
+
+/// Mixer Brush ⌥-click: load the brush with the image under the tip at (x, y), from the target
+/// layer or, with Sample All Layers, every visible layer. Load Solid Colors Only loads its
+/// average colour instead.
+fn mixer_load(s: &mut Session, p: &Value) -> Result<Value> {
+    let cmd = "paint.mixerLoad";
+    let (x, y) = match (p.get("x").and_then(Value::as_f64), p.get("y").and_then(Value::as_f64)) {
+        (Some(x), Some(y)) if x.is_finite() && y.is_finite() => (x, y),
+        _ => return Err(bad(cmd, "`x` and `y` are required")),
+    };
+    let size = num(p, "size").unwrap_or(s.tools.brush.size).max(1.0);
+    let all = flag(p, "sampleAllLayers", s.tools.brush.mixer.sample_all_layers);
+    let st = s.active().ok_or(EngineError::NoDocument)?;
+    let side = photocraft_paint::mixer::paint_side(size);
+    let half = (side / 2) as i32;
+    let (cx, cy) = (x.floor() as i32, y.floor() as i32);
+    let rect = Rect::new(cx - half, cy - half, cx + half + 1, cy + half + 1);
+    let which = if all { crate::sample_cmds::SampleLayers::All } else { crate::sample_cmds::SampleLayers::Current };
+    let px = crate::sample_cmds::sample_region(&st.doc, st.active_layer, rect, which);
+    let mut paint = Paint { side, px };
+    // Only what lies under the round tip counts towards a solid load.
+    if flag(p, "solidOnly", false) {
+        let r2 = (size / 2.0).powi(2);
+        let tip: Vec<[f32; 4]> =
+            paint.px.iter().enumerate().filter(|(i, _)| ((i % side) as f32 - half as f32).powi(2) + ((i / side) as f32 - half as f32).powi(2) <= r2).map(|(_, c)| *c).collect();
+        paint = Paint::solid(Paint { side: 1, px: tip }.average());
+    }
+    if paint.average()[3] <= 0.0 {
+        return Err(bad(cmd, "there is no paint there to load"));
+    }
+    let fg = s.tools.foreground;
+    let m = &mut s.tools.mixer;
+    m.load(paint);
+    m.loaded_with = Some(fg);
+    Ok(json!({ "color": m.swatch() }))
+}
+
+/// Load Brush (the swatch menu, or a colour picked for the load): fill the brush with `color`,
+/// else the foreground colour.
+fn mixer_load_color(s: &mut Session, p: &Value) -> Result<Value> {
+    let c = color(p.get("color"), s.tools.foreground);
+    let fg = s.tools.foreground;
+    let m = &mut s.tools.mixer;
+    m.load(Paint::solid(c));
+    m.loaded_with = Some(fg);
+    Ok(json!({ "color": c }))
+}
+
+/// Clean Brush: remove all paint from the brush (it then only smears until loaded again).
+fn mixer_clean(s: &mut Session, _: &Value) -> Result<Value> {
+    let fg = s.tools.foreground;
+    s.tools.mixer.clean();
+    // Cleaning isn't a new foreground colour: the next stroke doesn't load the brush.
+    s.tools.mixer.loaded_with = Some(fg);
+    Ok(json!({}))
 }
 
 fn color_replacement(s: &mut Session, p: &Value) -> Result<Value> {
@@ -890,11 +997,21 @@ pub fn specs() -> Vec<CommandSpec> {
         spec!(
             "paint.mixerBrush",
             "Mixer Brush",
-            r##"{"points":[…],"brush":{…}?,"preset":name?,"size":0.5..5000 px?,"wet":0..100=brush.mixer.wet,"load":0..100=brush.mixer.load,"mix":0..100=brush.mixer.mix,"flow":0..100=brush.mixer.flow,"color":"#rrggbb"?=foreground,"sampleAllLayers":bool=brush.mixer.sampleAllLayers,"cleanAfterStroke":bool=true,"loadAfterStroke":bool=true,"seed":u64?}"##,
+            r##"{"points":[…],"brush":{…}?,"preset":name?,"size":0.5..5000 px?,"wet":0..100=brush.mixer.wet,"load":0..100=brush.mixer.load,"mix":0..100=brush.mixer.mix,"flow":0..100=brush.mixer.flow,"color":"#rrggbb"?=foreground (a new colour loads the brush),"sampleAllLayers":bool=brush.mixer.sampleAllLayers,"mode":"rgb"|"pigment"=brush.mixer.mode,"cleanAfterStroke":bool=true,"loadAfterStroke":bool=true,"seed":u64?,"target":"pixels"|"mask"|"quickMask"|{"channel":i}=Channels panel target}"##,
             has_paintable,
             mixer_brush,
             true
         ),
+        spec!(
+            "paint.mixerLoad",
+            "Load Mixer Brush From Image",
+            r##"{"x":px,"y":px,"size":px?=brush size,"sampleAllLayers":bool=brush.mixer.sampleAllLayers,"solidOnly":bool=false}"##,
+            crate::commands::has_doc,
+            mixer_load,
+            true
+        ),
+        spec!("paint.mixerLoadColor", "Load Mixer Brush", r##"{"color":"#rrggbb"?=foreground}"##, always, mixer_load_color, true),
+        spec!("paint.mixerClean", "Clean Mixer Brush", "{}", always, mixer_clean, true),
         spec!(
             "paint.colorReplacement",
             "Color Replacement",
