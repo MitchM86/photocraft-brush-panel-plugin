@@ -136,7 +136,10 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                                 let key = egui::Id::new(("tool-slot", *slot_index));
                                 let tool = slot_tool(ui, app.ui.tool, slot, key);
                                 let sel = slot.contains(&app.ui.tool);
-                                let tip = if tool.key() == '\0' { tl!(tool.label()).to_string() } else { format!("{}  ({})", tl!(tool.label()), tool.key()) };
+                                let mut tip = if tool.key() == '\0' { tl!(tool.label()).to_string() } else { format!("{}  ({})", tl!(tool.label()), tool.key()) };
+                                if let Some(note) = tool.note() {
+                                    tip = format!("{tip}\n{}", tl!(note));
+                                }
                                 let resp = icons::button(ui, icons::tool_icon(tool), bx, sel, &tip);
                                 if slot.len() > 1 {
                                     paint_toolbar_flyout_indicator(ui, &t, &resp);
@@ -943,7 +946,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         mixing_dropdown(ui, &mut b.mixer.mode);
                         widgets::toggle(ui, &mut b.pressure_size, tl!("Pressure for Size"));
                     }
-                    // The Mixer Brush (Mixbox): the load is the foreground colour; every blend is
+                    // The Pigment Mixer Brush: the load is the foreground colour; every blend is
                     // Mixbox, so there is no Mixing choice.
                     Tool::MixboxBrush => {
                         brush_preset_chip(ui, b, &mut app.ui);

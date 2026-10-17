@@ -3608,3 +3608,5 @@ fontWeight	Italic	斜体
 	Layer name	レイヤー名
 	Pick Up From Stroke Start	ストローク開始時から取り込む
 	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	ストロークを始めたときのキャンバスと混ぜ、今塗ったばかりの絵の具とは混ぜません
+	Pigment Mixer Brush	顔料混合ブラシ
+	Pigment Mixer Brush Tool	顔料混合ブラシツール

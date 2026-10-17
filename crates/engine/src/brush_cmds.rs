@@ -548,10 +548,10 @@ fn mixer_brush(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(damage_json(s, dmg))
 }
 
-/// What a Mixer Brush (Mixbox) stroke runs: the stroke (its own Flow, no opacity), target layer
+/// What a Pigment Mixer Brush stroke runs: the stroke (its own Flow, no opacity), target layer
 /// (`None` for a channel), options, the load colour (`color`, else the foreground colour) and
-/// whether the pickup reads the canvas as the stroke began (`"pickup": "strokeStart"`) or as
-/// painted so far (`"live"`, the default). Shared with the live preview (`retouch_cmds::LiveDab`).
+/// whether the pickup reads the canvas as the stroke began (`"pickup": "strokeStart"`, the
+/// default) or as painted so far (`"live"`). Shared with the live preview (`retouch_cmds::LiveDab`).
 #[allow(clippy::type_complexity)]
 pub(crate) fn mixbox_stroke_params(s: &Session, p: &Value) -> Result<(Stroke, Option<photocraft_doc::LayerId>, MixerSettings, [f32; 4], bool)> {
     let cmd = "paint.mixboxBrush";
@@ -560,22 +560,22 @@ pub(crate) fn mixbox_stroke_params(s: &Session, p: &Value) -> Result<(Stroke, Op
     let m = mixer_settings(&brush, p);
     let id = if crate::channel_cmds::is_channel_target(p) { None } else { Some(layer_id(s, p)?) };
     let from_start = match p.get("pickup").and_then(Value::as_str) {
-        None | Some("live") => false,
-        Some("strokeStart") => true,
+        Some("live") => false,
+        None | Some("strokeStart") => true,
         Some(other) => return Err(bad(cmd, format!("`pickup` = {other:?} must be \"live\" or \"strokeStart\""))),
     };
     let stroke = photocraft_paint::mixer::mixer_stroke(&Stroke { brush, points: pts }, &m);
     Ok((stroke, id, m, color(p.get("color"), s.tools.foreground), from_start))
 }
 
-/// The Mixer Brush (Mixbox): `photocraft_paint::mixbox_brush`, every blend through Mixbox.
+/// The Pigment Mixer Brush: `photocraft_paint::mixbox_brush`, every blend through Mixbox.
 fn mixbox_brush(s: &mut Session, p: &Value) -> Result<Value> {
     let (stroke, id, m, color, from_start) = mixbox_stroke_params(s, p)?;
-    let dmg = s.edit("Mixer Brush", |doc, _| {
+    let dmg = s.edit("Pigment Mixer Brush", |doc, _| {
         let sel = doc.selection.clone();
         let canvas = doc.bounds();
         let (surf, lock) = crate::channel_cmds::target_surface(doc, id, p)?;
-        let mut brush = photocraft_paint::mixbox_brush::MixboxBrush::new(&m, color, surf.clone()).within(canvas);
+        let mut brush = photocraft_paint::mixbox_brush::MixboxBrush::new(&m, color, surf.clone(), stroke.brush.size).within(canvas);
         if from_start {
             brush = brush.from_stroke_start();
         }
@@ -1043,8 +1043,8 @@ pub fn specs() -> Vec<CommandSpec> {
         ),
         spec!(
             "paint.mixboxBrush",
-            "Mixer Brush",
-            r##"{"points":[…],"brush":{…}?,"preset":name?,"size":0.5..5000 px?,"wet":0..100=brush.mixer.wet,"load":0..100=brush.mixer.load,"mix":0..100=brush.mixer.mix,"flow":0..100=brush.mixer.flow,"color":"#rrggbb"?=foreground (the load),"pickup":"live"|"strokeStart"="live","seed":u64?,"target":"pixels"|"mask"|"quickMask"|{"channel":i}=Channels panel target}"##,
+            "Pigment Mixer Brush",
+            r##"{"points":[…],"brush":{…}?,"preset":name?,"size":0.5..5000 px?,"wet":0..100=brush.mixer.wet,"load":0..100=brush.mixer.load,"mix":0..100=brush.mixer.mix,"flow":0..100=brush.mixer.flow,"color":"#rrggbb"?=foreground (the load),"pickup":"strokeStart"|"live"="strokeStart","seed":u64?,"target":"pixels"|"mask"|"quickMask"|{"channel":i}=Channels panel target}"##,
             has_paintable,
             mixbox_brush,
             true

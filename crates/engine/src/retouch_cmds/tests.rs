@@ -1374,7 +1374,7 @@ fn live_mixer_brush_matches_the_commit() {
     }
 }
 
-/// The Mixer Brush (Mixbox) previews what it commits: the same dabs into the same latent canvas,
+/// The Pigment Mixer Brush previews what it commits: the same dabs into the same latent canvas,
 /// for both pickups, on 8-bit and 32-bit layers.
 #[test]
 fn live_mixbox_brush_matches_the_commit() {

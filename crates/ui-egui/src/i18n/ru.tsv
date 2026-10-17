@@ -2876,3 +2876,5 @@ fontWeight	Italic	Курсив
 	Layer name	Имя слоя
 	Pick Up From Stroke Start	Брать с начала мазка
 	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	Смешивать с холстом таким, каким он был в начале мазка, а не с краской, только что нанесённой мазком
+	Pigment Mixer Brush	Пигментная смешивающая кисть
+	Pigment Mixer Brush Tool	Инструмент «Пигментная смешивающая кисть»

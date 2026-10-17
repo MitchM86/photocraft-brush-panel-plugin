@@ -84,7 +84,7 @@ pub(crate) fn mixer_params(app: &PhotocraftApp) -> Value {
 }
 
 /// `paint.mixboxBrush` params beyond the brush and points: the load (the foreground colour) and
-/// where the pickup reads.
+/// where the pickup reads (as the stroke began unless Pick Up From Stroke Start is off).
 pub(crate) fn mixbox_params(app: &PhotocraftApp) -> Value {
     let pickup = if app.ui.tool_options.mixbox_from_start { "strokeStart" } else { "live" };
     json!({"color": app.session.tools.foreground, "pickup": pickup})
@@ -828,9 +828,9 @@ mod tests {
         app.ui.tool = Tool::MixboxBrush;
         crate::paint_mouse::sync_tool_brush(&mut app);
         app.run("tools.setBrush", json!({"pressureSize": false, "size": 16, "mixer": {"wet": 0.5, "load": 0.5, "mix": 0.5, "flow": 1.0, "mode": "rgb"}})).unwrap();
-        // Picking up the canvas as the stroke began, the blue meets the yellow all along (picking
-        // up its own fresh paint, a full brush would stay blue).
-        app.ui.tool_options.mixbox_from_start = true;
+        // Picking up the canvas as the stroke began (the default), the blue meets the yellow all
+        // along (picking up its own fresh paint, a full brush would stay blue).
+        assert!(app.ui.tool_options.mixbox_from_start);
         let none = egui::Modifiers::NONE;
         tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 30.0, pressure: 1.0 }, none);
         for i in 1..=40 {

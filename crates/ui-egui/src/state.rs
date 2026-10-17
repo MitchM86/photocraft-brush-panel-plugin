@@ -84,7 +84,7 @@ pub enum Tool {
     Pencil,
     ColorReplacement,
     MixerBrush,
-    /// The Mixer Brush (Mixbox): its own engine built from the Mixbox paper and code
+    /// The Pigment Mixer Brush: its own engine built from the Mixbox paper and code
     /// (`photocraft_paint::mixbox_brush`), every blend through Mixbox.
     MixboxBrush,
     Eraser,
@@ -220,7 +220,7 @@ impl Tool {
             Tool::Pencil => "Pencil Tool",
             Tool::ColorReplacement => "Color Replacement Tool",
             Tool::MixerBrush => "Mixer Brush Tool",
-            Tool::MixboxBrush => "Mixer Brush",
+            Tool::MixboxBrush => "Pigment Mixer Brush Tool",
             Tool::Eraser => "Eraser Tool",
             Tool::BackgroundEraser => "Background Eraser Tool",
             Tool::MagicEraser => "Magic Eraser Tool",
@@ -291,6 +291,14 @@ impl Tool {
     }
     pub fn is_vertical_type(self) -> bool {
         matches!(self, Self::VerticalType | Self::VerticalTypeMask)
+    }
+
+    /// A line the toolbar adds under the tool's name in its tooltip.
+    pub fn note(self) -> Option<&'static str> {
+        match self {
+            Tool::MixboxBrush => Some("Mix colours like real paint (Mixbox): blue and yellow make green"),
+            _ => None,
+        }
     }
 
     /// Retouching and painting tools that stroke with the brush (share the brush cursor and chip).
@@ -673,7 +681,9 @@ pub struct ToolOptions {
     #[serde(default = "yes")]
     pub mixer_clean_after: bool,
     pub mixer_solid_only: bool,
-    /// Mixer Brush (Mixbox): pick up from the canvas as the stroke began instead of as painted.
+    /// Pigment Mixer Brush: pick up from the canvas as the stroke began (the default) instead of
+    /// as painted so far.
+    #[serde(default = "yes")]
     pub mixbox_from_start: bool,
     /// Freeform Pen › Curve Fit: how closely (0.5–10 px) the path follows the drawn stroke.
     #[serde(default = "default_curve_fit")]
@@ -894,7 +904,7 @@ impl Default for ToolOptions {
             mixer_load_after: true,
             mixer_clean_after: true,
             mixer_solid_only: false,
-            mixbox_from_start: false,
+            mixbox_from_start: true,
             freeform_curve_fit: default_curve_fit(),
             freeform_magnetic: false,
             replace_mode: default_replace_mode(),
@@ -1432,6 +1442,8 @@ mod tests {
         assert_eq!(Tool::from_name("Pattern Stamp Tool"), Some(Tool::PatternStamp));
         assert_eq!(Tool::ALL.len(), 69);
         assert_eq!(Tool::from_name("mixboxBrush"), Some(Tool::MixboxBrush));
+        assert_eq!(Tool::from_name("Pigment Mixer Brush Tool"), Some(Tool::MixboxBrush));
+        assert!(Tool::MixboxBrush.note().is_some_and(|n| n.contains("Mixbox")));
         // "mixerBrush" stays the Mixer Brush Tool (its name before the Mixer Brush came).
         assert_eq!(Tool::from_name("Mixer Brush"), Some(Tool::MixerBrush));
         assert_eq!(Tool::MixboxBrush.key(), 'B');
@@ -1456,8 +1468,7 @@ mod tests {
         let list = rest.trim_start().lines().next().unwrap();
         // "Rectangular and Elliptical Marquee" names two tools: "Rectangular Marquee", "Elliptical Marquee".
         let mut named: Vec<String> = Vec::new();
-        // A note in parentheses tells same-named tools apart: "Mixer Brush (Mixbox)".
-        for entry in list.split(" · ").map(|e| e.split_once(" (").map_or(e, |(name, _)| name)) {
+        for entry in list.split(" · ") {
             match entry.split_once(" and ").and_then(|(first, rest)| Some((first, rest.split_once(' ')?))) {
                 Some((first, (second, noun))) => named.extend([format!("{first} {noun}"), format!("{second} {noun}")]),
                 None => named.push(entry.to_owned()),

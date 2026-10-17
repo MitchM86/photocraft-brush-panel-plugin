@@ -927,7 +927,7 @@ pub struct LiveDab {
     /// The Mixer Brush's stroke (it paints into its own cache and flushes per push), and the
     /// other layers' composite with Sample All Layers.
     mixer: Option<Box<(photocraft_paint::mixer::Mixer, Option<crate::brush_cmds::OtherLayers>)>>,
-    /// The Mixer Brush (Mixbox)'s stroke, run the same way.
+    /// The Pigment Mixer Brush's stroke, run the same way.
     mixbox: Option<Box<photocraft_paint::mixbox_brush::MixboxBrush>>,
 }
 
@@ -958,8 +958,9 @@ impl LiveDab {
             // The stroke `paint.mixboxBrush` commits.
             let (stroke, id, m, color, from_start) = crate::brush_cmds::mixbox_stroke_params(s, p)?;
             let canvas = s.active().ok_or(EngineError::NoDocument)?.doc.bounds();
+            let size = stroke.brush.size;
             return Self::start(s, cmd, p, stroke, id, 0, |_| Box::new(|_, _| {}), |_| None, move |pre| {
-                let brush = photocraft_paint::mixbox_brush::MixboxBrush::new(&m, color, pre.clone()).within(canvas);
+                let brush = photocraft_paint::mixbox_brush::MixboxBrush::new(&m, color, pre.clone(), size).within(canvas);
                 Some(Box::new(if from_start { brush.from_stroke_start() } else { brush }))
             });
         }
@@ -1047,7 +1048,7 @@ impl LiveDab {
             }
         }
         if let Some(brush) = self.mixbox.as_deref_mut() {
-            // The Mixer Brush (Mixbox): every new dab into its latent canvas, then one flush.
+            // The Pigment Mixer Brush: every new dab into its latent canvas, then one flush.
             for (k, d) in new.iter().enumerate() {
                 dmg = dmg.union(&brush.stroke_dab(&ctx, d, self.done + k));
             }

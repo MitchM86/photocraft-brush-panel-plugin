@@ -1,30 +1,33 @@
-//! The Mixer Brush (Mixbox): a brush made only of what Mixbox publishes. Sochorová and Jamriška,
+//! The Pigment Mixer Brush: a brush made only of what Mixbox publishes. Sochorová and Jamriška,
 //! *Practical Pigment Mixing for Digital Painting* (ACM TOG 40(6), 2021), and the Mixbox code
 //! (<https://github.com/scrtwpns/mixbox>, CC BY-NC 4.0, by Secret Weapons): every colour is
 //! encoded to a Mixbox latent, mixed as a weighted average of latents and decoded (§3.2, Eq. 14).
-//! The paper's own painting test used two brushes, a soft round brush and an area-averaging
-//! smudge brush; this brush is the two together, and the Mixer Brush Tool's rules aren't used.
+//! The Mixer Brush Tool's rules aren't used.
 //!
-//! Per dab of PhotoCraft's brush engine (tip shape, size, dynamics and smoothing as any brush):
+//! The brush carries a pickup image the size of the tip, as latents, on a grid that moves with
+//! it. Per dab of PhotoCraft's brush engine (tip shape, size, dynamics and smoothing as any brush),
+//! for each texel `p` under the tip and each pixel under it:
 //!
-//! 1. **Pickup** (the area-averaging smudge, Eq. 14): the latents of the canvas under the tip,
-//!    as painted so far, averaged with weights mask × alpha and divided by the sum of the weights.
-//!    A transparent pixel weighs nothing. Each dab averages the paint the dabs before it put down,
-//!    which is what drags colour along the stroke.
-//! 2. **The brush's colour**: the load (the foreground colour) and the pickup mixed by Mix, the
-//!    pickup's share scaled by Wet ([`pickup_share`]) and by how much paint lay under the tip. The
-//!    share the pickup can't fill comes from the load. The load runs dry by the distance painted
-//!    (Load sets the half-life in brush widths, [`load_half_life`]); with it dry the brush only
-//!    smears.
-//! 3. **Deposit** (Mixbox's `splash.html` example: `pixel = mixbox.lerp(pixel, colour, alpha ×
-//!    edge)`): each pixel is mixed towards the brush's colour by
+//! 1. `pickup[p] = lerp(pickup[p], canvas[p], rate)`: the texel follows the canvas under it,
+//!    `rate` = [`pickup_rate`]`(Wet, distance)`, so picked-up paint is dragged further the wetter
+//!    the brush. The canvas is read as the stroke began (the default) or as painted so far
+//!    ([`MixboxBrush::from_stroke_start`]); an empty texel fills at once.
+//! 2. `brush[p] = lerp(load, pickup[p], Mix)`: the load is the foreground colour; the pickup's
+//!    share is Mix × [`pickup_share`]`(Wet)` × how much paint the texel holds, the rest is the
+//!    load's, as much as is left. The load runs dry by the distance painted (Load sets the
+//!    half-life in brush widths, [`load_half_life`]); dry, the brush only smears.
+//! 3. `canvas[p] = lerp(canvas[p], brush[p], t[p])`, as Mixbox's `splash.html` stamps paint, with
 //!    `t = 1 − (1 − Flow × mask × amount)^(d / ref)`, `d` the distance from the previous dab and
 //!    `ref` = [`REFERENCE_SPACING`] of the diameter, so a stroke looks the same at any spacing,
 //!    brush size and speed. Alpha goes "over": paint never makes a pixel more transparent.
 //!
-//! The canvas is held as latents (7 floats and alpha per pixel, 64 px tiles converted as the
-//! stroke reaches them, freed with the brush) and only decoded, and clamped, when written to the
-//! layer. Other colour models go through RGB ([`to_rgba`]) to Mixbox and back.
+//! Every blend is one of Eq. 14's weighted averages of latents (bilinear reads included, weights ×
+//! amount over their sum, so transparent pixels weigh nothing). Each pixel mixes with its own
+//! texel, so the colour varies across the tip: no dab-wide colour drawing the tip's outline as
+//! arcs. Dabs are filled in at most [`SUBSTEP`] of the diameter apart. The canvas is held as
+//! latents (64 px tiles converted as the stroke reaches them, freed with the brush) and only
+//! decoded, and clamped, when written to the layer. Other colour models go through RGB
+//! ([`to_rgba`]) to Mixbox and back.
 
 use std::collections::HashMap;
 
@@ -50,11 +53,26 @@ const TILE: i32 = 64;
 /// the brush's colour follows the canvas dab by dab, and wider steps would make it lag by the
 /// spacing.
 pub const SUBSTEP: f32 = 0.05;
+/// Between two dabs the slide is followed at points this many pixels apart, at most
+/// [`MAX_SWEEP`] of them.
+const SWEEP_STEP: f32 = 1.0;
+const MAX_SWEEP: usize = 8;
 
 /// How much of the canvas the brush takes into its colour at Wet `wet` (0..1): none dry, rising to
 /// all of it at Wet 50 %, so from there Mix alone sets the canvas's share.
 pub fn pickup_share(wet: f32) -> f32 {
     (2.0 * wet.clamp(0.0, 1.0)).min(1.0)
+}
+
+/// Brush widths over which picked-up paint fades to 1/e at Wet `wet` (0..1): wetter paint is
+/// dragged further.
+pub fn drag(wet: f32) -> f32 {
+    0.1 + 0.5 * wet.clamp(0.0, 1.0)
+}
+
+/// How far the pickup moves towards the canvas under it after `widths` brush widths of travel.
+pub fn pickup_rate(wet: f32, widths: f32) -> f32 {
+    1.0 - (-widths.max(0.0) / drag(wet)).exp()
 }
 
 /// Brush widths over which the load halves at Load `load` (0..1); Load 100 % never runs dry.
@@ -153,7 +171,61 @@ struct Tile {
     touched: Vec<bool>,
 }
 
-/// One stroke of the Mixer Brush (Mixbox): [`MixboxBrush::new`] at pointer down,
+/// Paint on the brush-local grid: a latent and an amount (0 = none, the latent then means nothing).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Texel {
+    z: Latent,
+    a: f32,
+}
+
+impl Texel {
+    const NONE: Texel = Texel { z: [0.0; mixbox::LATENT_SIZE], a: 0.0 };
+
+    /// `self` and `other` mixed, `t` = the share of `other` (weighted by the amounts).
+    fn lerp(&self, other: &Texel, t: f32) -> Texel {
+        let (z, a) = weigh(&self.z, self.a, 1.0 - t, &other.z, other.a, t);
+        Texel { z, a }
+    }
+}
+
+/// `buf` (`w × h` texels) at the continuous position (`fx`, `fy`), integer positions being texel
+/// centres: the four neighbours' latents averaged with bilinear weights × amount over their sum
+/// (Eq. 14); outside is no paint.
+fn bilinear(buf: &[Texel], w: usize, h: usize, fx: f32, fy: f32) -> Texel {
+    let (x0, y0) = (fx.floor(), fy.floor());
+    let (tx, ty) = (fx - x0, fy - y0);
+    let (x0, y0) = (x0 as i64, y0 as i64);
+    let (mut z, mut a) = ([0.0f32; mixbox::LATENT_SIZE], 0.0f32);
+    for (dx, dy, wgt) in [(0, 0, (1.0 - tx) * (1.0 - ty)), (1, 0, tx * (1.0 - ty)), (0, 1, (1.0 - tx) * ty), (1, 1, tx * ty)] {
+        let (x, y) = (x0 + dx, y0 + dy);
+        if wgt <= 0.0 || x < 0 || y < 0 || x >= w as i64 || y >= h as i64 {
+            continue;
+        }
+        let c = &buf[y as usize * w + x as usize];
+        let k = wgt * c.a;
+        if k > 0.0 {
+            for (zi, ci) in z.iter_mut().zip(&c.z) {
+                *zi += k * ci;
+            }
+            a += k;
+        }
+    }
+    if a <= 1e-8 {
+        return Texel { z: [0.0; mixbox::LATENT_SIZE], a };
+    }
+    Texel { z: z.map(|v| v / a), a }
+}
+
+/// [`bilinear`] for plain values (the tip's coverage).
+fn bilinear_f32(buf: &[f32], w: usize, h: usize, fx: f32, fy: f32) -> f32 {
+    let (x0, y0) = (fx.floor(), fy.floor());
+    let (tx, ty) = (fx - x0, fy - y0);
+    let (x0, y0) = (x0 as i64, y0 as i64);
+    let at = |x: i64, y: i64| if x < 0 || y < 0 || x >= w as i64 || y >= h as i64 { 0.0 } else { buf[y as usize * w + x as usize] };
+    at(x0, y0) * (1.0 - tx) * (1.0 - ty) + at(x0 + 1, y0) * tx * (1.0 - ty) + at(x0, y0 + 1) * (1.0 - tx) * ty + at(x0 + 1, y0 + 1) * tx * ty
+}
+
+/// One stroke of the Pigment Mixer Brush: [`MixboxBrush::new`] at pointer down,
 /// [`MixboxBrush::stroke_dab`] for each dab, [`MixboxBrush::flush`] to write what changed.
 pub struct MixboxBrush {
     settings: MixerSettings,
@@ -165,6 +237,13 @@ pub struct MixboxBrush {
     /// The load colour and how much of it is left (1 = full).
     load: Latent,
     left: f32,
+    /// The pickup image: `side × side` texels on a grid centred on the tip, one per pixel offset
+    /// (`side = 2r + 1`), moving with the brush.
+    side: usize,
+    r: i32,
+    pickup: Vec<Texel>,
+    /// The brush's paint per texel under the current dab (kept to reuse the allocation).
+    brush: Vec<Texel>,
     /// Centre of the previous dab.
     last: Option<(f64, f64)>,
     /// Only the canvas is picked up from: a layer's pixels past its edge are out of sight.
@@ -177,12 +256,31 @@ pub struct MixboxBrush {
 
 impl MixboxBrush {
     /// Start a stroke on a target holding `pre`, loaded with `color` (straight RGBA as the
-    /// document's colours read through [`to_rgba`]; the foreground colour).
-    pub fn new(settings: &MixerSettings, color: [f32; 4], pre: Surface) -> Self {
+    /// document's colours read through [`to_rgba`]; the foreground colour), for tips up to
+    /// `max_brush_size` px. The pickup reads the live canvas unless
+    /// [`MixboxBrush::from_stroke_start`].
+    pub fn new(settings: &MixerSettings, color: [f32; 4], pre: Surface, max_brush_size: f32) -> Self {
         let conv = Conv::new(pre.format());
         let native = from_rgba(&conv.fmt, [color[0], color[1], color[2], 1.0]);
         let load = conv.latent(conv.rgb(&native));
-        Self { settings: settings.clone(), conv, pre, tiles: HashMap::new(), load, left: 1.0, last: None, canvas: None, from_start: false, last_dab: None }
+        // Room for the tip's corners (sampled tips fill their square) and a texel each side.
+        let side = 2 * ((max_brush_size.max(1.0) * std::f32::consts::SQRT_2 / 2.0).ceil() as usize + 2) + 1;
+        Self {
+            settings: settings.clone(),
+            conv,
+            pre,
+            tiles: HashMap::new(),
+            load,
+            left: 1.0,
+            side,
+            r: (side / 2) as i32,
+            pickup: vec![Texel::NONE; side * side],
+            brush: vec![Texel::NONE; side * side],
+            last: None,
+            canvas: None,
+            from_start: false,
+            last_dab: None,
+        }
     }
 
     /// Pick up from the canvas as it was when the stroke began, not as painted so far: the brush
@@ -205,10 +303,11 @@ impl MixboxBrush {
         self.left
     }
 
-    /// Bytes the latent canvas holds now (it is freed with the brush, at the end of the stroke).
+    /// Bytes the latent canvas and the pickup image hold now (freed with the brush, at the end of
+    /// the stroke).
     pub fn cache_bytes(&self) -> usize {
         let px = std::mem::size_of::<Latent>() + std::mem::size_of::<f32>();
-        self.tiles.len() * (TILE * TILE) as usize * (px * if self.from_start { 2 } else { 1 } + 1)
+        self.tiles.len() * (TILE * TILE) as usize * (px * if self.from_start { 2 } else { 1 } + 1) + 2 * self.side * self.side * std::mem::size_of::<Texel>()
     }
 
     fn ensure_tiles(&mut self, rect: Rect) {
@@ -230,8 +329,9 @@ impl MixboxBrush {
         self.tiles.extend(done);
     }
 
-    /// Paint the brush engine's dab `d` (number `index` in the stroke). Returns the rectangle
-    /// it touched; [`MixboxBrush::flush`] writes it.
+    /// Paint the brush engine's dab `d` (number `index` in the stroke), filling in dabs from the
+    /// previous one so they are at most [`SUBSTEP`] of the diameter apart. Returns the rectangle
+    /// touched; [`MixboxBrush::flush`] writes it.
     pub fn stroke_dab(&mut self, ctx: &crate::BrushContext, d: &crate::Dab, index: usize) -> Rect {
         let prev = self.last_dab.replace(*d);
         let Some(p) = prev else { return self.dab(&ctx.footprint(d, index)) };
@@ -259,104 +359,162 @@ impl MixboxBrush {
         dirty
     }
 
-    /// Paint one dab (its footprint: tip coverage × flow).
+    /// The canvas the pickup reads at pixel (`x`, `y`): as the stroke began or as painted so far;
+    /// no paint off the canvas or where no tile was converted.
+    fn source(&self, x: i32, y: i32) -> Texel {
+        if self.canvas.is_some_and(|c| !c.contains(x, y)) {
+            return Texel::NONE;
+        }
+        let (tx, ty) = (x.div_euclid(TILE), y.div_euclid(TILE));
+        let Some(t) = self.tiles.get(&(tx, ty)) else { return Texel::NONE };
+        let li = ((y - ty * TILE) * TILE + (x - tx * TILE)) as usize;
+        match (&t.start, self.from_start) {
+            (Some((z, a)), true) => Texel { z: z[li], a: a[li] },
+            _ => Texel { z: t.z[li], a: t.a[li] },
+        }
+    }
+
+    /// Paint one dab (its footprint: tip coverage × flow). The pickup image's grid sits at the
+    /// dab's sub-pixel centre; texels read the canvas at their exact position and pixels read the
+    /// brush at theirs, both bilinear (Eq. 14 weights), so slanted strokes don't step.
     pub fn dab(&mut self, fp: &Footprint) -> Rect {
         let (cx, cy) = (fp.dab.center.x, fp.dab.center.y);
         let diameter = (2.0 * fp.dab.radius).max(1.0);
         // The first dab counts as one reference step.
         let dist = self.last.map_or(REFERENCE_SPACING * diameter, |(lx, ly)| (cx - lx).hypot(cy - ly) as f32);
+        // How far the brush slid since the previous dab.
+        let (mx, my) = self.last.map_or((0.0, 0.0), |(lx, ly)| ((cx - lx) as f32, (cy - ly) as f32));
         self.last = Some((cx, cy));
         let flow = fp.dab.alpha;
         let rect = fp.rect;
         if flow <= 0.0 || rect.is_empty() {
             return Rect::EMPTY;
         }
-        self.ensure_tiles(rect);
+        // The slide is followed at points SWEEP_STEP px apart (at most MAX_SWEEP): without them
+        // a pixel's colour would come from wherever the last dab happened to leave the tip, in
+        // steps of the dab spacing, and show as stripes.
+        let sweep = ((mx.hypot(my) / SWEEP_STEP).ceil() as usize).clamp(1, MAX_SWEEP);
+        // Pixels the tip covered while it slid here, and the canvas around them.
+        let back = Rect::new(rect.x0 - mx.ceil().max(0.0) as i32, rect.y0 - my.ceil().max(0.0) as i32, rect.x1 + (-mx).ceil().max(0.0) as i32, rect.y1 + (-my).ceil().max(0.0) as i32);
+        let swept = rect.union(&back);
+        let halo = swept.inflate(1);
+        self.ensure_tiles(halo);
         let inv_flow = 1.0 / flow;
-        let w = rect.width() as usize;
-        let seen = self.canvas.map_or(rect, |c| rect.intersect(&c));
-
-        // 1. Pickup: Σ mask·alpha·z / Σ mask·alpha over the tip (Eq. 14), and how much of the tip
-        //    held paint (Σ mask·alpha / Σ mask).
-        let mask_at = |x: i32, y: i32| fp.cov[(y - rect.y0) as usize * w + (x - rect.x0) as usize] * inv_flow;
-        let (tiles, from_start) = (&self.tiles, self.from_start);
-        let (sz, swa, sw) = (seen.y0..seen.y1)
-            .into_par_iter()
-            .map(|y| {
-                let (mut z, mut wa, mut wsum) = ([0.0f64; mixbox::LATENT_SIZE], 0.0f64, 0.0f64);
-                let ty = y.div_euclid(TILE);
-                for x in seen.x0..seen.x1 {
-                    let m = mask_at(x, y);
-                    if m < MASK_EPS {
-                        continue;
-                    }
-                    wsum += f64::from(m);
-                    let Some(t) = tiles.get(&(x.div_euclid(TILE), ty)) else { continue };
-                    let li = ((y - ty * TILE) * TILE + (x - x.div_euclid(TILE) * TILE)) as usize;
-                    let (tz, ta) = match (&t.start, from_start) {
-                        (Some((z0, a0)), true) => (&z0[li], a0[li]),
-                        _ => (&t.z[li], t.a[li]),
-                    };
-                    let k = f64::from(m * ta);
-                    if k > 0.0 {
-                        for (zi, ci) in z.iter_mut().zip(tz) {
-                            *zi += k * f64::from(*ci);
-                        }
-                        wa += k;
-                    }
-                }
-                (z, wa, wsum)
-            })
-            .reduce(
-                || ([0.0f64; mixbox::LATENT_SIZE], 0.0, 0.0),
-                |a, b| (std::array::from_fn(|i| a.0[i] + b.0[i]), a.1 + b.1, a.2 + b.2),
-            );
-        let (picked, held) = if swa > 1e-9 { (sz.map(|v| (v / swa) as f32), (swa / sw.max(1e-9)) as f32) } else { ([0.0; mixbox::LATENT_SIZE], 0.0) };
-
-        // 2. The brush's colour: load and pickup by Mix, the share the pickup can't fill from the
-        //    load. Then the load runs dry by the distance painted.
+        let (fw, fh) = (rect.width() as usize, rect.height() as usize);
         let wet = (self.settings.wet * fp.dab.wet).clamp(0.0, 1.0);
         let mix = (self.settings.mix * fp.dab.mix).clamp(0.0, 1.0);
-        let wp = mix * pickup_share(wet) * held;
-        // Whatever the pickup doesn't fill (all but `wp`) is the load's, as much as is left. With
-        // the load full the brush always lays full paint; dry, it smears the pickup alone.
-        let wl = (1.0 - wp) * self.left;
-        let (paint, amount) = weigh(&self.load, 1.0, wl, &picked, 1.0, wp);
-        let amount = amount.min(1.0);
+        let share = mix * pickup_share(wet);
+        let rate = pickup_rate(wet, dist / diameter);
+        let left = self.left;
+        let load = Texel { z: self.load, a: 1.0 };
+
+        // The canvas under the slide (plus a pixel for interpolation), dense, for the texels to read.
+        let (hw, hh) = (halo.width() as usize, halo.height() as usize);
+        let src: Vec<Texel> = (0..hw * hh).into_par_iter().map(|i| self.source(halo.x0 + (i % hw) as i32, halo.y0 + (i / hw) as i32)).collect();
+
+        // Per texel under the dab: the pickup follows the canvas, and the brush's paint is the
+        // load and the pickup by Mix.
+        let (side, r) = (self.side, f64::from(self.r));
+        // Texel `t`'s centre in pixel-index space (pixel x's centre is x + 0.5).
+        let texel_at = |t: usize, c: f64| (c + t as f64 - r - 0.5) as f32;
+        // Texels within a pixel of the dab: `first..last`.
+        let span = |lo: i32, hi: i32, c: f64| {
+            let first = ((f64::from(lo) - 1.0 - c + r + 0.5).floor().max(0.0) as usize).min(side);
+            let last = ((f64::from(hi) + 1.0 - c + r + 0.5).floor().max(-1.0) + 1.0).min(side as f64) as usize;
+            (first, last.max(first))
+        };
+        let (t0, t1) = span(rect.y0, rect.y1, cy);
+        let (c0, c1) = span(rect.x0, rect.x1, cx);
+        self.brush.fill(Texel::NONE);
+        self.pickup[t0 * side..t1 * side].par_chunks_mut(side).zip(self.brush[t0 * side..t1 * side].par_chunks_mut(side)).enumerate().for_each(|(k, (prow, brow))| {
+            let sy = texel_at(t0 + k, cy);
+            for tx in c0..c1 {
+                let sx = texel_at(tx, cx);
+                let mask = bilinear_f32(&fp.cov, fw, fh, sx - rect.x0 as f32, sy - rect.y0 as f32) * inv_flow;
+                if mask < MASK_EPS {
+                    continue;
+                }
+                // The canvas the texel slid over since the previous dab: Eq. 14's average of the
+                // points along its way (bilinear reads, weights × amount).
+                let (mut z, mut a) = ([0.0f32; mixbox::LATENT_SIZE], 0.0f32);
+                for j in 0..sweep {
+                    let t = if sweep == 1 { 0.0 } else { (j as f32 + 0.5) / sweep as f32 };
+                    let p = bilinear(&src, hw, hh, sx - t * mx - halo.x0 as f32, sy - t * my - halo.y0 as f32);
+                    for (zi, ci) in z.iter_mut().zip(&p.z) {
+                        *zi += p.a * ci;
+                    }
+                    a += p.a;
+                }
+                let under = if a <= 1e-8 { Texel::NONE } else { Texel { z: z.map(|v| v / a), a: a / sweep as f32 } };
+                // pickup[p] = lerp(pickup[p], canvas[p], rate); an empty texel fills at once.
+                prow[tx] = if prow[tx].a <= 0.0 { under } else { prow[tx].lerp(&under, rate) };
+                // brush[p] = lerp(load, pickup[p], Mix): the share the pickup can't fill (it holds
+                // little paint) comes from the load, as much of it as is left.
+                let wp = share * prow[tx].a;
+                let (z, a) = weigh(&load.z, 1.0, (1.0 - wp) * left, &prow[tx].z, 1.0, wp);
+                brow[tx] = Texel { z, a: a.min(1.0) };
+            }
+        });
         let half_life = load_half_life(self.settings.load);
         if half_life.is_finite() {
             self.left *= 0.5f32.powf(dist / diameter / half_life);
         }
-        if amount <= 0.0 {
-            return Rect::EMPTY;
-        }
 
-        // 3. Deposit: each pixel towards the brush's colour by t = 1 − (1 − Flow·mask·amount)^(d/ref).
+        // canvas[p] = lerp(canvas[p], brush[p], t[p]), t = 1 − (1 − Flow·mask·amount)^(d/ref),
+        // alpha "over". The slide's points are laid one over the other, newest on top, each with
+        // its share of the distance, and combined into one lerp.
         let steps = dist / (REFERENCE_SPACING * diameter);
-        let (t0x, t1x) = (rect.x0.div_euclid(TILE), (rect.x1 - 1).div_euclid(TILE));
-        let (t0y, t1y) = (rect.y0.div_euclid(TILE), (rect.y1 - 1).div_euclid(TILE));
+        let part = steps / sweep as f32;
+        let (t0x, t1x) = (swept.x0.div_euclid(TILE), (swept.x1 - 1).div_euclid(TILE));
+        let (t0y, t1y) = (swept.y0.div_euclid(TILE), (swept.y1 - 1).div_euclid(TILE));
         let mut work: Vec<((i32, i32), Tile)> = (t0y..=t1y).flat_map(|ty| (t0x..=t1x).map(move |tx| (tx, ty))).filter_map(|k| self.tiles.remove_entry(&k)).collect();
+        let brush = &self.brush;
         work.par_iter_mut().for_each(|((tx, ty), tile)| {
-            let r = Rect::new(*tx * TILE, *ty * TILE, (*tx + 1) * TILE, (*ty + 1) * TILE).intersect(&rect);
-            for y in r.y0..r.y1 {
-                for x in r.x0..r.x1 {
-                    let v = (fp.cov[(y - rect.y0) as usize * w + (x - rect.x0) as usize] * amount).min(1.0);
-                    if v * inv_flow < MASK_EPS {
+            let tr = Rect::new(*tx * TILE, *ty * TILE, (*tx + 1) * TILE, (*ty + 1) * TILE).intersect(&swept);
+            for y in tr.y0..tr.y1 {
+                let fy = (f64::from(y) + 0.5 - cy + r) as f32;
+                for x in tr.x0..tr.x1 {
+                    let fx = (f64::from(x) + 0.5 - cx + r) as f32;
+                    let (mut z, mut keep) = ([0.0f32; mixbox::LATENT_SIZE], 1.0f32);
+                    for j in 0..sweep {
+                        // Newest first: the tip was (t·mx, t·my) behind where it is now.
+                        let t = if sweep == 1 { 0.0 } else { (j as f32 + 0.5) / sweep as f32 };
+                        let (ox, oy) = (t * mx, t * my);
+                        let cov = bilinear_f32(&fp.cov, fw, fh, (x - rect.x0) as f32 + ox, (y - rect.y0) as f32 + oy);
+                        if cov * inv_flow < MASK_EPS {
+                            continue;
+                        }
+                        let paint = bilinear(brush, side, side, fx + ox, fy + oy);
+                        let v = (cov * paint.a).min(1.0);
+                        if v <= 0.0 {
+                            continue;
+                        }
+                        let e = if v >= 1.0 { 1.0 } else { 1.0 - ((1.0 - v).ln() * part).exp() };
+                        let w = e * keep;
+                        for (zi, ci) in z.iter_mut().zip(&paint.z) {
+                            *zi += w * ci;
+                        }
+                        keep *= 1.0 - e;
+                        if keep <= 0.0 {
+                            break;
+                        }
+                    }
+                    let e = 1.0 - keep;
+                    if e <= 0.0 {
                         continue;
                     }
-                    let e = if v >= 1.0 { 1.0 } else { 1.0 - ((1.0 - v).ln() * steps).exp() };
                     let li = ((y - *ty * TILE) * TILE + (x - *tx * TILE)) as usize;
                     let a = tile.a[li];
                     // "Over": the canvas keeps (1 − e) of its paint, the brush adds e.
-                    let (z, _) = weigh(&tile.z[li], a, 1.0 - e, &paint, 1.0, e);
-                    tile.z[li] = z;
+                    let (zc, _) = weigh(&tile.z[li], a, 1.0 - e, &z.map(|v| v / e), 1.0, e);
+                    tile.z[li] = zc;
                     tile.a[li] = (a + (1.0 - a) * e).min(1.0);
                     tile.touched[li] = true;
                 }
             }
         });
         self.tiles.extend(work);
-        rect
+        swept
     }
 
     /// Write the pixels painted since the last flush inside `rect` to `work` (native pixels).
@@ -445,12 +603,12 @@ pub fn run_stroke(target: &mut Surface, stroke: &Stroke, brush: &mut MixboxBrush
     bounds
 }
 
-/// Paint a Mixer Brush (Mixbox) stroke loaded with `color`, picking up from the canvas as painted
+/// Paint a Pigment Mixer Brush stroke loaded with `color`, picking up from the canvas as painted
 /// so far or, with `from_start`, as the stroke began. Returns the damaged rectangle.
 #[allow(clippy::too_many_arguments)]
 pub fn apply_mixbox_stroke(target: &mut Surface, stroke: &Stroke, m: &MixerSettings, color: [f32; 4], from_start: bool, selection: Option<&Surface>, lock_transparency: bool) -> Rect {
     let st = crate::mixer::mixer_stroke(stroke, m);
-    let mut brush = MixboxBrush::new(m, color, target.clone());
+    let mut brush = MixboxBrush::new(m, color, target.clone(), st.brush.size);
     if from_start {
         brush = brush.from_stroke_start();
     }

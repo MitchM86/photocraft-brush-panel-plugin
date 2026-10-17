@@ -2601,3 +2601,5 @@ fontWeight	Italic	斜体
 	Layer name	图层名称
 	Pick Up From Stroke Start	从笔画开始时拾取
 	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	与笔画开始时的画布混合，而不是与笔画刚涂上的颜料混合
+	Pigment Mixer Brush	颜料混合器画笔
+	Pigment Mixer Brush Tool	颜料混合器画笔工具
