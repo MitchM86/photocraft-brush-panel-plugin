@@ -2591,3 +2591,5 @@ fontWeight	Italic	Kurzíva
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Táhněte rámeček · nad vybraným obrazem jej ořízne · Umístit vložené nebo přetažení souboru vyplní vybraný rámeček
 	This command needs a file on disk; it isn't available in the browser	Tento příkaz potřebuje soubor na disku; v prohlížeči není k dispozici
 	Layer name	Název vrstvy
+	Pick Up From Stroke Start	Nabírat z počátku tahu
+	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	Míchat s plátnem, jak vypadalo na začátku tahu, ne s barvou, kterou tah právě nanesl

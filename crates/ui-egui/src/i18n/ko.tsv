@@ -3169,3 +3169,5 @@ fontWeight	Italic	기울임
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	프레임을 드래그 · 선택한 이미지 위에서는 이미지를 자름 · 포함 가져오기 또는 파일을 놓으면 선택한 프레임을 채움
 	This command needs a file on disk; it isn't available in the browser	이 명령에는 디스크의 파일이 필요합니다. 브라우저에서는 사용할 수 없습니다
 	Layer name	레이어 이름
+	Pick Up From Stroke Start	획 시작 시점에서 묻히기
+	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	방금 칠한 물감이 아니라 획을 시작할 때의 캔버스와 섞습니다

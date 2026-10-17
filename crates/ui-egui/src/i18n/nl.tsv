@@ -3759,3 +3759,5 @@ cameraRaw	Whites	Witten
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Sleep een kader · boven een geselecteerde afbeelding knipt het die bij · Ingesloten plaatsen of een bestand neerzetten vult het geselecteerde kader
 	This command needs a file on disk; it isn't available in the browser	Deze opdracht heeft een bestand op schijf nodig; in de browser is hij niet beschikbaar
 	Layer name	Laagnaam
+	Pick Up From Stroke Start	Opnemen vanaf begin van streek
+	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	Mengen met het canvas zoals het was bij het begin van de streek, niet met de verf die de streek net heeft neergezet

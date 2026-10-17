@@ -84,6 +84,9 @@ pub enum Tool {
     Pencil,
     ColorReplacement,
     MixerBrush,
+    /// The Mixer Brush (Mixbox): its own engine built from the Mixbox paper and code
+    /// (`photocraft_paint::mixbox_brush`), every blend through Mixbox.
+    MixboxBrush,
     Eraser,
     BackgroundEraser,
     MagicEraser,
@@ -133,7 +136,7 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: [Tool; 68] = [
+    pub const ALL: [Tool; 69] = [
         Tool::Move,
         Tool::Artboard,
         Tool::RectMarquee,
@@ -156,6 +159,7 @@ impl Tool {
         Tool::Pencil,
         Tool::ColorReplacement,
         Tool::MixerBrush,
+        Tool::MixboxBrush,
         Tool::Eraser,
         Tool::BackgroundEraser,
         Tool::MagicEraser,
@@ -216,6 +220,7 @@ impl Tool {
             Tool::Pencil => "Pencil Tool",
             Tool::ColorReplacement => "Color Replacement Tool",
             Tool::MixerBrush => "Mixer Brush Tool",
+            Tool::MixboxBrush => "Mixer Brush",
             Tool::Eraser => "Eraser Tool",
             Tool::BackgroundEraser => "Background Eraser Tool",
             Tool::MagicEraser => "Magic Eraser Tool",
@@ -296,6 +301,7 @@ impl Tool {
                 | Tool::Pencil
                 | Tool::ColorReplacement
                 | Tool::MixerBrush
+                | Tool::MixboxBrush
                 | Tool::Eraser
                 | Tool::BackgroundEraser
                 | Tool::Remove
@@ -320,7 +326,7 @@ impl Tool {
             Tool::RectMarquee | Tool::EllipseMarquee => 'M',
             // Photoshop gives the single-pixel marquees no key of their own.
             Tool::SingleRowMarquee | Tool::SingleColumnMarquee => '\0',
-            Tool::Brush | Tool::Pencil | Tool::ColorReplacement | Tool::MixerBrush => 'B',
+            Tool::Brush | Tool::Pencil | Tool::ColorReplacement | Tool::MixerBrush | Tool::MixboxBrush => 'B',
             Tool::Eraser | Tool::BackgroundEraser | Tool::MagicEraser => 'E',
             Tool::Eyedropper | Tool::ColorSampler | Tool::Ruler | Tool::Note | Tool::Count => 'I',
             Tool::Lasso | Tool::PolygonLasso | Tool::MagneticLasso => 'L',
@@ -352,7 +358,7 @@ impl Tool {
             Tool::RectMarquee => "⬚",
             Tool::EllipseMarquee => "◌",
             Tool::Brush => "🖌",
-            Tool::MixerBrush => "🖌",
+            Tool::MixerBrush | Tool::MixboxBrush => "🖌",
             Tool::Eraser => "⌫",
             Tool::Eyedropper => "💧",
             Tool::Lasso | Tool::PolygonLasso | Tool::MagneticLasso => "L",
@@ -667,6 +673,8 @@ pub struct ToolOptions {
     #[serde(default = "yes")]
     pub mixer_clean_after: bool,
     pub mixer_solid_only: bool,
+    /// Mixer Brush (Mixbox): pick up from the canvas as the stroke began instead of as painted.
+    pub mixbox_from_start: bool,
     /// Freeform Pen › Curve Fit: how closely (0.5–10 px) the path follows the drawn stroke.
     #[serde(default = "default_curve_fit")]
     pub freeform_curve_fit: f32,
@@ -886,6 +894,7 @@ impl Default for ToolOptions {
             mixer_load_after: true,
             mixer_clean_after: true,
             mixer_solid_only: false,
+            mixbox_from_start: false,
             freeform_curve_fit: default_curve_fit(),
             freeform_magnetic: false,
             replace_mode: default_replace_mode(),
@@ -1421,7 +1430,12 @@ mod tests {
         assert!(!Tool::RedEye.is_brushlike());
         assert_eq!(Tool::from_name("patternStamp"), Some(Tool::PatternStamp));
         assert_eq!(Tool::from_name("Pattern Stamp Tool"), Some(Tool::PatternStamp));
-        assert_eq!(Tool::ALL.len(), 68);
+        assert_eq!(Tool::ALL.len(), 69);
+        assert_eq!(Tool::from_name("mixboxBrush"), Some(Tool::MixboxBrush));
+        // "mixerBrush" stays the Mixer Brush Tool (its name before the Mixer Brush came).
+        assert_eq!(Tool::from_name("Mixer Brush"), Some(Tool::MixerBrush));
+        assert_eq!(Tool::MixboxBrush.key(), 'B');
+        assert!(Tool::MixboxBrush.is_brushlike());
         assert_eq!(Tool::from_name("Remove Tool"), Some(Tool::Remove));
         assert_eq!(Tool::Remove.key(), 'J');
         assert!(Tool::Remove.is_brushlike());
@@ -1442,7 +1456,8 @@ mod tests {
         let list = rest.trim_start().lines().next().unwrap();
         // "Rectangular and Elliptical Marquee" names two tools: "Rectangular Marquee", "Elliptical Marquee".
         let mut named: Vec<String> = Vec::new();
-        for entry in list.split(" · ") {
+        // A note in parentheses tells same-named tools apart: "Mixer Brush (Mixbox)".
+        for entry in list.split(" · ").map(|e| e.split_once(" (").map_or(e, |(name, _)| name)) {
             match entry.split_once(" and ").and_then(|(first, rest)| Some((first, rest.split_once(' ')?))) {
                 Some((first, (second, noun))) => named.extend([format!("{first} {noun}"), format!("{second} {noun}")]),
                 None => named.push(entry.to_owned()),

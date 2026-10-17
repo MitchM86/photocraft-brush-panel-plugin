@@ -37,6 +37,17 @@
 //! they are; [`MixMode::Pigment`] uses Mixbox by Secret Weapons (CC BY-NC 4.0,
 //! <https://scrtwpns.com/mixbox>), so blue and yellow make green. Another mixer can be swapped in
 //! by adding a space.
+//!
+//! In Pigment every blend of colours is a weighted average of Mixbox latents, as Sochorová and
+//! Jamriška's paper (Practical Pigment Mixing for Digital Painting, 2021, §3.2) asks: encode each
+//! participating colour, take a weighted average of the latents, decode the result. Weights are
+//! normalised by the amount of paint, so a transparent pixel weighs nothing. That covers the
+//! deposit, pickup, smear, the sweep along a move, contamination, bilinear reads of the canvas and
+//! of the brush, resampling a loaded patch to the tip ([`Codec::grid`]), Load Solid Colors Only's
+//! average ([`average_paint`]) and a feathered selection's edge ([`Mixer::mix_back`]). The canvas
+//! copy, reservoir and pickup are float latents for the whole stroke and are kept as latents
+//! between strokes ([`MixerState::exact`]); only what is written to the layer is decoded and
+//! clamped.
 
 use std::collections::HashMap;
 
@@ -95,8 +106,9 @@ pub enum MixMode {
     /// Average the channels (what layers and other brushes do).
     #[default]
     Rgb,
-    /// Mix like pigments (Mixbox): blue and yellow make green. RGB documents only; other colour
-    /// modes mix as [`MixMode::Rgb`].
+    /// Mix like pigments (Mixbox): blue and yellow make green. Every blend, resample and average
+    /// of the brush's paint is a weighted sum of Mixbox latents; other colour models go through
+    /// RGB (Multichannel mixes as [`MixMode::Rgb`]).
     Pigment,
 }
 
@@ -144,10 +156,36 @@ impl PaintSpace for Mixbox {
     }
 }
 
-/// The space `mode` mixes in for pixels of `fmt`.
+/// [`MixMode::Pigment`] in a Grayscale, Bitmap, Duotone, CMYK or Lab document: the colour to RGB
+/// ([`to_rgba`]), Mixbox latents, and back ([`from_rgba`]), as the paper's RGB-in / RGB-out mixing
+/// asks. 32-bit grey is linear light like 32-bit RGB.
+struct MixboxVia {
+    /// The document's format without alpha (the codec hands over colour channels only).
+    fmt: PixelFormat,
+    space: Mixbox,
+}
+
+impl PaintSpace for MixboxVia {
+    fn encode(&self, native: &[f32]) -> Latent {
+        let c = to_rgba(&self.fmt, native);
+        self.space.encode(&c[..3])
+    }
+    fn decode(&self, z: &Latent, native: &mut [f32]) {
+        let mut rgb = [0.0f32; 3];
+        self.space.decode(z, &mut rgb);
+        photocraft_raster::from_rgba_into(&self.fmt, [rgb[0], rgb[1], rgb[2], 1.0], native);
+    }
+}
+
+/// The space `mode` mixes in for pixels of `fmt`. Pigment mixes every colour model through
+/// Mixbox but Multichannel (no RGB meaning), which mixes its channels.
 pub fn space(mode: MixMode, fmt: &PixelFormat) -> Box<dyn PaintSpace> {
+    let f32 = fmt.sample == SampleType::F32;
     match (mode, fmt.mode) {
-        (MixMode::Pigment, ColorMode::Rgb) => Box::new(Mixbox { linear: fmt.sample == SampleType::F32 }),
+        (MixMode::Pigment, ColorMode::Rgb | ColorMode::Indexed) => Box::new(Mixbox { linear: f32 }),
+        (MixMode::Pigment, ColorMode::Grayscale | ColorMode::Bitmap | ColorMode::Duotone) => Box::new(MixboxVia { fmt: PixelFormat { alpha: false, ..*fmt }, space: Mixbox { linear: f32 } }),
+        // Their conversions to RGB give sRGB-encoded values at any depth.
+        (MixMode::Pigment, ColorMode::Cmyk | ColorMode::Lab) => Box::new(MixboxVia { fmt: PixelFormat { alpha: false, ..*fmt }, space: Mixbox { linear: false } }),
         _ => Box::new(Channels { nc: fmt.mode.color_channels() }),
     }
 }
@@ -251,38 +289,29 @@ impl Paint {
         Self { side: 1, px: vec![c] }
     }
 
-    /// The paint at cell (`qx`, `qy`) of a `side × side` grid.
-    /// Read bilinearly (colour weighted by alpha), so a patch loaded at one brush size stays smooth
-    /// on a brush of another.
-    fn at(&self, qx: usize, qy: usize, side: usize) -> [f32; 4] {
-        if self.side <= 1 || self.px.len() < self.side * self.side {
-            return self.px.first().copied().unwrap_or([0.0; 4]);
-        }
-        if side == self.side {
-            return self.px[qy * self.side + qx];
-        }
-        let last = (self.side - 1) as f32;
-        let map = |q: usize| ((q as f32 + 0.5) * self.side as f32 / side as f32 - 0.5).clamp(0.0, last);
-        let (fx, fy) = (map(qx), map(qy));
-        let (x0, y0) = (fx.floor() as usize, fy.floor() as usize);
-        let (tx, ty) = (fx - x0 as f32, fy - y0 as f32);
-        let (x1, y1) = ((x0 + 1).min(self.side - 1), (y0 + 1).min(self.side - 1));
-        let (mut c, mut a) = ([0.0f32; 3], 0.0f32);
-        for (x, y, w) in [(x0, y0, (1.0 - tx) * (1.0 - ty)), (x1, y0, tx * (1.0 - ty)), (x0, y1, (1.0 - tx) * ty), (x1, y1, tx * ty)] {
-            let p = self.px[y * self.side + x];
-            let wa = w * p[3];
-            for i in 0..3 {
-                c[i] += wa * p[i];
-            }
-            a += wa;
-        }
-        if a <= 1e-8 {
-            return [0.0; 4];
-        }
-        [c[0] / a, c[1] / a, c[2] / a, a]
+    /// A grid holding paint: `side × side` cells (a solid colour is one).
+    fn is_grid(&self) -> bool {
+        self.side > 1 && self.px.len() >= self.side * self.side
     }
 
-    /// The average colour (alpha-weighted), for the options bar's swatch.
+    /// The amount of paint (alpha) at cell (`qx`, `qy`) of a `side × side` grid, read bilinearly so
+    /// a patch loaded at one brush size runs dry smoothly on a brush of another. Colours are only
+    /// resampled in mixing space ([`Codec::grid`]): averaging them here would mix them in RGB.
+    fn amount_at(&self, qx: usize, qy: usize, side: usize) -> f32 {
+        if !self.is_grid() {
+            return self.px.first().map_or(0.0, |p| p[3]);
+        }
+        if side == self.side {
+            return self.px[qy * self.side + qx][3];
+        }
+        let last = (self.side - 1) as f32;
+        let map = |q: usize| grid_map(q, side, self.side).clamp(0.0, last);
+        let a: Vec<f32> = self.px.iter().map(|p| p[3]).collect();
+        bilinear_f32(&a, self.side, self.side, map(qx), map(qy))
+    }
+
+    /// The average colour (alpha-weighted, straight RGB), for the options bar's swatch. Paint to
+    /// paint with is averaged by [`average_paint`] in mixing space.
     pub fn average(&self) -> [f32; 4] {
         let (mut acc, mut asum) = ([0.0f32; 3], 0.0f32);
         for p in &self.px {
@@ -296,6 +325,11 @@ impl Paint {
         }
         [acc[0] / asum, acc[1] / asum, acc[2] / asum, asum / self.px.len().max(1) as f32]
     }
+}
+
+/// Where cell `q` of a `to`-cell row lies on a `from`-cell row (cell centres at integers).
+fn grid_map(q: usize, to: usize, from: usize) -> f32 {
+    (q as f32 + 0.5) * from as f32 / to as f32 - 0.5
 }
 
 /// `buf` (`w × h`, row-major) at the continuous position (`fx`, `fy`), integer positions being
@@ -348,6 +382,21 @@ pub struct MixerState {
     /// The foreground colour when the brush was last loaded: a different foreground colour loads
     /// the brush with it.
     pub loaded_with: Option<[f32; 4]>,
+    /// The reservoir and pickup exactly as the last stroke left them, in its mixing space:
+    /// `reservoir` and `pickup` are them decoded (and clamped) to straight RGBA, which a stroke in
+    /// the same space and on the same grid doesn't go back through.
+    #[serde(skip)]
+    pub exact: Option<ExactPaint>,
+}
+
+/// [`MixerState::exact`]: the brush's paint as latents.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExactPaint {
+    /// The mixing mode and the pixel format whose space the latents are in.
+    pub space: (MixMode, PixelFormat),
+    pub side: usize,
+    pub reservoir: Vec<Colorant>,
+    pub pickup: Vec<Colorant>,
 }
 
 impl MixerState {
@@ -356,25 +405,37 @@ impl MixerState {
         self.reservoir = Some(paint.clone());
         self.loaded = Some(paint);
         self.pickup = None;
+        self.exact = None;
     }
     /// Fill the reservoir up again, keeping its colours.
     pub fn refill(&mut self) {
         if let (Some(r), Some(l)) = (self.reservoir.as_mut(), self.loaded.as_ref()) {
             let side = r.side;
             for (q, p) in r.px.iter_mut().enumerate() {
-                p[3] = l.at(q % side.max(1), q / side.max(1), side)[3];
+                p[3] = l.amount_at(q % side.max(1), q / side.max(1), side);
+            }
+            if let Some(e) = self.exact.as_mut().filter(|e| e.side == side && e.reservoir.len() == r.px.len()) {
+                for (c, p) in e.reservoir.iter_mut().zip(&r.px) {
+                    c.a = p[3];
+                }
             }
         }
     }
     /// Wash the brush after a stroke: no picked-up paint, and the reservoir back to the colours it
-    /// was loaded with (as much of them as is left).
+    /// was loaded with (as much of them as is left). The loaded colours are taken as they are, on
+    /// their own grid: resampling them would mix them outside the mixing space.
     pub fn wash(&mut self) {
         self.pickup = None;
+        self.exact = None;
         if let (Some(r), Some(l)) = (self.reservoir.as_mut(), self.loaded.as_ref()) {
-            let side = r.side;
-            for (q, p) in r.px.iter_mut().enumerate() {
-                let c = l.at(q % side.max(1), q / side.max(1), side);
-                *p = [c[0], c[1], c[2], p[3].min(c[3])];
+            if !l.is_grid() || l.side == r.side {
+                for (q, p) in r.px.iter_mut().enumerate() {
+                    let c = if l.is_grid() { l.px[q] } else { l.px.first().copied().unwrap_or([0.0; 4]) };
+                    *p = [c[0], c[1], c[2], p[3].min(c[3])];
+                }
+            } else {
+                let px = l.px.iter().enumerate().map(|(q, c)| [c[0], c[1], c[2], r.amount_at(q % l.side, q / l.side, l.side).min(c[3])]).collect();
+                *r = Paint { side: l.side, px };
             }
         }
     }
@@ -383,6 +444,7 @@ impl MixerState {
         self.reservoir = None;
         self.loaded = None;
         self.pickup = None;
+        self.exact = None;
     }
     /// The colour the options bar shows: the reservoir's average, None when clean.
     pub fn swatch(&self) -> Option<[f32; 4]> {
@@ -460,6 +522,41 @@ impl Codec {
         out[3] = c.a.min(1.0);
         out
     }
+
+    /// `p` on a `side × side` grid in mixing space: its pixels encoded, then resampled bilinearly
+    /// as latents (weighted by amount), so a patch loaded at one brush size mixes on a brush of
+    /// another exactly as its colours would on the canvas.
+    fn grid(&self, p: &Paint, side: usize) -> Vec<Colorant> {
+        if !p.is_grid() {
+            return vec![self.encode_rgba(p.px.first().copied().unwrap_or([0.0; 4])); side * side];
+        }
+        let src: Vec<Colorant> = p.px.iter().map(|&c| self.encode_rgba(c)).collect();
+        if side == p.side {
+            return src;
+        }
+        let last = (p.side - 1) as f32;
+        let map = |q: usize| grid_map(q, side, p.side).clamp(0.0, last);
+        (0..side * side).map(|q| bilinear(&src, p.side, p.side, map(q % side), map(q / side))).collect()
+    }
+}
+
+/// The average of `p` (weighted by amount; alpha = the mean amount) mixed as `mode` mixes paint in
+/// a `fmt` document: what Load Solid Colors Only loads.
+pub fn average_paint(p: &Paint, mode: MixMode, fmt: PixelFormat) -> [f32; 4] {
+    let codec = Codec::new(mode, fmt);
+    let (mut z, mut a) = ([0.0f32; LATENT], 0.0f32);
+    for c in p.px.iter().map(|&c| codec.encode_rgba(c)) {
+        for (zi, ci) in z.iter_mut().zip(&c.z) {
+            *zi += c.a * ci;
+        }
+        a += c.a;
+    }
+    if a <= 1e-6 {
+        return [0.0; 4];
+    }
+    let mut out = codec.decode_rgba(&Colorant { z: z.map(|v| v / a), a: 1.0 });
+    out[3] = a / p.px.len().max(1) as f32;
+    out
 }
 
 /// One Mixer Brush stroke: [`Mixer::new`] at pointer down, [`Mixer::dab`] for each dab
@@ -495,10 +592,19 @@ impl Mixer {
     pub fn new(settings: &MixerSettings, state: &MixerState, pre: Surface, max_brush_size: f32) -> Self {
         let codec = Codec::new(settings.mode, pre.format());
         let side = paint_side(max_brush_size);
-        let grid = |p: &Paint| -> Vec<Colorant> { (0..side * side).map(|q| codec.encode_rgba(p.at(q % side, q / side, side))).collect() };
+        // The last stroke's latents when this one mixes in the same space on the same grid.
+        let exact = state.exact.as_ref().filter(|e| e.space == (settings.mode, pre.format()) && e.side == side && e.reservoir.len() == side * side && e.pickup.len() == side * side);
         let empty = || vec![Colorant::NONE; side * side];
-        let reservoir = state.reservoir.as_ref().map_or_else(empty, grid);
-        let pickup = state.pickup.as_ref().map_or_else(empty, grid);
+        let reservoir = match (&state.reservoir, exact) {
+            (None, _) => empty(),
+            (Some(_), Some(e)) => e.reservoir.clone(),
+            (Some(p), None) => codec.grid(p, side),
+        };
+        let pickup = match (&state.pickup, exact) {
+            (None, _) => empty(),
+            (Some(_), Some(e)) => e.pickup.clone(),
+            (Some(p), None) => codec.grid(p, side),
+        };
         Self { settings: settings.clone(), codec, pre, r: (side / 2) as i32, side, reservoir, pickup, tiles: HashMap::new(), last: None, last_dab: None, brush: Vec::new(), brush_span: (0, 0, 0, 0), canvas: None, state: state.clone() }
     }
 
@@ -517,7 +623,54 @@ impl Mixer {
             st.reservoir = Some(paint(&self.reservoir));
         }
         st.pickup = self.pickup.iter().any(|c| c.a > 1e-4).then(|| paint(&self.pickup));
+        st.exact = Some(ExactPaint { space: (self.settings.mode, self.codec.fmt), side: self.side, reservoir: self.reservoir.clone(), pickup: self.pickup.clone() });
         st
+    }
+
+    /// Lay the stroke (`work`) over the target as it began (`orig`) at `opacity` inside
+    /// `selection`, as [`mix_back`] does, mixing a part-selected pixel in this stroke's mixing
+    /// space: a feathered selection edge blends the paint into the canvas as pigment, not RGB.
+    #[allow(clippy::too_many_arguments)]
+    pub fn mix_back(&self, target: &mut Surface, orig: &Region, work: &Region, rect: Rect, opacity: f32, selection: Option<&Surface>, lock_transparency: bool) {
+        if self.settings.mode == MixMode::Rgb {
+            return mix_back(target, orig, work, rect, opacity, selection, lock_transparency);
+        }
+        let codec = &self.codec;
+        let mut out = orig.crop(rect);
+        let n = out.ch;
+        let opacity = opacity.clamp(0.0, 1.0);
+        for y in rect.y0..rect.y1 {
+            for x in rect.x0..rect.x1 {
+                let k = (opacity * selection.map_or(1.0, |s| s.sample_channel(x, y, 0))).min(1.0);
+                if k <= 0.0 {
+                    continue;
+                }
+                let wv = work.px(x, y);
+                let i = out.index(x, y) * n;
+                let o = &mut out.data[i..i + n];
+                let keep = codec.alpha.map(|a| o[a]);
+                if k >= 1.0 {
+                    o.copy_from_slice(wv);
+                } else {
+                    let (was, now) = (codec.encode_native(o), codec.encode_native(wv));
+                    let m = if lock_transparency {
+                        // Alpha stays: mix the colours alone (a transparent side has none to give).
+                        match (was.a > 0.0, now.a > 0.0) {
+                            (true, true) => Colorant { a: was.a, ..mix(&was.full(), &now.full(), k) },
+                            (false, true) => Colorant { a: 1.0, ..now },
+                            _ => continue,
+                        }
+                    } else {
+                        mix(&was, &now, k)
+                    };
+                    codec.decode_native(&m, o);
+                }
+                if let (true, Some(a), Some(v)) = (lock_transparency, codec.alpha, keep) {
+                    o[a] = v;
+                }
+            }
+        }
+        out.write(target);
     }
 
     /// Convert the cache tiles over `rect` not converted yet (in parallel).
@@ -836,7 +989,7 @@ pub fn run_stroke<'a>(
     let orig = Region::read(target, bounds);
     let mut work = orig.clone();
     mixer.flush(&mut work, dirty);
-    mix_back(target, &orig, &work, bounds, stroke.brush.opacity, selection, lock_transparency);
+    mixer.mix_back(target, &orig, &work, bounds, stroke.brush.opacity, selection, lock_transparency);
     bounds
 }
 
@@ -1445,18 +1598,208 @@ mod tests {
         }
     }
 
-    /// Time one dab at the largest built-in brush size (300 px), Pigment mode, per pixel under the
-    /// tip, on one core and on all of them (stroke cache already converted).
+    // --- Every blend through Mixbox (Sochorová & Jamriška 2021) ---------------------------------
+
+    /// How far (largest channel, 8-bit levels) `c` lies from Mixbox's gradient between `a` and `b`,
+    /// and where on it: the gradient sampled at 1/2000 steps.
+    fn off_gradient(c: [i32; 3], a: [u8; 3], b: [u8; 3]) -> (i32, f32) {
+        (0..=2000)
+            .map(|i| {
+                let t = i as f32 / 2000.0;
+                let g = mixbox::lerp(&a, &b, t).map(i32::from);
+                ((0..3).map(|k| (g[k] - c[k]).abs()).max().unwrap_or(0), t)
+            })
+            .min_by_key(|&(d, _)| d)
+            .unwrap_or((i32::MAX, 0.0))
+    }
+
+    /// How far (largest channel) `c` lies from the straight RGB line between `a` and `b`.
+    fn off_rgb_line(c: [i32; 3], a: [u8; 3], b: [u8; 3]) -> f32 {
+        (0..=2000)
+            .map(|i| {
+                let t = i as f32 / 2000.0;
+                (0..3).map(|k| (f32::from(a[k]) + (f32::from(b[k]) - f32::from(a[k])) * t - c[k] as f32).abs()).fold(0.0, f32::max)
+            })
+            .fold(f32::MAX, f32::min)
+    }
+
+    #[test]
+    fn a_stroke_across_blue_and_yellow_follows_the_mixbox_gradient_not_rgb() {
+        // The paper's Fig. 5: Cobalt Blue and Hansa Yellow. A brush loaded with the blue strokes
+        // from the blue half into the yellow one, so every paint in play is a mix of the two: each
+        // pixel must lie on Mixbox's curved gradient between them, away from RGB's straight
+        // grey-blue blend.
+        let (blue, yellow) = ([0u8, 33, 133], [252u8, 211, 0]);
+        let mut img = image(120, 40, rgba8(blue));
+        img.fill_rect(Rect::new(60, 0, 120, 40), &rgba8(yellow));
+        let mut st = loaded(rgba8(blue));
+        paint(&mut img, None, &mut st, &settings(MixMode::Pigment, 0.5, 0.5, 0.5), &line(20.0, 10.0, 110.0, 0.1));
+        let (mut mixed, mut worst) = (0, 0);
+        for y in 0..40 {
+            for x in 0..120 {
+                let c = u8s3(img.rgba(x, y));
+                let (d, t) = off_gradient(c, blue, yellow);
+                worst = worst.max(d);
+                assert!(d <= 2, "({x}, {y}) {c:?} is {d} levels off the Mixbox gradient");
+                if (0.2..=0.8).contains(&t) {
+                    mixed += 1;
+                    let r = off_rgb_line(c, blue, yellow);
+                    assert!(r >= 20.0, "({x}, {y}) {c:?} is only {r} levels from the RGB blend");
+                }
+            }
+        }
+        assert!(mixed >= 100, "the stroke mixed only {mixed} pixels");
+        // RGB mode, for contrast, makes the grey-blue blend.
+        let mut img = image(120, 40, rgba8(blue));
+        img.fill_rect(Rect::new(60, 0, 120, 40), &rgba8(yellow));
+        let mut st = loaded(rgba8(blue));
+        paint(&mut img, None, &mut st, &settings(MixMode::Rgb, 0.5, 0.5, 0.5), &line(20.0, 10.0, 110.0, 0.1));
+        let greyish = (0..120).filter(|&x| off_rgb_line(u8s3(img.rgba(x, 20)), blue, yellow) <= 2.0 && off_gradient(u8s3(img.rgba(x, 20)), blue, yellow).0 > 10).count();
+        assert!(greyish > 10, "RGB mode should blend in a straight line ({greyish} pixels)");
+        println!("worst {worst} levels off the gradient over {mixed} mixed pixels");
+    }
+
+    #[test]
+    fn bilinear_halfway_between_two_pixels_is_mixbox_lerp() {
+        let codec = Codec::new(MixMode::Pigment, PixelFormat::RGBA8);
+        for (i, a) in PIGMENTS.iter().enumerate() {
+            for b in PIGMENTS[i + 1..].iter().chain([[255u8, 255, 255]].iter()) {
+                let want = mixbox::lerp(a, b, 0.5).map(i32::from);
+                let (za, zb) = (codec.encode_rgba(rgba8(*a)), codec.encode_rgba(rgba8(*b)));
+                // Picking up between two canvas pixels.
+                let got = u8s3(codec.decode_rgba(&bilinear(&[za, zb], 2, 1, 0.5, 0.0)));
+                assert!(got.iter().zip(want).all(|(g, w)| (g - w).abs() <= 1), "{a:?} | {b:?}: {got:?}, Mixbox {want:?}");
+                // A loaded 2 × 2 patch on a 3 × 3 tip: the middle column lies halfway.
+                let patch = Paint { side: 2, px: vec![rgba8(*a), rgba8(*b), rgba8(*a), rgba8(*b)] };
+                let grid = codec.grid(&patch, 3);
+                for row in 0..3 {
+                    let got = u8s3(codec.decode_rgba(&grid[row * 3 + 1]));
+                    assert!(got.iter().zip(want).all(|(g, w)| (g - w).abs() <= 1), "patch {a:?} | {b:?}: {got:?}, Mixbox {want:?}");
+                }
+            }
+        }
+    }
+
+    /// Hue (degrees) and HSV saturation of an 8-bit colour.
+    fn hue_sat(c: [i32; 3]) -> (f32, f32) {
+        let [r, g, b] = c.map(|v| v as f32 / 255.0);
+        let (max, min) = (r.max(g).max(b), r.min(g).min(b));
+        let d = max - min;
+        if d <= 1e-6 {
+            return (0.0, 0.0);
+        }
+        let h = if max == r { 60.0 * ((g - b) / d).rem_euclid(6.0) } else if max == g { 60.0 * ((b - r) / d + 2.0) } else { 60.0 * ((r - g) / d + 4.0) };
+        (h, d / max)
+    }
+
+    #[test]
+    fn phthalo_blue_with_white_turns_turquoise_not_grey() {
+        // The paper's Fig. 4: Phthalo Blue gains white towards turquoise (hue falling from its
+        // ~225° towards 180°) and stays saturated; RGB fades it towards lavender-grey.
+        let phthalo = [13u8, 27, 68];
+        let (h0, _) = hue_sat(phthalo.map(i32::from));
+        let codec = Codec::new(MixMode::Pigment, PixelFormat::RGBA8);
+        let (p, w) = (codec.encode_rgba(rgba8(phthalo)), codec.encode_rgba(WHITE));
+        let mut last = h0;
+        for t in [0.2, 0.4, 0.6, 0.8] {
+            let c = u8s3(codec.decode_rgba(&mix(&p, &w, t)));
+            let (h, sat) = hue_sat(c);
+            assert!(h < last && h < h0 - 10.0, "{t}: {c:?} hue {h:.0}° doesn't move from {h0:.0}° towards turquoise");
+            assert!(sat > 0.25, "{t}: {c:?} turned grey (saturation {sat:.2})");
+            if t == 0.2 {
+                // A little white first raises the saturation, revealing the pigment.
+                assert!(sat > hue_sat(phthalo.map(i32::from)).1, "{c:?}: saturation {sat:.2}");
+            }
+            last = h;
+        }
+        // A stroke of white over Phthalo Blue at Mix 50 %.
+        let mut img = image(100, 40, rgba8(phthalo));
+        let mut st = loaded(WHITE);
+        paint(&mut img, None, &mut st, &settings(MixMode::Pigment, 0.5, 1.0, 0.5), &line(20.0, 4.0, 96.0, 0.1));
+        let c = u8s3(img.rgba(60, 20));
+        let (h, sat) = hue_sat(c);
+        assert!(h < h0 - 10.0 && sat > 0.25, "{c:?}: hue {h:.0}°, saturation {sat:.2}");
+        // RGB keeps the hue and loses saturation.
+        let mut img = image(100, 40, rgba8(phthalo));
+        let mut st = loaded(WHITE);
+        paint(&mut img, None, &mut st, &settings(MixMode::Rgb, 0.5, 1.0, 0.5), &line(20.0, 4.0, 96.0, 0.1));
+        let (hr, sr) = hue_sat(u8s3(img.rgba(60, 20)));
+        assert!((hr - h0).abs() < 5.0 && sr < sat, "RGB: hue {hr:.0}°, saturation {sr:.2}");
+        println!("phthalo {h0:.0}°; stroke Pigment {c:?} {h:.0}° sat {sat:.2}; RGB {:?} {hr:.0}° sat {sr:.2}", u8s3(img.rgba(60, 20)));
+    }
+
+    #[test]
+    fn a_feathered_selection_edge_mixes_as_pigment() {
+        // Half selected: the blue laid on the yellow comes out as Mixbox's halfway green.
+        let mut img = image(60, 40, YELLOW);
+        let mut sel = Surface::new(PixelFormat::GRAY8);
+        sel.fill_rect(Rect::new(0, 0, 60, 40), &[0.5]);
+        let mut st = loaded(BLUE);
+        let stroke = mixer_stroke(&line(20.0, 4.0, 56.0, 0.1), &settings(MixMode::Pigment, 0.0, 1.0, 0.0));
+        let mut mixer = Mixer::new(&settings(MixMode::Pigment, 0.0, 1.0, 0.0), &st, img.clone(), stroke.brush.size);
+        run_stroke(&mut img, &stroke, &mut mixer, |_| None, Some(&sel), false);
+        st = mixer.state();
+        assert!(st.exact.is_some());
+        let half = (0.5f32 * 255.0).round() / 255.0;
+        let want = mixbox::lerp(&[252, 211, 0], &[0, 33, 133], half).map(i32::from);
+        let got = u8s3(img.rgba(30, 20));
+        assert!(got.iter().zip(want).all(|(g, w)| (g - w).abs() <= 2), "{got:?}, Mixbox {want:?}");
+    }
+
+    #[test]
+    fn the_brush_keeps_its_latents_between_strokes() {
+        let m = MixerSettings { ..settings(MixMode::Pigment, 0.8, 0.3, 0.6) };
+        let mut img = image(100, 40, YELLOW);
+        img.fill_rect(Rect::new(50, 0, 100, 40), &BLUE);
+        let mut st = loaded(RED);
+        paint(&mut img, None, &mut st, &m, &line(20.0, 4.0, 96.0, 0.1));
+        let e = st.exact.clone().expect("latents kept");
+        let next = Mixer::new(&m, &st, img.clone(), 20.0);
+        assert_eq!(next.reservoir, e.reservoir);
+        assert_eq!(next.pickup, e.pickup);
+        // Another space (RGB) or a wash goes back to the paint as RGBA.
+        let rgb = Mixer::new(&settings(MixMode::Rgb, 0.8, 0.3, 0.6), &st, img.clone(), 20.0);
+        assert_ne!(rgb.reservoir, e.reservoir);
+        st.wash();
+        assert!(st.exact.is_none());
+    }
+
+    #[test]
+    fn pigment_mixes_through_mixbox_in_other_colour_models() {
+        use photocraft_color::ColorMode;
+        for mode in [ColorMode::Lab, ColorMode::Cmyk, ColorMode::Grayscale] {
+            let fmt = PixelFormat { mode, sample: SampleType::U8, alpha: true };
+            let codec = Codec::new(MixMode::Pigment, fmt);
+            let c = codec.decode_rgba(&mix(&codec.encode_rgba(BLUE), &codec.encode_rgba(YELLOW), 0.5));
+            if mode == ColorMode::Grayscale {
+                // Grey has no hue; mixing a grey with itself stays that grey.
+                let g = codec.encode_rgba([0.4, 0.4, 0.4, 1.0]);
+                assert!((codec.decode_rgba(&mix(&g, &g, 0.5))[0] - 0.4).abs() < 0.01);
+            } else {
+                assert!(c[1] > c[0] && c[1] > c[2], "{mode:?}: {c:?} should be green");
+            }
+        }
+    }
+
+    /// Time one dab, RGB against Pigment, per pixel under the tip, on one core and on all of them
+    /// (stroke cache already converted). The tip is `MIXER_DAB_SIZE` px (default 300, the largest
+    /// built-in brush).
     /// `cargo test -p photocraft-paint --release --lib mixer::tests::dab_timing -- --ignored --nocapture`
     #[test]
     #[ignore = "timing"]
     fn dab_timing() {
-        let size = 300.0;
+        let size: f32 = std::env::var("MIXER_DAB_SIZE").ok().and_then(|v| v.parse().ok()).unwrap_or(300.0);
+        for mode in [MixMode::Rgb, MixMode::Pigment] {
+            dab_timing_in(mode, size);
+        }
+    }
+
+    fn dab_timing_in(mode: MixMode, size: f32) {
         let mut s = image(1400, 400, WHITE);
         for i in 0..70 {
             s.fill_rect(Rect::new(i * 20, 0, i * 20 + 10, 400), &[0.9, 0.7, 0.1, 1.0]);
         }
-        let m = settings(MixMode::Pigment, 0.6, 0.5, 0.5);
+        let m = settings(mode, 0.6, 0.5, 0.5);
         let mut st = line(200.0, 160.0, 1240.0, 0.05);
         st.brush.size = size;
         let st = mixer_stroke(&st, &m);
@@ -1483,7 +1826,7 @@ mod tests {
         let one = rayon::ThreadPoolBuilder::new().num_threads(1).build().map(|p| p.install(|| best(&run))).unwrap_or((f64::NAN, f64::NAN, f64::NAN));
         let many = best(&run);
         println!(
-            "{} dabs of {:.0} px: dab {:.1} ns/px on 1 core, {:.1} on {} threads ({:.2} ms per dab); conversion {:.1} ns/px; flush {:.1} ns/px",
+            "{mode:?}, {size} px tip, {} dabs of {:.0} px: dab {:.1} ns/px on 1 core, {:.1} on {} threads ({:.2} ms per dab); conversion {:.1} ns/px; flush {:.1} ns/px",
             fps.len(),
             pixels as f64 / fps.len() as f64,
             one.1,

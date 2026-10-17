@@ -199,6 +199,8 @@ fn b_cycles_brush_pencil_color_replacement_and_mixer_brush() {
     assert_eq!(h.state().ui.tool, Tool::ColorReplacement, "Photoshop's order: Brush, Pencil, Color Replacement, Mixer Brush");
     press(&mut h, Modifiers::NONE);
     assert_eq!(h.state().ui.tool, Tool::MixerBrush);
+    press(&mut h, Modifiers::NONE);
+    assert_eq!(h.state().ui.tool, Tool::MixboxBrush, "then PhotoCraft's Mixer Brush (Mixbox)");
     // Use Shift Key for Tool Switch: ⇧B cycles, B keeps the group's tool.
     h.state_mut().session.edit_prefs(|p| p.tools.use_shift_key_for_tool_switch = true);
     press(&mut h, Modifiers::SHIFT);
@@ -209,8 +211,10 @@ fn b_cycles_brush_pencil_color_replacement_and_mixer_brush() {
     assert_eq!(h.state().ui.tool, Tool::ColorReplacement);
     press(&mut h, Modifiers::SHIFT);
     assert_eq!(h.state().ui.tool, Tool::MixerBrush);
+    press(&mut h, Modifiers::SHIFT);
+    assert_eq!(h.state().ui.tool, Tool::MixboxBrush);
     press(&mut h, Modifiers::NONE);
-    assert_eq!(h.state().ui.tool, Tool::MixerBrush);
+    assert_eq!(h.state().ui.tool, Tool::MixboxBrush);
     assert_eq!(Tool::from_name("pencil"), Some(Tool::Pencil));
     assert_eq!(Tool::from_name("mixerBrush"), Some(Tool::MixerBrush));
 }

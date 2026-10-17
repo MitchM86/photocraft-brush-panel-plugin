@@ -355,7 +355,7 @@ fn stroke_params(app: &PhotocraftApp, tool: Tool, erase: bool, points: &[Vec<f64
 pub(crate) fn strokes_live(tool: Tool) -> bool {
     matches!(
         tool,
-        Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::Eraser | Tool::Blur | Tool::Sharpen | Tool::Smudge | Tool::Dodge | Tool::Burn | Tool::Sponge | Tool::ArtHistoryBrush
+        Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::MixboxBrush | Tool::Eraser | Tool::Blur | Tool::Sharpen | Tool::Smudge | Tool::Dodge | Tool::Burn | Tool::Sponge | Tool::ArtHistoryBrush
     )
         || live_retouch_command(tool).is_some()
 }
@@ -487,6 +487,12 @@ fn begin_live_stroke(app: &PhotocraftApp) -> Option<LiveStroke> {
         p["points"] = json!(d.points);
         p["target"] = paint_target(app);
         EngineStroke::Dab(photocraft_engine::retouch_cmds::LiveDab::begin(&app.session, "paint.mixerBrush", &p).ok()?)
+    } else if d.tool == Tool::MixboxBrush {
+        // The params `retouch_ui::finish_stroke` commits.
+        let mut p = crate::retouch_ui::mixbox_params(app);
+        p["points"] = json!(d.points);
+        p["target"] = paint_target(app);
+        EngineStroke::Dab(photocraft_engine::retouch_cmds::LiveDab::begin(&app.session, "paint.mixboxBrush", &p).ok()?)
     } else if let Some((cmd, mut p)) = crate::retouch_ui::dab_params(app, d.tool, d.modifiers) {
         // The params `retouch_ui::finish_stroke` commits; Sample All Layers isn't previewed.
         p["points"] = json!(d.points);
@@ -580,6 +586,7 @@ pub(crate) fn freehand_tool(tool: Tool) -> bool {
         Tool::Brush
             | Tool::Pencil
             | Tool::MixerBrush
+            | Tool::MixboxBrush
             | Tool::Eraser
             | Tool::BackgroundEraser
             | Tool::HistoryBrush
@@ -3882,7 +3889,7 @@ fn draw_drag_preview(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &View
 /// reservoir instead (`load_mixer`).
 pub(crate) fn alt_samples(tool: Tool, mods: egui::Modifiers) -> bool {
     // Control+Alt is the brush-resize drag (`brush_resize`), not sampling.
-    mods.alt && !mods.ctrl && matches!(tool, Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::Gradient | Tool::PaintBucket)
+    mods.alt && !mods.ctrl && matches!(tool, Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::MixboxBrush | Tool::Gradient | Tool::PaintBucket)
 }
 
 /// Mixer Brush ⌥-click, as in Photoshop: load the brush with the image under the tip (from the
@@ -4559,7 +4566,7 @@ pub(crate) fn finish_gesture(app: &mut PhotocraftApp, d: Drag) {
         app.last_stroke_end = Some((st.doc.id, [end[0], end[1]]));
     }
     // A live Clone Stamp preview ends here; the commit below replaces it.
-    if live_retouch_command(d.tool).is_some() || d.tool == Tool::MixerBrush || crate::retouch_ui::dab_params(app, d.tool, d.modifiers).is_some() {
+    if live_retouch_command(d.tool).is_some() || matches!(d.tool, Tool::MixerBrush | Tool::MixboxBrush) || crate::retouch_ui::dab_params(app, d.tool, d.modifiers).is_some() {
         app.live_stroke = None;
     }
     if crate::eraser_ui::finish_stroke(app, d.tool, &d.points) || crate::retouch_ui::finish_stroke(app, d.tool, &d.points, d.modifiers) {
@@ -5442,6 +5449,7 @@ mod tests {
             Tool::Brush,
             Tool::Pencil,
             Tool::MixerBrush,
+            Tool::MixboxBrush,
             Tool::Eraser,
             Tool::BackgroundEraser,
             Tool::CloneStamp,

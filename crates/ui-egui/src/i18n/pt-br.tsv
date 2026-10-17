@@ -3013,3 +3013,5 @@ fontWeight	Italic	Itálico
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Arraste um quadro · sobre uma imagem selecionada ele a recorta · Inserir incorporado ou soltar um arquivo preenche o quadro selecionado
 	This command needs a file on disk; it isn't available in the browser	Este comando precisa de um arquivo no disco; não está disponível no navegador
 	Layer name	Nome da camada
+	Pick Up From Stroke Start	Coletar do início do traço
+	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	Misturar com a tela como estava no início do traço, não com a tinta que o traço acabou de aplicar

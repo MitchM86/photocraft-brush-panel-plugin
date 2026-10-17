@@ -2568,3 +2568,5 @@ fontWeight	Italic	斜體
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	拖曳出框架 · 在選取的影像上會裁切該影像 · 置入嵌入的物件或拖放檔案可填滿選取的框架
 	This command needs a file on disk; it isn't available in the browser	此命令需要磁碟上的檔案；在瀏覽器中無法使用
 	Layer name	圖層名稱
+	Pick Up From Stroke Start	從筆畫開始時拾取
+	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	與筆畫開始時的畫布混合，而不是與筆畫剛塗上的顏料混合

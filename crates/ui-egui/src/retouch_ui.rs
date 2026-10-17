@@ -83,6 +83,13 @@ pub(crate) fn mixer_params(app: &PhotocraftApp) -> Value {
     json!({"color": app.session.tools.foreground, "loadAfterStroke": o.mixer_load_after, "cleanAfterStroke": o.mixer_clean_after})
 }
 
+/// `paint.mixboxBrush` params beyond the brush and points: the load (the foreground colour) and
+/// where the pickup reads.
+pub(crate) fn mixbox_params(app: &PhotocraftApp) -> Value {
+    let pickup = if app.ui.tool_options.mixbox_from_start { "strokeStart" } else { "live" };
+    json!({"color": app.session.tools.foreground, "pickup": pickup})
+}
+
 /// Finish a stroke with a retouching tool. Returns false if `tool` isn't one.
 pub fn finish_stroke(app: &mut PhotocraftApp, tool: Tool, points: &[[f64; 3]], mods: egui::Modifiers) -> bool {
     let o = app.ui.tool_options.clone();
@@ -91,6 +98,7 @@ pub fn finish_stroke(app: &mut PhotocraftApp, tool: Tool, points: &[[f64; 3]], m
         Tool::SpotHealing => ("paint.spotHealing", json!({"type": o.spot_type, "sampleAllLayers": o.sample_all_layers})),
         Tool::Remove => ("paint.remove", json!({"sampleAllLayers": o.sample_all_layers})),
         Tool::MixerBrush => ("paint.mixerBrush", mixer_params(app)),
+        Tool::MixboxBrush => ("paint.mixboxBrush", mixbox_params(app)),
         Tool::ColorReplacement => (
             "paint.colorReplacement",
             json!({"mode": o.replace_mode, "sampling": o.replace_sampling, "limits": o.replace_limits, "tolerance": o.replace_tolerance, "antiAlias": o.anti_alias}),
@@ -336,7 +344,7 @@ fn pct(ui: &mut egui::Ui, label: &str, v: &mut f32) {
 /// Options bar for the retouching and smart-selection tools. Returns false for other tools.
 pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bool {
     if !tool.is_brushlike() && !matches!(tool, Tool::QuickSelection | Tool::ObjectSelection | Tool::Patch | Tool::ContentAwareMove | Tool::RedEye)
-        || matches!(tool, Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::Eraser)
+        || matches!(tool, Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::MixboxBrush | Tool::Eraser)
     {
         return false;
     }
@@ -807,6 +815,35 @@ mod tests {
         app.ui.status.clear();
         report_smart_result(&mut app, Ok(json!({"selected": true, "changed": true})), "nothing there");
         assert!(app.ui.status.is_empty());
+    }
+
+    #[test]
+    fn the_mixbox_mixer_brush_mixes_as_pigment_whatever_its_brush_says() {
+        // Cobalt Blue on the brush, through Hansa Yellow: green, where RGB makes a grey-olive
+        // (red above green). The brush itself is set to RGB mixing; the Mixer Brush (its own
+        // Mixbox engine, `paint.mixboxBrush`) has no such setting.
+        let mut app = app();
+        app.run("paint.pencil", json!({"points": [[50, 30]], "size": 200, "color": "#fcd300"})).unwrap();
+        app.run("tools.setColors", json!({"foreground": "#002185"})).unwrap();
+        app.ui.tool = Tool::MixboxBrush;
+        crate::paint_mouse::sync_tool_brush(&mut app);
+        app.run("tools.setBrush", json!({"pressureSize": false, "size": 16, "mixer": {"wet": 0.5, "load": 0.5, "mix": 0.5, "flow": 1.0, "mode": "rgb"}})).unwrap();
+        // Picking up the canvas as the stroke began, the blue meets the yellow all along (picking
+        // up its own fresh paint, a full brush would stay blue).
+        app.ui.tool_options.mixbox_from_start = true;
+        let none = egui::Modifiers::NONE;
+        tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 30.0, pressure: 1.0 }, none);
+        for i in 1..=40 {
+            tool_event(&mut app, ToolEvent::Move { x: 10.0 + f64::from(i) * 2.0, y: 30.0, pressure: 1.0 }, none);
+        }
+        tool_event(&mut app, ToolEvent::Up { x: 90.0, y: 30.0 }, none);
+        let (id, p) = app.session.journal.last().cloned().unwrap();
+        assert_eq!((id.as_str(), &p["pickup"]), ("paint.mixboxBrush", &json!("strokeStart")));
+        let c = active(&app).surface().unwrap().rgba(50, 30);
+        assert!(c[1] > c[0] && c[1] > c[2], "{c:?} should be green");
+        // The default picks up the live canvas.
+        app.ui.tool_options.mixbox_from_start = false;
+        assert_eq!(mixbox_params(&app)["pickup"], "live");
     }
 
     #[test]

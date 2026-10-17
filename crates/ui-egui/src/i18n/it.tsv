@@ -2660,3 +2660,5 @@ fontWeight	Italic	Corsivo
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Disegna una cornice · su un'immagine selezionata la ritaglia · Inserisci incorporato o trascina un file per riempire la cornice selezionata
 	This command needs a file on disk; it isn't available in the browser	Questo comando richiede un file su disco; non è disponibile nel browser
 	Layer name	Nome livello
+	Pick Up From Stroke Start	Preleva dall’inizio del tratto
+	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	Mescola con la tela com’era all’inizio del tratto, non con il colore appena steso dal tratto

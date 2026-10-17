@@ -1374,6 +1374,44 @@ fn live_mixer_brush_matches_the_commit() {
     }
 }
 
+/// The Mixer Brush (Mixbox) previews what it commits: the same dabs into the same latent canvas,
+/// for both pickups, on 8-bit and 32-bit layers.
+#[test]
+fn live_mixbox_brush_matches_the_commit() {
+    for depth in [8, 32] {
+        for pickup in ["live", "strokeStart"] {
+            let mut s = session(200, 90, depth, "rgb");
+            paint_layer(&mut s, texture);
+            s.execute("tools.setColors", json!({"foreground": "#002185"})).unwrap();
+            let all = [[10.0, 40.0], [100.0, 60.0], [180.0, 40.0], [60.0, 30.0], [150.0, 70.0]];
+            let pts = |v: &[[f64; 2]]| v.iter().map(|q| StrokePoint::new(q[0], q[1], 1.0)).collect::<Vec<_>>();
+            let opts = |p: &[[f64; 2]]| json!({"points": p, "size": 30, "hardness": 80, "wet": 60, "load": 50, "mix": 40, "pickup": pickup});
+            let mut live = LiveDab::begin(&s, "paint.mixboxBrush", &opts(&all[..1])).unwrap();
+            live.push(&pts(&all[1..3])).unwrap();
+            live.push(&pts(&all[3..])).unwrap();
+            let shown = live.doc.clone();
+            s.execute("paint.mixboxBrush", opts(&all)).unwrap();
+            let id = s.active().unwrap().active_layer.unwrap();
+            let (a, b) = (shown.layer(id).unwrap().surface().unwrap(), s.active().unwrap().doc.layer(id).unwrap().surface().unwrap());
+            let (mut changed, mut worst) = (false, 0.0f32);
+            for y in 0..90 {
+                for x in 0..200 {
+                    let (got, want) = (a.rgba(x, y), b.rgba(x, y));
+                    changed |= (want[0] - texture(x, y)[0]).abs() > 0.02;
+                    // The commit also lays the smoothing catch-up dabs, which the live stroke shows on release.
+                    if (x - 150).pow(2) + (y - 70).pow(2) > 30 * 30 {
+                        worst = (0..4).map(|c| (got[c] - want[c]).abs()).fold(worst, f32::max);
+                    }
+                }
+            }
+            assert!(changed, "{depth}-bit {pickup}");
+            assert!(worst <= 1e-4, "{depth}-bit {pickup}: live and commit differ by {worst}");
+        }
+    }
+    let s = session(50, 50, 8, "rgb");
+    assert!(LiveDab::begin(&s, "paint.mixboxBrush", &json!({"points": [[10, 10]], "pickup": "sideways"})).is_err());
+}
+
 /// Sample All Layers: on an empty layer above the image the Mixer Brush picks up and blends the
 /// image's colours (a dry or unsampled brush would paint its load only), live as on commit.
 #[test]

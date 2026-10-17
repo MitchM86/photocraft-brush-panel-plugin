@@ -3606,3 +3606,5 @@ cameraRaw	Roughness	Chropowatość
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Przeciągnij ramkę · nad zaznaczonym obrazem przycina go · Umieść osadzony lub upuść plik, aby wypełnić zaznaczoną ramkę
 	This command needs a file on disk; it isn't available in the browser	To polecenie wymaga pliku na dysku; nie jest dostępne w przeglądarce
 	Layer name	Nazwa warstwy
+	Pick Up From Stroke Start	Pobieraj od początku pociągnięcia
+	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	Mieszaj z płótnem takim, jakie było na początku pociągnięcia, a nie z farbą, którą pociągnięcie właśnie nałożyło

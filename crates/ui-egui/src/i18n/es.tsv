@@ -2670,3 +2670,5 @@ fontWeight	Italic	Cursiva
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Dibuje un marco · sobre una imagen seleccionada la recorta · Colocar incrustado o soltar un archivo rellena el marco seleccionado
 	This command needs a file on disk; it isn't available in the browser	Este comando necesita un archivo en el disco; no está disponible en el navegador
 	Layer name	Nombre de capa
+	Pick Up From Stroke Start	Recoger desde el inicio del trazo
+	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	Mezclar con el lienzo tal como estaba al empezar el trazo, no con la pintura que el trazo acaba de dejar

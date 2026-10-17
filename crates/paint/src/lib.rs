@@ -22,6 +22,7 @@ pub mod bg_erase;
 pub mod brush;
 pub mod curve;
 pub mod dynamics;
+pub mod mixbox_brush;
 pub mod mixer;
 pub mod presets;
 pub mod procedural;

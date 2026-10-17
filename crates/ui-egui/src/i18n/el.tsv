@@ -3690,3 +3690,5 @@ fontWeight	Thin	Πολύ λεπτά
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Σύρετε ένα πλαίσιο · πάνω από επιλεγμένη εικόνα την περικόπτει · Τοποθέτηση ή απόθεση αρχείου γεμίζει το επιλεγμένο πλαίσιο
 	This command needs a file on disk; it isn't available in the browser	Αυτή η εντολή χρειάζεται αρχείο στον δίσκο· δεν είναι διαθέσιμη στο πρόγραμμα περιήγησης
 	Layer name	Όνομα επιπέδου
+	Pick Up From Stroke Start	Λήψη από την αρχή της πινελιάς
+	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	Ανάμειξη με τον καμβά όπως ήταν στην αρχή της πινελιάς, όχι με το χρώμα που μόλις άφησε η πινελιά

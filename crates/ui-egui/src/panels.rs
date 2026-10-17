@@ -26,7 +26,7 @@ const TOOL_SECTIONS: &[&[&[Tool]]] = &[
     ],
     &[
         &[Tool::Remove, Tool::SpotHealing, Tool::Healing, Tool::Patch, Tool::ContentAwareMove, Tool::RedEye],
-        &[Tool::Brush, Tool::Pencil, Tool::ColorReplacement, Tool::MixerBrush],
+        &[Tool::Brush, Tool::Pencil, Tool::ColorReplacement, Tool::MixerBrush, Tool::MixboxBrush],
         &[Tool::CloneStamp, Tool::PatternStamp],
         &[Tool::HistoryBrush, Tool::ArtHistoryBrush],
         &[Tool::Eraser, Tool::BackgroundEraser, Tool::MagicEraser],
@@ -808,7 +808,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 // chip, so a tool change swaps the brush with it (Photoshop keeps one per tool).
                 crate::paint_mouse::sync_tool_brush(app);
                 // Brush edits here go through `tools.setBrush`, one journal entry per gesture (Rule 1).
-                if (tool.is_brushlike() && !matches!(tool, Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::Eraser)) || tool == Tool::QuickSelection {
+                if (tool.is_brushlike() && !matches!(tool, Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::MixboxBrush | Tool::Eraser)) || tool == Tool::QuickSelection {
                     brush_preset_chip(ui, &app.session.tools.brush, &mut app.ui);
                     crate::brush_picker::settings_toggle(app, ui);
                     widgets::vline(ui, 22.0);
@@ -941,6 +941,27 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         widgets::vline(ui, 22.0);
                         widgets::checkbox(ui, &mut b.mixer.sample_all_layers, tl!("Sample All Layers"));
                         mixing_dropdown(ui, &mut b.mixer.mode);
+                        widgets::toggle(ui, &mut b.pressure_size, tl!("Pressure for Size"));
+                    }
+                    // The Mixer Brush (Mixbox): the load is the foreground colour; every blend is
+                    // Mixbox, so there is no Mixing choice.
+                    Tool::MixboxBrush => {
+                        brush_preset_chip(ui, b, &mut app.ui);
+                        crate::brush_picker::settings_toggle(app, ui);
+                        widgets::vline(ui, 22.0);
+                        for (label, value) in [
+                            (tl!("Wet"), &mut b.mixer.wet),
+                            (tl!("Load"), &mut b.mixer.load),
+                            (tl!("Mix"), &mut b.mixer.mix),
+                            (tl!("Flow"), &mut b.mixer.flow),
+                        ] {
+                            percent_field(ui, label, value, 0.0..=100.0, 62.0);
+                        }
+                        opt_label(ui, tl!("Smoothing"));
+                        smoothing_field(ui, b, 62.0);
+                        widgets::vline(ui, 22.0);
+                        widgets::checkbox(ui, &mut app.ui.tool_options.mixbox_from_start, tl!("Pick Up From Stroke Start"))
+                            .on_hover_text(tl!("Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid"));
                         widgets::toggle(ui, &mut b.pressure_size, tl!("Pressure for Size"));
                     }
                     // Photoshop's single-pixel marquees: the selection mode and Feather (no Style,
@@ -4371,7 +4392,7 @@ mod toolbar_hidden_tests {
         let slots: usize = TOOL_SECTIONS.iter().map(|section| section.len()).sum();
         hide(&mut app, &Tool::ALL);
         assert_eq!(tool_buttons(&mut app), all - slots, "every tool slot is gone when every tool is hidden");
-        hide(&mut app, &[Tool::Brush, Tool::Pencil, Tool::ColorReplacement, Tool::MixerBrush]);
+        hide(&mut app, &[Tool::Brush, Tool::Pencil, Tool::ColorReplacement, Tool::MixerBrush, Tool::MixboxBrush]);
         assert_eq!(tool_buttons(&mut app), all - 1, "a slot whose tools are all hidden is gone");
         hide(&mut app, &[Tool::Sponge]);
         assert_eq!(tool_buttons(&mut app), all, "a slot with a visible tool stays");

@@ -3606,3 +3606,5 @@ fontWeight	Italic	斜体
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	フレームをドラッグ · 選択した画像の上ではその画像を切り抜く · 埋め込みを配置またはファイルのドロップで選択したフレームを埋める
 	This command needs a file on disk; it isn't available in the browser	このコマンドにはディスク上のファイルが必要です。ブラウザーでは使用できません
 	Layer name	レイヤー名
+	Pick Up From Stroke Start	ストローク開始時から取り込む
+	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	ストロークを始めたときのキャンバスと混ぜ、今塗ったばかりの絵の具とは混ぜません

@@ -927,6 +927,8 @@ pub struct LiveDab {
     /// The Mixer Brush's stroke (it paints into its own cache and flushes per push), and the
     /// other layers' composite with Sample All Layers.
     mixer: Option<Box<(photocraft_paint::mixer::Mixer, Option<crate::brush_cmds::OtherLayers>)>>,
+    /// The Mixer Brush (Mixbox)'s stroke, run the same way.
+    mixbox: Option<Box<photocraft_paint::mixbox_brush::MixboxBrush>>,
 }
 
 impl LiveDab {
@@ -940,8 +942,25 @@ impl LiveDab {
             let doc = &s.active().ok_or(EngineError::NoDocument)?.doc;
             let under = (m.sample_all_layers && id.is_some()).then(|| crate::brush_cmds::OtherLayers::new(doc, id));
             let canvas = doc.bounds();
-            return Self::start(s, cmd, p, stroke, id, 0, |_| Box::new(|_, _| {}), move |pre| {
-                Some(Box::new((photocraft_paint::mixer::Mixer::new(&m, &state, pre.clone(), size).within(canvas), under)))
+            return Self::start(
+                s,
+                cmd,
+                p,
+                stroke,
+                id,
+                0,
+                |_| Box::new(|_, _| {}),
+                move |pre| Some(Box::new((photocraft_paint::mixer::Mixer::new(&m, &state, pre.clone(), size).within(canvas), under))),
+                |_| None,
+            );
+        }
+        if cmd == "paint.mixboxBrush" {
+            // The stroke `paint.mixboxBrush` commits.
+            let (stroke, id, m, color, from_start) = crate::brush_cmds::mixbox_stroke_params(s, p)?;
+            let canvas = s.active().ok_or(EngineError::NoDocument)?.doc.bounds();
+            return Self::start(s, cmd, p, stroke, id, 0, |_| Box::new(|_, _| {}), |_| None, move |pre| {
+                let brush = photocraft_paint::mixbox_brush::MixboxBrush::new(&m, color, pre.clone()).within(canvas);
+                Some(Box::new(if from_start { brush.from_stroke_start() } else { brush }))
             });
         }
         if sample_all_layers(p) {
@@ -950,7 +969,7 @@ impl LiveDab {
         let (stroke, id) = parse_brush(s, p, cmd)?;
         let (tool, _) = DabTool::parse(s, cmd, p, &stroke)?;
         let spacing = stroke.brush.spacing;
-        Self::start(s, cmd, p, stroke, id, tool.halo(), move |pre| tool.effect(pre.format(), spacing), |_| None)
+        Self::start(s, cmd, p, stroke, id, tool.halo(), move |pre| tool.effect(pre.format(), spacing), |_| None, |_| None)
     }
 
     /// Start a live stroke of `stroke` whose dabs run the effect `effect` makes for the target as
@@ -965,6 +984,7 @@ impl LiveDab {
         halo: i32,
         effect: impl FnOnce(&Surface) -> DabEffect,
         mixer: impl FnOnce(&Surface) -> Option<Box<(photocraft_paint::mixer::Mixer, Option<crate::brush_cmds::OtherLayers>)>>,
+        mixbox: impl FnOnce(&Surface) -> Option<Box<photocraft_paint::mixbox_brush::MixboxBrush>>,
     ) -> Result<Self> {
         let mut doc = (*s.active().ok_or(EngineError::NoDocument)?.doc).clone();
         let sel = doc.selection.clone();
@@ -972,6 +992,7 @@ impl LiveDab {
         let pre_surf = surf.clone();
         let effect = effect(&pre_surf);
         let mixer = mixer(&pre_surf);
+        let mixbox = mixbox(&pre_surf);
         // `apply_dab_stroke` generates the same dabs (`dabs`: zoom 1, no smoothing scale).
         let renderer = photocraft_paint::StrokeRenderer::new(&stroke.brush, None, 1.0).record_dabs();
         let mut live = Self {
@@ -990,6 +1011,7 @@ impl LiveDab {
             lock,
             bounds: Rect::EMPTY,
             mixer,
+            mixbox,
         };
         live.push(&stroke.points)?;
         Ok(live)
@@ -1024,7 +1046,18 @@ impl LiveDab {
                 region.write(&mut self.work);
             }
         }
-        for (k, d) in new.iter().enumerate().filter(|_| self.mixer.is_none()) {
+        if let Some(brush) = self.mixbox.as_deref_mut() {
+            // The Mixer Brush (Mixbox): every new dab into its latent canvas, then one flush.
+            for (k, d) in new.iter().enumerate() {
+                dmg = dmg.union(&brush.stroke_dab(&ctx, d, self.done + k));
+            }
+            if !dmg.is_empty() {
+                let mut region = Region::read(&self.work, dmg);
+                brush.flush(&mut region, dmg);
+                region.write(&mut self.work);
+            }
+        }
+        for (k, d) in new.iter().enumerate().filter(|_| self.mixer.is_none() && self.mixbox.is_none()) {
             let r = ctx.dab_rect(d, false);
             if r.is_empty() {
                 continue;
@@ -1041,7 +1074,12 @@ impl LiveDab {
         self.bounds = self.bounds.union(&dmg);
         let (orig, work) = (Region::read(&self.pre_surf, dmg), Region::read(&self.work, dmg));
         let (surf, _) = crate::channel_cmds::target_surface(std::sync::Arc::make_mut(&mut self.doc), self.id, &self.params)?;
-        photocraft_paint::retouch::mix_back(surf, &orig, &work, dmg, self.opacity, self.sel.as_ref(), self.lock);
+        match (self.mixer.as_deref(), self.mixbox.as_deref()) {
+            // As their commits do: a part-selected pixel mixes in the brush's mixing space.
+            (Some((mixer, _)), _) => mixer.mix_back(surf, &orig, &work, dmg, self.opacity, self.sel.as_ref(), self.lock),
+            (None, Some(brush)) => brush.mix_back(surf, &orig, &work, dmg, self.opacity, self.sel.as_ref(), self.lock),
+            (None, None) => photocraft_paint::retouch::mix_back(surf, &orig, &work, dmg, self.opacity, self.sel.as_ref(), self.lock),
+        }
         Ok(dmg)
     }
 }

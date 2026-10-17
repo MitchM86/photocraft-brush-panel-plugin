@@ -548,6 +548,42 @@ fn mixer_brush(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(damage_json(s, dmg))
 }
 
+/// What a Mixer Brush (Mixbox) stroke runs: the stroke (its own Flow, no opacity), target layer
+/// (`None` for a channel), options, the load colour (`color`, else the foreground colour) and
+/// whether the pickup reads the canvas as the stroke began (`"pickup": "strokeStart"`) or as
+/// painted so far (`"live"`, the default). Shared with the live preview (`retouch_cmds::LiveDab`).
+#[allow(clippy::type_complexity)]
+pub(crate) fn mixbox_stroke_params(s: &Session, p: &Value) -> Result<(Stroke, Option<photocraft_doc::LayerId>, MixerSettings, [f32; 4], bool)> {
+    let cmd = "paint.mixboxBrush";
+    let pts = parse_points(p, cmd)?;
+    let brush = resolve_brush(s, p, cmd)?;
+    let m = mixer_settings(&brush, p);
+    let id = if crate::channel_cmds::is_channel_target(p) { None } else { Some(layer_id(s, p)?) };
+    let from_start = match p.get("pickup").and_then(Value::as_str) {
+        None | Some("live") => false,
+        Some("strokeStart") => true,
+        Some(other) => return Err(bad(cmd, format!("`pickup` = {other:?} must be \"live\" or \"strokeStart\""))),
+    };
+    let stroke = photocraft_paint::mixer::mixer_stroke(&Stroke { brush, points: pts }, &m);
+    Ok((stroke, id, m, color(p.get("color"), s.tools.foreground), from_start))
+}
+
+/// The Mixer Brush (Mixbox): `photocraft_paint::mixbox_brush`, every blend through Mixbox.
+fn mixbox_brush(s: &mut Session, p: &Value) -> Result<Value> {
+    let (stroke, id, m, color, from_start) = mixbox_stroke_params(s, p)?;
+    let dmg = s.edit("Mixer Brush", |doc, _| {
+        let sel = doc.selection.clone();
+        let canvas = doc.bounds();
+        let (surf, lock) = crate::channel_cmds::target_surface(doc, id, p)?;
+        let mut brush = photocraft_paint::mixbox_brush::MixboxBrush::new(&m, color, surf.clone()).within(canvas);
+        if from_start {
+            brush = brush.from_stroke_start();
+        }
+        Ok(photocraft_paint::mixbox_brush::run_stroke(surf, &stroke, &mut brush, sel.as_ref(), lock))
+    })?;
+    Ok(damage_json(s, dmg))
+}
+
 /// The Mixer Brush options of a stroke: the brush's, overridden by the scalar params.
 pub(crate) fn mixer_settings(brush: &BrushSettings, p: &Value) -> MixerSettings {
     let bm = &brush.mixer;
@@ -630,7 +666,9 @@ fn mixer_load(s: &mut Session, p: &Value) -> Result<Value> {
         let r2 = (size / 2.0).powi(2);
         let tip: Vec<[f32; 4]> =
             paint.px.iter().enumerate().filter(|(i, _)| ((i % side) as f32 - half as f32).powi(2) + ((i / side) as f32 - half as f32).powi(2) <= r2).map(|(_, c)| *c).collect();
-        paint = Paint::solid(Paint { side: 1, px: tip }.average());
+        // Averaged as the brush mixes (Pigment: as Mixbox latents, not RGB).
+        let mode = p.get("mode").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or(s.tools.brush.mixer.mode);
+        paint = Paint::solid(photocraft_paint::mixer::average_paint(&Paint { side: 1, px: tip }, mode, st.doc.pixel_format()));
     }
     if paint.average()[3] <= 0.0 {
         return Err(bad(cmd, "there is no paint there to load"));
@@ -1004,9 +1042,17 @@ pub fn specs() -> Vec<CommandSpec> {
             true
         ),
         spec!(
+            "paint.mixboxBrush",
+            "Mixer Brush",
+            r##"{"points":[…],"brush":{…}?,"preset":name?,"size":0.5..5000 px?,"wet":0..100=brush.mixer.wet,"load":0..100=brush.mixer.load,"mix":0..100=brush.mixer.mix,"flow":0..100=brush.mixer.flow,"color":"#rrggbb"?=foreground (the load),"pickup":"live"|"strokeStart"="live","seed":u64?,"target":"pixels"|"mask"|"quickMask"|{"channel":i}=Channels panel target}"##,
+            has_paintable,
+            mixbox_brush,
+            true
+        ),
+        spec!(
             "paint.mixerLoad",
             "Load Mixer Brush From Image",
-            r##"{"x":px,"y":px,"size":px?=brush size,"sampleAllLayers":bool=brush.mixer.sampleAllLayers,"solidOnly":bool=false}"##,
+            r##"{"x":px,"y":px,"size":px?=brush size,"sampleAllLayers":bool=brush.mixer.sampleAllLayers,"solidOnly":bool=false,"mode":"rgb"|"pigment"=brush.mixer.mode (how solidOnly averages)}"##,
             crate::commands::has_doc,
             mixer_load,
             true

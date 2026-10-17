@@ -2874,3 +2874,5 @@ fontWeight	Italic	Курсив
 	Drag a frame · over a selected image it clips the image · Place Embedded or drop a file to fill the selected frame	Нарисуйте кадр · над выбранным изображением он обрезает его · «Поместить встроенные» или перетаскивание файла заполняет выбранный кадр
 	This command needs a file on disk; it isn't available in the browser	Этой команде нужен файл на диске; в браузере она недоступна
 	Layer name	Имя слоя
+	Pick Up From Stroke Start	Брать с начала мазка
+	Mix with the canvas as it was when the stroke began, not with the paint the stroke just laid	Смешивать с холстом таким, каким он был в начале мазка, а не с краской, только что нанесённой мазком
